@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
 import '../../utils/app_formatters.dart';
+import 'novo_gasto_screen.dart';
 
 class MeusGastosScreen extends StatefulWidget {
   const MeusGastosScreen({super.key, required this.db});
@@ -132,11 +133,46 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                   ],
                 ),
               ),
-              const Expanded(
+              Expanded(
                 child: Center(
-                  child: Text(
-                    'Nenhum gasto neste mês.\nClique no + para adicionar.',
-                    textAlign: TextAlign.center,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 72,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Nenhum gasto neste mês',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Registre um novo gasto para começar a acompanhar suas saídas.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => NovoGastoScreen(db: widget.db),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Adicionar gasto'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

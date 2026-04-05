@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/conta_model.dart';
 import '../../services/database_service.dart';
 import '../../utils/app_formatters.dart';
+import 'nova_conta_screen.dart';
 
 class AReceberScreen extends StatelessWidget {
   AReceberScreen({super.key, required this.db, this.somentePendentes = false});
@@ -84,77 +85,82 @@ class AReceberScreen extends StatelessWidget {
             ? 0
             : totalReceber / totalGeral;
 
-        final Widget cardResumo = Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
+        final Widget cardResumo = Card(
+          elevation: 1,
           margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              const Text(
-                'Resumo Financeiro',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ResumoFinanceiroCard(
-                      titulo: 'Recebido',
-                      valor: AppFormatters.moeda(totalReceber),
-                      cor: Colors.green,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Resumo Financeiro',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ResumoFinanceiroCard(
+                        titulo: 'Recebido',
+                        valor: AppFormatters.moeda(totalReceber),
+                        cor: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _ResumoFinanceiroCard(
+                        titulo: 'Pendente',
+                        valor: AppFormatters.moeda(totalPendente),
+                        cor: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progresso,
+                    minHeight: 8,
+                    backgroundColor: Colors.red.withValues(alpha: 0.2),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.green,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ResumoFinanceiroCard(
-                      titulo: 'Pendente',
-                      valor: AppFormatters.moeda(totalPendente),
-                      cor: Colors.red,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+                if (somentePendentes) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Filtro ativo: somente pendentes',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange,
+                      ),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: progresso,
-                  minHeight: 8,
-                  backgroundColor: Colors.red.withValues(alpha: 0.2),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-              ),
-              if (somentePendentes) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Filtro ativo: somente pendentes',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.orange,
-                    ),
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
         );
 
@@ -162,12 +168,47 @@ class AReceberScreen extends StatelessWidget {
           return Column(
             children: [
               cardResumo,
-              const Expanded(
+              Expanded(
                 child: Center(
-                  child: Text(
-                    "Nenhuma conta pendente.\nClique no '+' para anotar quem te deve!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.inbox_rounded,
+                          size: 72,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          "Nenhuma conta pendente",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.",
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => NovoRecebivelScreen(db: db),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Adicionar cobrança'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/conta_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
@@ -62,22 +63,12 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Item a receber salvo com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Item a receber salvo com sucesso!');
         }
       } catch (e) {
         if (mounted) {
           setState(() => _salvando = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_normalizarMensagemErro(e)),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppFeedback.showError(context, _normalizarMensagemErro(e));
         }
       }
     }

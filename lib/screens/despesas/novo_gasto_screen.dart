@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 
 class NovoGastoScreen extends StatefulWidget {
@@ -84,21 +85,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gasto salvo com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppFeedback.showSuccess(context, 'Gasto salvo com sucesso!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_normalizarMensagemErro(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppFeedback.showError(context, _normalizarMensagemErro(e));
       }
     } finally {
       if (mounted) {

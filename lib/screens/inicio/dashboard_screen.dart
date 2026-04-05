@@ -122,46 +122,42 @@ class DashboardScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: saldoPositivo
-                        ? [Colors.green.shade400, Colors.teal.shade500]
-                        : [Colors.red.shade400, Colors.deepOrange.shade500],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              Card(
+                elevation: 2,
+                shadowColor: Colors.black.withValues(alpha: 0.06),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: saldoPositivo
+                          ? [Colors.green.shade400, Colors.teal.shade500]
+                          : [Colors.red.shade400, Colors.deepOrange.shade500],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (saldoPositivo ? Colors.green : Colors.red)
-                          .withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Saldo Mensal (Recebido - Gastos)',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Saldo Mensal (Recebido - Gastos)',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      AppFormatters.moeda(saldo),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 8),
+                      Text(
+                        AppFormatters.moeda(saldo),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -305,28 +301,32 @@ class _ComparativoChip extends StatelessWidget {
     final Color cor = bom ? Colors.green : Colors.red;
     final IconData icone = subiu ? Icons.trending_up : Icons.trending_down;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.1),
+    return Card(
+      elevation: 0,
+      color: cor.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: cor.withValues(alpha: 0.25)),
       ),
-      child: Row(
-        children: [
-          Icon(icone, color: cor, size: 16),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              '$titulo: ${percentual.toStringAsFixed(1)}%',
-              style: TextStyle(
-                color: cor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            Icon(icone, color: cor, size: 16),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '$titulo: ${percentual.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: cor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
