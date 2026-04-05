@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "78049230117",
+    "project_id": "roblox-casa",
+    "storage_bucket": "roblox-casa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:78049230117:android:58fbd39e89ed30c5ee6ecc",
+        "android_client_info": {
+          "package_name": "com.example.paga_o_que_me_deve"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRl0sEPa0pSGeFubpv2Er-m0ylZVE7PKg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
