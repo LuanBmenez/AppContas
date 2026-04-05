@@ -200,54 +200,72 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                 itemCount: gastosFiltrados.length,
                 itemBuilder: (context, index) {
                   final Gasto gasto = gastosFiltrados[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    child: ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.payments)),
-                      title: Text(
-                        gasto.titulo,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(gasto.categoria.name.toUpperCase()),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _formatarValor(gasto.valor),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            color: Colors.red,
-                            tooltip: 'Excluir',
-                            onPressed: () async {
-                              final bool confirmado = await _confirmarExclusao(
-                                gasto,
-                              );
-                              if (!confirmado) {
-                                return;
-                              }
 
-                              try {
-                                await DatabaseService().deletarGasto(gasto.id);
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Erro ao excluir gasto: $e',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
+                  // Arrastar para apagar implementado aqui
+                  return Dismissible(
+                    key: Key(gasto.id),
+                    direction: DismissDirection.endToStart,
+                    confirmDismiss: (direction) async {
+                      return await _confirmarExclusao(gasto);
+                    },
+                    onDismissed: (direction) async {
+                      try {
+                        await DatabaseService().deletarGasto(gasto.id);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erro ao excluir gasto: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    // Fundo vermelho com a lixeira ao arrastar
+                    background: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade400,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child: const Icon(Icons.delete, color: Colors.white),
+                    ),
+                    child: Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: gasto.categoria.color.withValues(
+                            alpha: 0.15,
                           ),
-                        ],
+                          child: Icon(
+                            gasto.categoria.icon,
+                            color: gasto.categoria.color,
+                          ),
+                        ),
+                        title: Text(
+                          gasto.titulo,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "Dia ${gasto.data.day.toString().padLeft(2, '0')} • ${gasto.categoria.label}",
+                        ),
+                        // Botão de lixeira removido, mantendo só o valor limpo e destacado
+                        trailing: Text(
+                          _formatarValor(gasto.valor),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   );

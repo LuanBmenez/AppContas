@@ -93,6 +93,8 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
             children: [
               TextFormField(
                 controller: _nomeController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Nome de quem deve',
                   border: OutlineInputBorder(),
@@ -109,6 +111,8 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
               TextFormField(
                 controller: _descricaoController,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Descricao (Ex: Internet de Abril)',
                   border: OutlineInputBorder(),
@@ -125,6 +129,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
               TextFormField(
                 controller: _valorController,
+                textInputAction: TextInputAction.done,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
