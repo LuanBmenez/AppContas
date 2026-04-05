@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../models/gasto_model.dart';
-import '../services/database_service.dart';
+import '../../models/gasto_model.dart';
+import '../../services/database_service.dart';
 
 class NovoGastoScreen extends StatefulWidget {
-  const NovoGastoScreen({super.key});
+  const NovoGastoScreen({super.key, required this.db});
+
+  final DatabaseService db;
 
   @override
   State<NovoGastoScreen> createState() => _NovoGastoScreenState();
@@ -33,7 +35,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
     if (lower.contains('firestore.googleapis.com') ||
         lower.contains('permission_denied')) {
-      return 'Cloud Firestore desativado ou sem permissão no projeto.\n'
+      return 'Cloud Firestore desativado ou sem permissao no projeto.\n'
           'Ative o Firestore no Firebase Console e tente novamente.';
     }
 
@@ -80,7 +82,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         tipo: _tipoSelecionado,
       );
 
-      await DatabaseService().adicionarGasto(novoGasto);
+      await widget.db.adicionarGasto(novoGasto);
 
       if (mounted) {
         Navigator.pop(context);
@@ -125,19 +127,18 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
-                  labelText: 'Título (Ex: Mercado, Uber)',
+                  labelText: 'Titulo (Ex: Mercado, Uber)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.edit_note),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Informe o título do gasto.';
+                    return 'Informe o titulo do gasto.';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _valorController,
                 textInputAction: TextInputAction.done,
@@ -158,14 +159,13 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                   final String normalizado = value.replaceAll(',', '.');
                   final double? valor = double.tryParse(normalizado);
                   if (valor == null || valor <= 0) {
-                    return 'Informe um valor numérico maior que zero.';
+                    return 'Informe um valor numerico maior que zero.';
                   }
 
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-
               Row(
                 children: [
                   Expanded(
@@ -219,7 +219,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-
               OutlinedButton.icon(
                 onPressed: _selecionarData,
                 icon: const Icon(Icons.calendar_month),
@@ -230,7 +229,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
               SizedBox(
                 height: 50,
                 child: ElevatedButton(

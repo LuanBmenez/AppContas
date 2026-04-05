@@ -1,7 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../models/conta_model.dart';
 import '../models/gasto_model.dart';
+
+class DashboardResumo {
+  final List<Gasto> gastos;
+  final List<Conta> contas;
+
+  const DashboardResumo(this.gastos, this.contas);
+}
 
 class DatabaseService {
   final CollectionReference<Map<String, dynamic>> _receberCollection =
@@ -67,6 +75,14 @@ class DatabaseService {
           .map((doc) => Gasto.fromMap(doc.data(), doc.id))
           .toList();
     });
+  }
+
+  Stream<DashboardResumo> get dashboardResumo {
+    return Rx.combineLatest2<List<Gasto>, List<Conta>, DashboardResumo>(
+      meusGastos,
+      contasAReceber,
+      (gastos, contas) => DashboardResumo(gastos, contas),
+    );
   }
 
   Future<void> deletarGasto(String id) async {

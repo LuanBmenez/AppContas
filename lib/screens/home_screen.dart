@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'a_receber_screen.dart';
-import 'dashboard_screen.dart';
-import 'meus_gastos_screen.dart';
-import 'nova_conta_screen.dart';
-import 'novo_gasto_screen.dart';
+import '../services/database_service.dart';
+import 'a_receber/a_receber_screen.dart';
+import 'a_receber/nova_conta_screen.dart';
+import 'despesas/meus_gastos_screen.dart';
+import 'despesas/novo_gasto_screen.dart';
+import 'inicio/dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,12 +15,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final DatabaseService db = DatabaseService();
   int _indiceAtual = 0;
+  bool _somentePendentes = false;
+  int _gastosKeyVersion = 0;
 
-  List<Widget> get _abas => const [
-    DashboardScreen(),
-    MeusGastosScreen(),
-    AReceberScreen(),
+  List<Widget> get _abas => [
+    DashboardScreen(
+      db: db,
+      onTapSaidas: _abrirDespesasMesAtual,
+      onTapReceber: _abrirReceberPendentes,
+    ),
+    MeusGastosScreen(key: ValueKey(_gastosKeyVersion), db: db),
+    AReceberScreen(db: db, somentePendentes: _somentePendentes),
   ];
 
   String get _titulo {
@@ -32,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_indiceAtual == 1) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NovoGastoScreen()),
+        MaterialPageRoute(builder: (_) => NovoGastoScreen(db: db)),
       );
       return;
     }
@@ -40,12 +48,27 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_indiceAtual == 2) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NovoRecebivelScreen()),
+        MaterialPageRoute(builder: (_) => NovoRecebivelScreen(db: db)),
       );
       return;
     }
 
     _mostrarMenuDeOpcoes(context);
+  }
+
+  void _abrirDespesasMesAtual() {
+    setState(() {
+      _gastosKeyVersion++;
+      _indiceAtual = 1;
+      _somentePendentes = false;
+    });
+  }
+
+  void _abrirReceberPendentes() {
+    setState(() {
+      _indiceAtual = 2;
+      _somentePendentes = true;
+    });
   }
 
   void _mostrarMenuDeOpcoes(BuildContext context) {
@@ -75,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const NovoGastoScreen()),
+                    MaterialPageRoute(builder: (_) => NovoGastoScreen(db: db)),
                   );
                 },
               ),
@@ -90,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const NovoRecebivelScreen(),
+                      builder: (_) => NovoRecebivelScreen(db: db),
                     ),
                   );
                 },
@@ -117,7 +140,12 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _indiceAtual,
         onDestinationSelected: (index) {
-          setState(() => _indiceAtual = index);
+          setState(() {
+            _indiceAtual = index;
+            if (index != 2) {
+              _somentePendentes = false;
+            }
+          });
         },
         destinations: const [
           NavigationDestination(

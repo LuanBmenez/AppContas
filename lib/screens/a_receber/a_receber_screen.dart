@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../models/conta_model.dart';
-import '../services/database_service.dart';
+import '../../models/conta_model.dart';
+import '../../services/database_service.dart';
 
 class AReceberScreen extends StatelessWidget {
-  const AReceberScreen({super.key});
+  AReceberScreen({super.key, required this.db, this.somentePendentes = false});
+
+  final DatabaseService db;
+  final bool somentePendentes;
 
   String _mensagemErroFirestore(Object? error) {
     final String erro = (error ?? '').toString().toLowerCase();
@@ -42,7 +45,7 @@ class AReceberScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Conta>>(
-      stream: DatabaseService().contasAReceber,
+      stream: db.contasAReceber,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -60,11 +63,14 @@ class AReceberScreen extends StatelessWidget {
           );
         }
 
-        final List<Conta> listaContas = snapshot.data ?? [];
+        final List<Conta> todasAsContas = snapshot.data ?? [];
+        final List<Conta> listaContas = somentePendentes
+            ? todasAsContas.where((conta) => !conta.foiPago).toList()
+            : todasAsContas;
 
         double totalReceber = 0;
         double totalPendente = 0;
-        for (final conta in listaContas) {
+        for (final conta in todasAsContas) {
           if (conta.foiPago) {
             totalReceber += conta.valor;
           } else {
@@ -128,6 +134,27 @@ class AReceberScreen extends StatelessWidget {
                 '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
               ),
+              if (somentePendentes) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Filtro ativo: somente pendentes',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -166,7 +193,7 @@ class AReceberScreen extends StatelessWidget {
                     },
                     onDismissed: (direction) async {
                       try {
-                        await DatabaseService().deletarRecebivel(conta.id);
+                        await db.deletarRecebivel(conta.id);
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -267,7 +294,7 @@ class AReceberScreen extends StatelessWidget {
                         ),
                         onTap: () async {
                           try {
-                            await DatabaseService().alternarStatusRecebivel(
+                            await db.alternarStatusRecebivel(
                               conta.id,
                               conta.foiPago,
                             );

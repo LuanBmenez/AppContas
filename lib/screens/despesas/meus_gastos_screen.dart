@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../models/gasto_model.dart';
-import '../services/database_service.dart';
+import '../../models/gasto_model.dart';
+import '../../services/database_service.dart';
 
 class MeusGastosScreen extends StatefulWidget {
-  const MeusGastosScreen({super.key});
+  const MeusGastosScreen({super.key, required this.db});
+
+  final DatabaseService db;
 
   @override
   State<MeusGastosScreen> createState() => _MeusGastosScreenState();
@@ -87,7 +89,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Gasto>>(
-      stream: DatabaseService().meusGastos,
+      stream: widget.db.meusGastos,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -201,16 +203,15 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                 itemBuilder: (context, index) {
                   final Gasto gasto = gastosFiltrados[index];
 
-                  // Arrastar para apagar implementado aqui
                   return Dismissible(
                     key: Key(gasto.id),
                     direction: DismissDirection.endToStart,
                     confirmDismiss: (direction) async {
-                      return await _confirmarExclusao(gasto);
+                      return _confirmarExclusao(gasto);
                     },
                     onDismissed: (direction) async {
                       try {
-                        await DatabaseService().deletarGasto(gasto.id);
+                        await widget.db.deletarGasto(gasto.id);
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -222,7 +223,6 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                         }
                       }
                     },
-                    // Fundo vermelho com a lixeira ao arrastar
                     background: Container(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -258,7 +258,6 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                         subtitle: Text(
                           "Dia ${gasto.data.day.toString().padLeft(2, '0')} • ${gasto.categoria.label}",
                         ),
-                        // Botão de lixeira removido, mantendo só o valor limpo e destacado
                         trailing: Text(
                           _formatarValor(gasto.valor),
                           style: const TextStyle(

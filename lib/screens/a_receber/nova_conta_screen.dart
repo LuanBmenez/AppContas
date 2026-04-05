@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../models/conta_model.dart';
-import '../services/database_service.dart';
+import '../../models/conta_model.dart';
+import '../../services/database_service.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
-  const NovoRecebivelScreen({super.key});
+  const NovoRecebivelScreen({super.key, required this.db});
+
+  final DatabaseService db;
 
   @override
   State<NovoRecebivelScreen> createState() => _NovoRecebivelScreenState();
@@ -54,7 +56,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
           data: DateTime.now(),
         );
 
-        await DatabaseService().adicionarRecebivel(novaConta);
+        await widget.db.adicionarRecebivel(novaConta);
 
         if (mounted) {
           Navigator.pop(context);
@@ -108,7 +110,6 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                 },
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _descricaoController,
                 textCapitalization: TextCapitalization.sentences,
@@ -126,7 +127,6 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                 },
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _valorController,
                 textInputAction: TextInputAction.done,
@@ -153,7 +153,6 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                 },
               ),
               const SizedBox(height: 24),
-
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
