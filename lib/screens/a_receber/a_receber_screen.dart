@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/conta_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_formatters.dart';
 
 class AReceberScreen extends StatelessWidget {
   AReceberScreen({super.key, required this.db, this.somentePendentes = false});
@@ -13,7 +14,7 @@ class AReceberScreen extends StatelessWidget {
     final String erro = (error ?? '').toString().toLowerCase();
     if (erro.contains('firestore.googleapis.com') ||
         erro.contains('permission_denied')) {
-      return 'Firestore sem permissao ou desativado no projeto.\n'
+      return 'Firestore sem permissão ou desativado no projeto.\n'
           'Ative o Cloud Firestore no Firebase Console e tente novamente.';
     }
     return 'Erro ao carregar as contas.';
@@ -103,8 +104,7 @@ class AReceberScreen extends StatelessWidget {
                   Expanded(
                     child: _ResumoFinanceiroCard(
                       titulo: 'Recebido',
-                      valor:
-                          'R\$ ${totalReceber.toStringAsFixed(2).replaceAll('.', ',')}',
+                      valor: AppFormatters.moeda(totalReceber),
                       cor: Colors.green,
                     ),
                   ),
@@ -112,8 +112,7 @@ class AReceberScreen extends StatelessWidget {
                   Expanded(
                     child: _ResumoFinanceiroCard(
                       titulo: 'Pendente',
-                      valor:
-                          'R\$ ${totalPendente.toStringAsFixed(2).replaceAll('.', ',')}',
+                      valor: AppFormatters.moeda(totalPendente),
                       cor: Colors.red,
                     ),
                   ),
@@ -248,7 +247,7 @@ class AReceberScreen extends StatelessWidget {
                         ),
                         subtitle: Text(
                           conta.descricao.isEmpty
-                              ? 'Sem descricao'
+                              ? 'Sem descrição'
                               : conta.descricao,
                           style: TextStyle(
                             color: Theme.of(
@@ -261,7 +260,7 @@ class AReceberScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              'R\$ ${conta.valor.toStringAsFixed(2).replaceAll('.', ',')}',
+                              AppFormatters.moeda(conta.valor),
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,

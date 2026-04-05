@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/conta_model.dart';
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_formatters.dart';
 
 class DashboardScreen extends StatelessWidget {
   DashboardScreen({
@@ -24,6 +25,16 @@ class DashboardScreen extends StatelessWidget {
     return ((atual - anterior) / anterior.abs()) * 100;
   }
 
+  String _mensagemErroDashboard(Object? error) {
+    final String erro = (error ?? '').toString().toLowerCase();
+    if (erro.contains('firestore.googleapis.com') ||
+        erro.contains('permission_denied')) {
+      return 'Firestore sem permissao ou desativado no projeto.\n'
+          'Ative o Cloud Firestore no Firebase Console e tente novamente.';
+    }
+    return 'Erro ao carregar o painel.';
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DashboardResumo>(
@@ -31,6 +42,18 @@ class DashboardScreen extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                _mensagemErroDashboard(snapshot.error),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
         }
 
         final List<Gasto> gastos = snapshot.data?.gastos ?? [];
@@ -54,13 +77,15 @@ class DashboardScreen extends StatelessWidget {
         }
 
         double totalPendente = 0;
-        double totalRecebido = 0;
+        double totalRecebidoMesAtual = 0;
         double totalRecebidoMesAnterior = 0;
         for (final conta in contas) {
           if (!conta.foiPago) {
             totalPendente += conta.valor;
           } else {
-            totalRecebido += conta.valor;
+            if (conta.data.month == mesAtual && conta.data.year == anoAtual) {
+              totalRecebidoMesAtual += conta.valor;
+            }
 
             if (conta.data.month == mesAnterior &&
                 conta.data.year == anoMesAnterior) {
@@ -69,7 +94,7 @@ class DashboardScreen extends StatelessWidget {
           }
         }
 
-        final double saldo = totalRecebido - totalGastosMes;
+        final double saldo = totalRecebidoMesAtual - totalGastosMes;
         final double saldoMesAnterior =
             totalRecebidoMesAnterior - totalGastosMesAnterior;
         final bool saldoPositivo = saldo >= 0;
@@ -93,7 +118,7 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Mes de ${['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][mesAtual - 1]}',
+                'Mês de ${AppFormatters.nomeMes(mesAtual)}',
                 style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 24),
@@ -129,7 +154,7 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'R\$ ${saldo.toStringAsFixed(2).replaceAll('.', ',')}',
+                      AppFormatters.moeda(saldo),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 36,
@@ -144,7 +169,7 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _ComparativoChip(
-                      titulo: 'Saldo vs mes anterior',
+                      titulo: 'Saldo vs mês anterior',
                       percentual: variacaoSaldo,
                       positivoEhBom: true,
                     ),
@@ -152,7 +177,7 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _ComparativoChip(
-                      titulo: 'Gastos vs mes anterior',
+                      titulo: 'Gastos vs mês anterior',
                       percentual: variacaoGastos,
                       positivoEhBom: false,
                     ),
@@ -164,7 +189,7 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _MiniSummaryCard(
-                      titulo: 'Saidas',
+                      titulo: 'Saídas',
                       valor: totalGastosMes,
                       cor: Colors.red,
                       icone: Icons.arrow_downward,
@@ -248,7 +273,7 @@ class _MiniSummaryCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
+                AppFormatters.moeda(valor),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

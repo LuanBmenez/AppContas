@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   String get _titulo {
-    if (_indiceAtual == 0) return 'Visao Geral';
+    if (_indiceAtual == 0) return 'Visão Geral';
     if (_indiceAtual == 1) return 'Meus Gastos';
     return 'A Receber';
   }
@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'O que voce deseja registrar?',
+                'O que você deseja registrar?',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: Colors.green,
                   child: Icon(Icons.handshake, color: Colors.white),
                 ),
-                title: const Text('Uma divida (Alguem me deve)'),
+                title: const Text('Uma dívida (Alguém me deve)'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -151,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
-            label: 'Inicio',
+            label: 'Início',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet_outlined),

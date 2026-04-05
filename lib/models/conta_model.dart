@@ -81,6 +81,6 @@ class Conta {
       return DateTime.fromMillisecondsSinceEpoch(raw);
     }
 
-    return DateTime.now();
+    throw FormatException('Campo data invalido em Conta: $raw');
   }
 }

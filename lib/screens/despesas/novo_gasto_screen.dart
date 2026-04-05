@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_formatters.dart';
 
 class NovoGastoScreen extends StatefulWidget {
   const NovoGastoScreen({super.key, required this.db});
@@ -35,7 +36,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
     if (lower.contains('firestore.googleapis.com') ||
         lower.contains('permission_denied')) {
-      return 'Cloud Firestore desativado ou sem permissao no projeto.\n'
+      return 'Cloud Firestore desativado ou sem permissão no projeto.\n'
           'Ative o Firestore no Firebase Console e tente novamente.';
     }
 
@@ -43,9 +44,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   String _formatarData(DateTime data) {
-    final String dia = data.day.toString().padLeft(2, '0');
-    final String mes = data.month.toString().padLeft(2, '0');
-    return '$dia/$mes/${data.year}';
+    return AppFormatters.dataCurta(data);
   }
 
   Future<void> _selecionarData() async {
@@ -70,8 +69,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     setState(() => _salvando = true);
 
     try {
-      final String valorTexto = _valorController.text.replaceAll(',', '.');
-      final double valor = double.parse(valorTexto);
+      final double valor = AppFormatters.parseMoedaInput(_valorController.text);
 
       final Gasto novoGasto = Gasto(
         id: '',
@@ -127,13 +125,13 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
-                  labelText: 'Titulo (Ex: Mercado, Uber)',
+                  labelText: 'Título (Ex: Mercado, Uber)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.edit_note),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Informe o titulo do gasto.';
+                    return 'Informe o título do gasto.';
                   }
                   return null;
                 },
@@ -156,10 +154,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     return 'Informe o valor do gasto.';
                   }
 
-                  final String normalizado = value.replaceAll(',', '.');
-                  final double? valor = double.tryParse(normalizado);
+                  final double? valor = double.tryParse(
+                    value.replaceAll('.', '').replaceAll(',', '.'),
+                  );
                   if (valor == null || valor <= 0) {
-                    return 'Informe um valor numerico maior que zero.';
+                    return 'Informe um valor numérico maior que zero.';
                   }
 
                   return null;

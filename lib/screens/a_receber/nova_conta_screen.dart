@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/conta_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_formatters.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
   const NovoRecebivelScreen({super.key, required this.db});
@@ -25,7 +26,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
     if (lower.contains('firestore.googleapis.com') ||
         lower.contains('permission_denied')) {
-      return 'Cloud Firestore desativado ou sem permissao no projeto.\n'
+      return 'Cloud Firestore desativado ou sem permissão no projeto.\n'
           'Ative o Firestore no Firebase Console e tente novamente.';
     }
 
@@ -45,8 +46,9 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
       setState(() => _salvando = true);
 
       try {
-        final String valorTexto = _valorController.text.replaceAll(',', '.');
-        final double valor = double.parse(valorTexto);
+        final double valor = AppFormatters.parseMoedaInput(
+          _valorController.text,
+        );
 
         final Conta novaConta = Conta(
           id: '',
@@ -68,13 +70,15 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
           );
         }
       } catch (e) {
-        setState(() => _salvando = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_normalizarMensagemErro(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          setState(() => _salvando = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_normalizarMensagemErro(e)),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -90,8 +94,8 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             children: [
               TextFormField(
                 controller: _nomeController,
@@ -115,7 +119,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
-                  labelText: 'Descricao (Ex: Internet de Abril)',
+                  labelText: 'Descrição (Ex: Internet de Abril)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.description),
                 ),
@@ -143,10 +147,11 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                     return 'Por favor, informe o valor.';
                   }
 
-                  final String normalizado = value.replaceAll(',', '.');
-                  final double? valor = double.tryParse(normalizado);
+                  final double? valor = double.tryParse(
+                    value.replaceAll('.', '').replaceAll(',', '.'),
+                  );
                   if (valor == null || valor <= 0) {
-                    return 'Informe um valor numerico maior que zero.';
+                    return 'Informe um valor numérico maior que zero.';
                   }
 
                   return null;

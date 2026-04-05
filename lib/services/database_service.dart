@@ -18,15 +18,11 @@ class DatabaseService {
       FirebaseFirestore.instance.collection('meus_gastos');
 
   Future<void> adicionarRecebivel(Conta conta) async {
-    try {
-      final DocumentReference<Map<String, dynamic>> docRef = _receberCollection
-          .doc();
-      final Conta contaComId = conta.copyWith(id: docRef.id);
+    final DocumentReference<Map<String, dynamic>> docRef = _receberCollection
+        .doc();
+    final Conta contaComId = conta.copyWith(id: docRef.id);
 
-      await docRef.set(contaComId.toMap());
-    } on FirebaseException catch (e) {
-      throw Exception('Erro ao adicionar a receber: ${e.message ?? e.code}');
-    }
+    await docRef.set(contaComId.toMap());
   }
 
   Stream<List<Conta>> get contasAReceber {
@@ -40,31 +36,19 @@ class DatabaseService {
   }
 
   Future<void> alternarStatusRecebivel(String id, bool statusAtual) async {
-    try {
-      await _receberCollection.doc(id).update({'foiPago': !statusAtual});
-    } on FirebaseException catch (e) {
-      throw Exception('Erro ao atualizar status: ${e.message ?? e.code}');
-    }
+    await _receberCollection.doc(id).update({'foiPago': !statusAtual});
   }
 
   Future<void> deletarRecebivel(String id) async {
-    try {
-      await _receberCollection.doc(id).delete();
-    } on FirebaseException catch (e) {
-      throw Exception('Erro ao deletar item a receber: ${e.message ?? e.code}');
-    }
+    await _receberCollection.doc(id).delete();
   }
 
   Future<void> adicionarGasto(Gasto gasto) async {
-    try {
-      final DocumentReference<Map<String, dynamic>> docRef = _gastosCollection
-          .doc();
-      final Gasto gastoComId = gasto.copyWith(id: docRef.id);
+    final DocumentReference<Map<String, dynamic>> docRef = _gastosCollection
+        .doc();
+    final Gasto gastoComId = gasto.copyWith(id: docRef.id);
 
-      await docRef.set(gastoComId.toMap());
-    } on FirebaseException catch (e) {
-      throw Exception('Erro ao adicionar gasto: ${e.message ?? e.code}');
-    }
+    await docRef.set(gastoComId.toMap());
   }
 
   Stream<List<Gasto>> get meusGastos {
@@ -86,10 +70,6 @@ class DatabaseService {
   }
 
   Future<void> deletarGasto(String id) async {
-    try {
-      await _gastosCollection.doc(id).delete();
-    } on FirebaseException catch (e) {
-      throw Exception('Erro ao deletar gasto: ${e.message ?? e.code}');
-    }
+    await _gastosCollection.doc(id).delete();
   }
 }

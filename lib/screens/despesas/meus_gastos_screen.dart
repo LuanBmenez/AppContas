@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
+import '../../utils/app_formatters.dart';
 
 class MeusGastosScreen extends StatefulWidget {
   const MeusGastosScreen({super.key, required this.db});
@@ -19,22 +20,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
   );
 
   String _formatarMes(DateTime date) {
-    const List<String> meses = [
-      'Janeiro',
-      'Fevereiro',
-      'Marco',
-      'Abril',
-      'Maio',
-      'Junho',
-      'Julho',
-      'Agosto',
-      'Setembro',
-      'Outubro',
-      'Novembro',
-      'Dezembro',
-    ];
-
-    return '${meses[date.month - 1]} de ${date.year}';
+    return AppFormatters.mesAno(date);
   }
 
   bool _mesCorresponde(DateTime data) {
@@ -48,7 +34,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
       initialDate: _mesSelecionado,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      helpText: 'Escolha uma data para filtrar o mes',
+      helpText: 'Escolha uma data para filtrar o mês',
     );
 
     if (data != null) {
@@ -83,7 +69,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
   }
 
   String _formatarValor(double valor) {
-    return 'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}';
+    return AppFormatters.moeda(valor);
   }
 
   @override
@@ -125,7 +111,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      'Total Gasto no Mes',
+                      'Total Gasto no Mês',
                       style: TextStyle(fontSize: 16),
                     ),
                     const SizedBox(height: 8),
@@ -149,7 +135,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
               const Expanded(
                 child: Center(
                   child: Text(
-                    'Nenhum gasto neste mes.\nClique no + para adicionar.',
+                    'Nenhum gasto neste mês.\nClique no + para adicionar.',
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -176,7 +162,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
               child: Column(
                 children: [
                   const Text(
-                    'Total Gasto no Mes',
+                    'Total Gasto no Mês',
                     style: TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 8),
