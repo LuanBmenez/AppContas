@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/conta_model.dart';
 import '../../services/database_service.dart';
+import '../../theme/app_tokens.dart';
 import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 
@@ -82,7 +84,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppSpacing.s16),
         child: Form(
           key: _formKey,
           child: ListView(
@@ -104,7 +106,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               TextFormField(
                 controller: _descricaoController,
                 textCapitalization: TextCapitalization.sentences,
@@ -121,13 +123,14 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               TextFormField(
                 controller: _valorController,
                 textInputAction: TextInputAction.done,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
+                inputFormatters: <TextInputFormatter>[MoedaInputFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Valor (Ex: 45.50)',
                   border: OutlineInputBorder(),
@@ -138,17 +141,19 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                     return 'Por favor, informe o valor.';
                   }
 
-                  final double? valor = double.tryParse(
-                    value.replaceAll('.', '').replaceAll(',', '.'),
-                  );
-                  if (valor == null || valor <= 0) {
+                  try {
+                    final double valor = AppFormatters.parseMoedaInput(value);
+                    if (valor <= 0) {
+                      return 'Informe um valor numérico maior que zero.';
+                    }
+                  } catch (_) {
                     return 'Informe um valor numérico maior que zero.';
                   }
 
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.s24),
               SizedBox(
                 height: 50,
                 child: ElevatedButton(

@@ -13,6 +13,8 @@ enum CategoriaGasto {
 
 enum TipoGasto { fixo, variavel }
 
+enum OrigemGasto { manual, cartaoCredito }
+
 extension CategoriaGastoInfo on CategoriaGasto {
   String get label {
     switch (this) {
@@ -83,6 +85,17 @@ extension TipoGastoInfo on TipoGasto {
   }
 }
 
+extension OrigemGastoInfo on OrigemGasto {
+  String get label {
+    switch (this) {
+      case OrigemGasto.manual:
+        return 'Manual';
+      case OrigemGasto.cartaoCredito:
+        return 'Cartao de credito';
+    }
+  }
+}
+
 class Gasto {
   final String id;
   final String titulo;
@@ -90,6 +103,14 @@ class Gasto {
   final DateTime data;
   final CategoriaGasto categoria;
   final TipoGasto tipo;
+  final OrigemGasto origem;
+  final String? cartaoId;
+  final String? cartaoNome;
+  final String? hashImportacao;
+  final int? parcelaAtual;
+  final int? parcelaTotal;
+  final DateTime? dataCompra;
+  final DateTime? dataLancamento;
 
   Gasto({
     required this.id,
@@ -98,6 +119,14 @@ class Gasto {
     required this.data,
     required this.categoria,
     this.tipo = TipoGasto.variavel,
+    this.origem = OrigemGasto.manual,
+    this.cartaoId,
+    this.cartaoNome,
+    this.hashImportacao,
+    this.parcelaAtual,
+    this.parcelaTotal,
+    this.dataCompra,
+    this.dataLancamento,
   });
 
   factory Gasto.fromMap(Map<String, dynamic> map, String id) {
@@ -119,6 +148,17 @@ class Gasto {
         (e) => e.name == map['tipo'],
         orElse: () => TipoGasto.variavel,
       ),
+      origem: OrigemGasto.values.firstWhere(
+        (e) => e.name == map['origem'],
+        orElse: () => OrigemGasto.manual,
+      ),
+      cartaoId: map['cartaoId']?.toString(),
+      cartaoNome: map['cartaoNome']?.toString(),
+      hashImportacao: map['hashImportacao']?.toString(),
+      parcelaAtual: _parseNullableInt(map['parcelaAtual']),
+      parcelaTotal: _parseNullableInt(map['parcelaTotal']),
+      dataCompra: _parseNullableDate(map['dataCompra']),
+      dataLancamento: _parseNullableDate(map['dataLancamento']),
     );
   }
 
@@ -129,6 +169,14 @@ class Gasto {
       'data': data,
       'categoria': categoria.name,
       'tipo': tipo.name,
+      'origem': origem.name,
+      'cartaoId': cartaoId,
+      'cartaoNome': cartaoNome,
+      'hashImportacao': hashImportacao,
+      'parcelaAtual': parcelaAtual,
+      'parcelaTotal': parcelaTotal,
+      'dataCompra': dataCompra,
+      'dataLancamento': dataLancamento,
     };
   }
 
@@ -139,6 +187,14 @@ class Gasto {
     DateTime? data,
     CategoriaGasto? categoria,
     TipoGasto? tipo,
+    OrigemGasto? origem,
+    String? cartaoId,
+    String? cartaoNome,
+    String? hashImportacao,
+    int? parcelaAtual,
+    int? parcelaTotal,
+    DateTime? dataCompra,
+    DateTime? dataLancamento,
   }) {
     return Gasto(
       id: id ?? this.id,
@@ -147,7 +203,22 @@ class Gasto {
       data: data ?? this.data,
       categoria: categoria ?? this.categoria,
       tipo: tipo ?? this.tipo,
+      origem: origem ?? this.origem,
+      cartaoId: cartaoId ?? this.cartaoId,
+      cartaoNome: cartaoNome ?? this.cartaoNome,
+      hashImportacao: hashImportacao ?? this.hashImportacao,
+      parcelaAtual: parcelaAtual ?? this.parcelaAtual,
+      parcelaTotal: parcelaTotal ?? this.parcelaTotal,
+      dataCompra: dataCompra ?? this.dataCompra,
+      dataLancamento: dataLancamento ?? this.dataLancamento,
     );
+  }
+
+  String? get parcelaLabel {
+    if (parcelaAtual == null || parcelaTotal == null) {
+      return null;
+    }
+    return '${parcelaAtual!}/${parcelaTotal!}';
   }
 
   static DateTime _parseDate(dynamic raw) {
@@ -168,5 +239,28 @@ class Gasto {
     }
 
     throw FormatException('Campo data invalido em Gasto: $raw');
+  }
+
+  static DateTime? _parseNullableDate(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    return _parseDate(raw);
+  }
+
+  static int? _parseNullableInt(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+
+    if (raw is int) {
+      return raw;
+    }
+
+    if (raw is num) {
+      return raw.toInt();
+    }
+
+    return int.tryParse(raw.toString());
   }
 }

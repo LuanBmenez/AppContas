@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../theme/app_tokens.dart';
 import 'a_receber/a_receber_screen.dart';
 import 'a_receber/nova_conta_screen.dart';
+import 'despesas/cartoes_credito_screen.dart';
+import 'despesas/importar_extrato_screen.dart';
 import 'despesas/meus_gastos_screen.dart';
 import 'despesas/novo_gasto_screen.dart';
 import 'inicio/dashboard_screen.dart';
@@ -79,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -87,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 'O que você deseja registrar?',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Colors.redAccent,
@@ -131,6 +134,34 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_titulo),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: _indiceAtual == 1
+            ? <Widget>[
+                IconButton(
+                  tooltip: 'Cartoes',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CartoesCreditoScreen(db: db),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.credit_card_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Importar extrato CSV',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ImportarExtratoScreen(db: db),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.upload_file_outlined),
+                ),
+              ]
+            : null,
       ),
       body: _abas[_indiceAtual],
       floatingActionButton: FloatingActionButton(

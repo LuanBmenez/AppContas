@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
+import '../../theme/app_tokens.dart';
 import '../../utils/app_formatters.dart';
+import '../../widgets/app_skeleton.dart';
 import 'novo_gasto_screen.dart';
 
 class MeusGastosScreen extends StatefulWidget {
@@ -73,19 +75,136 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
     return AppFormatters.moeda(valor);
   }
 
+  String _buildSubtitle(Gasto gasto) {
+    final List<String> partes = <String>[
+      'Dia ${gasto.data.day.toString().padLeft(2, '0')}',
+      gasto.categoria.label,
+    ];
+
+    if (gasto.origem == OrigemGasto.cartaoCredito) {
+      partes.add('Cartao ${gasto.cartaoNome ?? ''}'.trim());
+    }
+
+    if (gasto.parcelaLabel != null) {
+      partes.add('Parcela ${gasto.parcelaLabel}');
+    }
+
+    return partes.join(' • ');
+  }
+
+  Future<void> _editarCategoria(Gasto gasto) async {
+    CategoriaGasto categoriaSelecionada = gasto.categoria;
+    bool aprenderRegra = gasto.origem == OrigemGasto.cartaoCredito;
+
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Editar categoria'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    gasto.titulo,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
+                  DropdownButtonFormField<CategoriaGasto>(
+                    initialValue: categoriaSelecionada,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoria',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: CategoriaGasto.values
+                        .map(
+                          (categoria) => DropdownMenuItem<CategoriaGasto>(
+                            value: categoria,
+                            child: Text(categoria.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => categoriaSelecionada = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: aprenderRegra,
+                    onChanged: (value) {
+                      setDialogState(() => aprenderRegra = value ?? false);
+                    },
+                    title: const Text(
+                      'Aprender regra para próximas importações',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmar != true) {
+      return;
+    }
+
+    try {
+      final Gasto gastoAtualizado = gasto.copyWith(
+        categoria: categoriaSelecionada,
+      );
+      await widget.db.atualizarGasto(gastoAtualizado);
+
+      if (aprenderRegra) {
+        await widget.db.salvarRegraCategoriaImportacao(
+          termo: gasto.titulo,
+          categoria: categoriaSelecionada,
+        );
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Categoria atualizada com sucesso.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao atualizar categoria: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Gasto>>(
       stream: widget.db.meusGastos,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const ListSkeleton();
         }
 
         if (snapshot.hasError) {
           return Center(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.s16),
               child: Text(
                 'Erro ao carregar gastos: ${snapshot.error}',
                 textAlign: TextAlign.center,
@@ -104,7 +223,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.all(16),
+                margin: const EdgeInsets.all(AppSpacing.s16),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(16),
@@ -115,7 +234,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                       'Total Gasto no Mês',
                       style: TextStyle(fontSize: 16),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.s8),
                     Text(
                       _formatarValor(0),
                       style: const TextStyle(
@@ -124,7 +243,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                         color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.s12),
                     TextButton.icon(
                       onPressed: _selecionarMes,
                       icon: const Icon(Icons.calendar_month),
@@ -136,7 +255,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
               Expanded(
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.s24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -145,7 +264,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                           size: 72,
                           color: Theme.of(context).colorScheme.outline,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.s12),
                         const Text(
                           'Nenhum gasto neste mês',
                           style: TextStyle(
@@ -153,12 +272,12 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.s8),
                         const Text(
                           'Registre um novo gasto para começar a acompanhar suas saídas.',
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.s16),
                         FilledButton.icon(
                           onPressed: () {
                             Navigator.push(
@@ -190,7 +309,12 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              margin: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                AppSpacing.s16,
+                AppSpacing.s16,
+                AppSpacing.s8,
+              ),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.tertiaryContainer,
                 borderRadius: BorderRadius.circular(16),
@@ -201,7 +325,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                     'Total Gasto no Mês',
                     style: TextStyle(fontSize: 16),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.s8),
                   Text(
                     _formatarValor(totalGasto),
                     style: const TextStyle(
@@ -210,7 +334,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.s12),
                   TextButton.icon(
                     onPressed: _selecionarMes,
                     icon: const Icon(Icons.calendar_month),
@@ -247,7 +371,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                     },
                     background: Container(
                       margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
+                        horizontal: AppSpacing.s16,
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
@@ -260,10 +384,11 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                     ),
                     child: Card(
                       margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
+                        horizontal: AppSpacing.s16,
                         vertical: 6,
                       ),
                       child: ListTile(
+                        onTap: () => _editarCategoria(gasto),
                         leading: CircleAvatar(
                           backgroundColor: gasto.categoria.color.withValues(
                             alpha: 0.15,
@@ -277,9 +402,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                           gasto.titulo,
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        subtitle: Text(
-                          "Dia ${gasto.data.day.toString().padLeft(2, '0')} • ${gasto.categoria.label}",
-                        ),
+                        subtitle: Text(_buildSubtitle(gasto)),
                         trailing: Text(
                           _formatarValor(gasto.valor),
                           style: const TextStyle(

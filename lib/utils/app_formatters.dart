@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class AppFormatters {
@@ -60,5 +61,39 @@ class AppFormatters {
 
   static String nomeMes(int mes) {
     return _meses[mes - 1];
+  }
+}
+
+class MoedaInputFormatter extends TextInputFormatter {
+  MoedaInputFormatter()
+    : _formatter = NumberFormat.currency(
+        locale: 'pt_BR',
+        symbol: '',
+        decimalDigits: 2,
+      );
+
+  final NumberFormat _formatter;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final String digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+
+    final double value = double.parse(digits) / 100;
+    final String formatted = _formatter
+        .format(value)
+        .replaceAll('\u00A0', ' ')
+        .trim();
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }

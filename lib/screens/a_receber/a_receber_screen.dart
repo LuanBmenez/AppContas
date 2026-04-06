@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../models/conta_model.dart';
 import '../../services/database_service.dart';
+import '../../theme/app_tokens.dart';
 import '../../utils/app_formatters.dart';
+import '../../widgets/app_skeleton.dart';
 import 'nova_conta_screen.dart';
 
 class AReceberScreen extends StatelessWidget {
@@ -50,13 +52,13 @@ class AReceberScreen extends StatelessWidget {
       stream: db.contasAReceber,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const ListSkeleton();
         }
 
         if (snapshot.hasError) {
           return Center(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.s16),
               child: Text(
                 _mensagemErroFirestore(snapshot.error),
                 textAlign: TextAlign.center,
@@ -87,7 +89,7 @@ class AReceberScreen extends StatelessWidget {
 
         final Widget cardResumo = Card(
           elevation: 1,
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(AppSpacing.s16),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -101,7 +103,7 @@ class AReceberScreen extends StatelessWidget {
                   'Resumo Financeiro',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.s16),
                 Row(
                   children: [
                     Expanded(
@@ -111,7 +113,7 @@ class AReceberScreen extends StatelessWidget {
                         cor: Colors.green,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.s12),
                     Expanded(
                       child: _ResumoFinanceiroCard(
                         titulo: 'Pendente',
@@ -121,7 +123,7 @@ class AReceberScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.s16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
@@ -133,13 +135,13 @@ class AReceberScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.s8),
                 Text(
                   '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
                 if (somentePendentes) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.s12),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -171,7 +173,7 @@ class AReceberScreen extends StatelessWidget {
               Expanded(
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.s24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -180,7 +182,7 @@ class AReceberScreen extends StatelessWidget {
                           size: 72,
                           color: Theme.of(context).colorScheme.outline,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.s12),
                         const Text(
                           "Nenhuma conta pendente",
                           textAlign: TextAlign.center,
@@ -189,12 +191,12 @@ class AReceberScreen extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.s8),
                         const Text(
                           "Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.",
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.s16),
                         FilledButton.icon(
                           onPressed: () {
                             Navigator.push(
@@ -247,7 +249,7 @@ class AReceberScreen extends StatelessWidget {
                     },
                     background: Container(
                       margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
+                        horizontal: AppSpacing.s16,
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
@@ -260,7 +262,7 @@ class AReceberScreen extends StatelessWidget {
                     ),
                     child: Card(
                       margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
+                        horizontal: AppSpacing.s16,
                         vertical: 6,
                       ),
                       shape: RoundedRectangleBorder(

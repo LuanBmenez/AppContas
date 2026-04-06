@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/gasto_model.dart';
 import '../../services/database_service.dart';
+import '../../theme/app_tokens.dart';
 import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 
@@ -106,7 +108,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.s16),
         child: Form(
           key: _formKey,
           child: ListView(
@@ -127,13 +129,14 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               TextFormField(
                 controller: _valorController,
                 textInputAction: TextInputAction.done,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
+                inputFormatters: <TextInputFormatter>[MoedaInputFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Valor',
                   border: OutlineInputBorder(),
@@ -145,23 +148,25 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     return 'Informe o valor do gasto.';
                   }
 
-                  final double? valor = double.tryParse(
-                    value.replaceAll('.', '').replaceAll(',', '.'),
-                  );
-                  if (valor == null || valor <= 0) {
+                  try {
+                    final double valor = AppFormatters.parseMoedaInput(value);
+                    if (valor <= 0) {
+                      return 'Informe um valor numérico maior que zero.';
+                    }
+                  } catch (_) {
                     return 'Informe um valor numérico maior que zero.';
                   }
 
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               Row(
                 children: [
                   Expanded(
                     flex: 3,
                     child: DropdownButtonFormField<CategoriaGasto>(
-                      value: _categoriaSelecionada,
+                      initialValue: _categoriaSelecionada,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Categoria',
@@ -182,11 +187,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.s12),
                   Expanded(
                     flex: 2,
                     child: DropdownButtonFormField<TipoGasto>(
-                      value: _tipoSelecionado,
+                      initialValue: _tipoSelecionado,
                       decoration: const InputDecoration(
                         labelText: 'Tipo',
                         border: OutlineInputBorder(),
@@ -208,7 +213,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.s16),
               OutlinedButton.icon(
                 onPressed: _selecionarData,
                 icon: const Icon(Icons.calendar_month),
@@ -218,7 +223,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                   alignment: Alignment.center,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.s24),
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
