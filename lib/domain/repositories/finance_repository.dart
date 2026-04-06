@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/cartao_credito_model.dart';
+import '../../models/categoria_personalizada_model.dart';
 import '../../models/conta_model.dart';
 import '../../models/gasto_model.dart';
+import '../../models/preferencias_novo_gasto_model.dart';
 import '../../models/regra_categoria_importacao_model.dart';
 
 class DashboardResumo {
@@ -47,15 +49,11 @@ class RelatorioMensalFinanceiro {
     required this.totalPorCategoria,
   });
 
-  double get totalGastos => gastosMes.fold<double>(
-    0,
-    (total, gasto) => total + gasto.valor,
-  );
+  double get totalGastos =>
+      gastosMes.fold<double>(0, (total, gasto) => total + gasto.valor);
 
-  double get totalPendencias => contasPendentes.fold<double>(
-    0,
-    (total, conta) => total + conta.valor,
-  );
+  double get totalPendencias =>
+      contasPendentes.fold<double>(0, (total, conta) => total + conta.valor);
 }
 
 abstract class FinanceRepository {
@@ -64,6 +62,7 @@ abstract class FinanceRepository {
   Stream<DashboardResumo> get dashboardResumo;
   Stream<List<CartaoCredito>> get cartoesCredito;
   Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao;
+  Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas;
 
   Future<void> adicionarRecebivel(Conta conta);
   Future<void> alternarStatusRecebivel(String id, bool statusAtual);
@@ -93,6 +92,19 @@ abstract class FinanceRepository {
 
   Future<void> adicionarCartaoCredito(CartaoCredito cartao);
   Future<void> deletarCartaoCredito(String id);
+
+  Future<void> salvarCategoriaPersonalizada(CategoriaPersonalizada categoria);
+  Future<void> arquivarCategoriaPersonalizada(String id, bool arquivada);
+  Future<void> alternarFavoritaCategoriaPersonalizada(String id, bool favorita);
+  Future<void> deletarCategoriaPersonalizada(String id);
+  Future<bool> categoriaPersonalizadaEmUso(String id);
+
+  Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto();
+  Future<void> registrarUsoNovoGasto({
+    CategoriaGasto? categoriaPadrao,
+    String? categoriaPersonalizadaId,
+    required TipoGasto tipo,
+  });
 
   Future<void> salvarRegraCategoriaImportacao({
     required String termo,

@@ -3,8 +3,10 @@ import 'package:rxdart/rxdart.dart';
 
 import '../domain/repositories/finance_repository.dart';
 import '../models/cartao_credito_model.dart';
+import '../models/categoria_personalizada_model.dart';
 import '../models/conta_model.dart';
 import '../models/gasto_model.dart';
+import '../models/preferencias_novo_gasto_model.dart';
 import '../models/regra_categoria_importacao_model.dart';
 import '../utils/text_normalizer.dart';
 
@@ -17,6 +19,10 @@ class DatabaseService implements FinanceRepository {
       FirebaseFirestore.instance.collection('cartoes_credito');
   final CollectionReference<Map<String, dynamic>> _regrasCategoriaCollection =
       FirebaseFirestore.instance.collection('regras_categoria_importacao');
+  final CollectionReference<Map<String, dynamic>> _categoriasPersonalizadas =
+      FirebaseFirestore.instance.collection('categorias_personalizadas');
+  final CollectionReference<Map<String, dynamic>> _preferenciasCollection =
+      FirebaseFirestore.instance.collection('preferencias_app');
 
   @override
   Future<void> adicionarRecebivel(Conta conta) async {
@@ -300,6 +306,153 @@ class DatabaseService implements FinanceRepository {
   }
 
   @override
+  Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas {
+    return _categoriasPersonalizadas
+        .orderBy('favorita', descending: true)
+        .orderBy('usoCount', descending: true)
+        .orderBy('nome')
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => CategoriaPersonalizada.fromMap(doc.data(), doc.id))
+              .toList();
+        });
+  }
+
+  @override
+  Future<void> salvarCategoriaPersonalizada(CategoriaPersonalizada categoria) {
+    final DateTime now = DateTime.now();
+    final DocumentReference<Map<String, dynamic>> docRef = categoria.id.isEmpty
+        ? _categoriasPersonalizadas.doc()
+        : _categoriasPersonalizadas.doc(categoria.id);
+
+    final CategoriaPersonalizada atualizado = categoria.copyWith(
+      id: docRef.id,
+      criadaEm: categoria.criadaEm ?? now,
+      atualizadaEm: now,
+    );
+
+    return docRef.set(atualizado.toMap(), SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> arquivarCategoriaPersonalizada(String id, bool arquivada) {
+    return _categoriasPersonalizadas.doc(id).set({
+      'arquivada': arquivada,
+      'atualizadaEm': DateTime.now(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> alternarFavoritaCategoriaPersonalizada(
+    String id,
+    bool favorita,
+  ) {
+    return _categoriasPersonalizadas.doc(id).set({
+      'favorita': favorita,
+      'atualizadaEm': DateTime.now(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> deletarCategoriaPersonalizada(String id) async {
+    await _categoriasPersonalizadas.doc(id).delete();
+  }
+
+  @override
+  Future<bool> categoriaPersonalizadaEmUso(String id) async {
+    final QuerySnapshot<Map<String, dynamic>> snapshot = await _gastosCollection
+        .where('categoriaPersonalizadaId', isEqualTo: id)
+        .limit(1)
+        .get();
+    return snapshot.docs.isNotEmpty;
+  }
+
+  @override
+  Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto() async {
+    final DocumentSnapshot<Map<String, dynamic>> doc =
+        await _preferenciasCollection.doc('novo_gasto').get();
+
+    final Map<String, dynamic> data = doc.data() ?? <String, dynamic>{};
+    final List<String> recentesPadraoRaw =
+        (data['recentesPadrao'] as List<dynamic>? ?? <dynamic>[])
+            .map((e) => e.toString())
+            .toList();
+    final List<CategoriaGasto> recentesPadrao = recentesPadraoRaw
+        .map(
+          (nome) => CategoriaGasto.values.firstWhere(
+            (e) => e.name == nome,
+            orElse: () => CategoriaGasto.outros,
+          ),
+        )
+        .toList();
+
+    return PreferenciasNovoGasto(
+      ultimaCategoriaPadrao: _parseCategoria(data['ultimaCategoriaPadrao']),
+      ultimaCategoriaPersonalizadaId: data['ultimaCategoriaPersonalizadaId']
+          ?.toString(),
+      ultimoTipo: _parseTipo(data['ultimoTipo']),
+      recentesPadrao: recentesPadrao,
+      recentesPersonalizadas:
+          (data['recentesPersonalizadas'] as List<dynamic>? ?? <dynamic>[])
+              .map((e) => e.toString())
+              .toList(),
+    );
+  }
+
+  @override
+  Future<void> registrarUsoNovoGasto({
+    CategoriaGasto? categoriaPadrao,
+    String? categoriaPersonalizadaId,
+    required TipoGasto tipo,
+  }) async {
+    final DocumentReference<Map<String, dynamic>> docRef =
+        _preferenciasCollection.doc('novo_gasto');
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final DocumentSnapshot<Map<String, dynamic>> snap = await tx.get(docRef);
+      final Map<String, dynamic> data = snap.data() ?? <String, dynamic>{};
+      final List<String> recentesPadrao =
+          (data['recentesPadrao'] as List<dynamic>? ?? <dynamic>[])
+              .map((e) => e.toString())
+              .toList();
+      final List<String> recentesPersonalizadas =
+          (data['recentesPersonalizadas'] as List<dynamic>? ?? <dynamic>[])
+              .map((e) => e.toString())
+              .toList();
+
+      if (categoriaPadrao != null) {
+        recentesPadrao.remove(categoriaPadrao.name);
+        recentesPadrao.insert(0, categoriaPadrao.name);
+      }
+
+      if (categoriaPersonalizadaId != null &&
+          categoriaPersonalizadaId.isNotEmpty) {
+        recentesPersonalizadas.remove(categoriaPersonalizadaId);
+        recentesPersonalizadas.insert(0, categoriaPersonalizadaId);
+      }
+
+      tx.set(docRef, {
+        'ultimaCategoriaPadrao': categoriaPadrao?.name,
+        'ultimaCategoriaPersonalizadaId': categoriaPersonalizadaId,
+        'ultimoTipo': tipo.name,
+        'recentesPadrao': recentesPadrao.take(5).toList(),
+        'recentesPersonalizadas': recentesPersonalizadas.take(5).toList(),
+        'atualizadoEm': DateTime.now(),
+      }, SetOptions(merge: true));
+
+      if (categoriaPersonalizadaId != null &&
+          categoriaPersonalizadaId.isNotEmpty) {
+        tx.set(
+          _categoriasPersonalizadas.doc(categoriaPersonalizadaId),
+          {'usoCount': FieldValue.increment(1), 'atualizadaEm': DateTime.now()},
+          SetOptions(merge: true),
+        );
+      }
+    });
+  }
+
+  @override
   Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao {
     return _regrasCategoriaCollection.orderBy('termo').snapshots().map((
       snapshot,
@@ -368,6 +521,32 @@ class DatabaseService implements FinanceRepository {
 
   String _normalizarTextoBusca(String texto) =>
       TextNormalizer.normalizeForSearch(texto);
+
+  CategoriaGasto? _parseCategoria(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    final String valor = raw.toString();
+    for (final CategoriaGasto item in CategoriaGasto.values) {
+      if (item.name == valor) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  TipoGasto? _parseTipo(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    final String valor = raw.toString();
+    for (final TipoGasto item in TipoGasto.values) {
+      if (item.name == valor) {
+        return item;
+      }
+    }
+    return null;
+  }
 
   Future<int> _gravarGastosSemHash(List<Gasto> gastos) async {
     if (gastos.isEmpty) {

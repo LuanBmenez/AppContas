@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../components/app_confirm_dialog.dart';
+import '../../components/app_empty_state_cta.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../models/gasto_model.dart';
 import '../../theme/app_tokens.dart';
@@ -50,27 +52,11 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
   }
 
   Future<bool> _confirmarExclusao(Gasto gasto) async {
-    final bool? confirmado = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Excluir gasto'),
-          content: Text('Deseja excluir "${gasto.titulo}"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Excluir'),
-            ),
-          ],
-        );
-      },
+    return AppConfirmDialog.show(
+      context,
+      title: 'Excluir gasto',
+      message: 'Deseja excluir "${gasto.titulo}"?',
     );
-
-    return confirmado ?? false;
   }
 
   String _formatarValor(double valor) {
@@ -80,7 +66,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
   String _buildSubtitle(Gasto gasto) {
     final List<String> partes = <String>[
       'Dia ${gasto.data.day.toString().padLeft(2, '0')}',
-      gasto.categoria.label,
+      gasto.categoriaLabelExibicao,
     ];
 
     if (gasto.origem == OrigemGasto.cartaoCredito) {
@@ -253,46 +239,20 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                 ),
               ),
               Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.receipt_long_outlined,
-                          size: 72,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                        const SizedBox(height: AppSpacing.s12),
-                        const Text(
-                          'Nenhum gasto neste mês',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.s8),
-                        const Text(
-                          'Registre um novo gasto para começar a acompanhar suas saídas.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppSpacing.s16),
-                        FilledButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => NovoGastoScreen(db: widget.db),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Adicionar gasto'),
-                        ),
-                      ],
-                    ),
-                  ),
+                child: AppEmptyStateCta(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Nenhum gasto neste mês',
+                  description:
+                      'Registre um novo gasto para começar a acompanhar suas saídas.',
+                  buttonLabel: 'Adicionar gasto',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => NovoGastoScreen(db: widget.db),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -388,12 +348,11 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                       child: ListTile(
                         onTap: () => _editarCategoria(gasto),
                         leading: CircleAvatar(
-                          backgroundColor: gasto.categoria.color.withValues(
-                            alpha: 0.15,
-                          ),
+                          backgroundColor: gasto.categoriaCorExibicao
+                              .withValues(alpha: 0.15),
                           child: Icon(
-                            gasto.categoria.icon,
-                            color: gasto.categoria.color,
+                            gasto.categoriaIconeExibicao,
+                            color: gasto.categoriaCorExibicao,
                           ),
                         ),
                         title: Text(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../components/app_form_submit_bar.dart';
+import '../../components/app_section_card.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../models/conta_model.dart';
 import '../../theme/app_tokens.dart';
@@ -72,18 +74,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   }
 
   Widget _buildSectionCard({required Widget child}) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        child: child,
-      ),
-    );
+    return AppSectionCard(child: child);
   }
 
   Widget _buildSectionTitle({required String title, required IconData icon}) {
@@ -149,53 +140,10 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
         title: const Text('Novo Item a Receber'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.s16,
-          AppSpacing.s12,
-          AppSpacing.s16,
-          AppSpacing.s16,
-        ),
-        child: SafeArea(
-          top: false,
-          left: false,
-          right: false,
-          minimum: const EdgeInsets.only(bottom: AppSpacing.s8),
-          child: SizedBox(
-            height: 54,
-            child: FilledButton(
-              onPressed: _salvando ? null : _salvarConta,
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: _salvando
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                        SizedBox(width: AppSpacing.s8),
-                        Text('Salvando...'),
-                      ],
-                    )
-                  : const Text(
-                      'SALVAR ITEM A RECEBER',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-          ),
-        ),
+      bottomNavigationBar: AppFormSubmitBar(
+        onPressed: _salvarConta,
+        label: 'SALVAR ITEM A RECEBER',
+        isLoading: _salvando,
       ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),

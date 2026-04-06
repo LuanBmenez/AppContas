@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../components/app_confirm_dialog.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../models/cartao_credito_model.dart';
 import '../../theme/app_tokens.dart';
@@ -82,27 +83,13 @@ class CartoesCreditoScreen extends StatelessWidget {
     BuildContext context,
     CartaoCredito cartao,
   ) async {
-    final bool? confirmar = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Excluir cartao'),
-          content: Text('Deseja excluir ${cartao.label}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Excluir'),
-            ),
-          ],
-        );
-      },
+    final bool confirmar = await AppConfirmDialog.show(
+      context,
+      title: 'Excluir cartao',
+      message: 'Deseja excluir ${cartao.label}?',
     );
 
-    if (confirmar != true || !context.mounted) {
+    if (!confirmar || !context.mounted) {
       return;
     }
 

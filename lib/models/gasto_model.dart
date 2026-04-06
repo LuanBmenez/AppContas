@@ -102,6 +102,10 @@ class Gasto {
   final double valor;
   final DateTime data;
   final CategoriaGasto categoria;
+  final String? categoriaPersonalizadaId;
+  final String? categoriaPersonalizadaNome;
+  final int? categoriaPersonalizadaCorValue;
+  final int? categoriaPersonalizadaIconeCodePoint;
   final TipoGasto tipo;
   final OrigemGasto origem;
   final String? cartaoId;
@@ -118,6 +122,10 @@ class Gasto {
     required this.valor,
     required this.data,
     required this.categoria,
+    this.categoriaPersonalizadaId,
+    this.categoriaPersonalizadaNome,
+    this.categoriaPersonalizadaCorValue,
+    this.categoriaPersonalizadaIconeCodePoint,
     this.tipo = TipoGasto.variavel,
     this.origem = OrigemGasto.manual,
     this.cartaoId,
@@ -144,6 +152,14 @@ class Gasto {
         (e) => e.name == map['categoria'],
         orElse: () => CategoriaGasto.outros,
       ),
+      categoriaPersonalizadaId: map['categoriaPersonalizadaId']?.toString(),
+      categoriaPersonalizadaNome: map['categoriaPersonalizadaNome']?.toString(),
+      categoriaPersonalizadaCorValue: _parseNullableInt(
+        map['categoriaPersonalizadaCorValue'],
+      ),
+      categoriaPersonalizadaIconeCodePoint: _parseNullableInt(
+        map['categoriaPersonalizadaIconeCodePoint'],
+      ),
       tipo: TipoGasto.values.firstWhere(
         (e) => e.name == map['tipo'],
         orElse: () => TipoGasto.variavel,
@@ -168,6 +184,11 @@ class Gasto {
       'valor': valor,
       'data': data,
       'categoria': categoria.name,
+      'categoriaPersonalizadaId': categoriaPersonalizadaId,
+      'categoriaPersonalizadaNome': categoriaPersonalizadaNome,
+      'categoriaPersonalizadaCorValue': categoriaPersonalizadaCorValue,
+      'categoriaPersonalizadaIconeCodePoint':
+          categoriaPersonalizadaIconeCodePoint,
       'tipo': tipo.name,
       'origem': origem.name,
       'cartaoId': cartaoId,
@@ -186,6 +207,10 @@ class Gasto {
     double? valor,
     DateTime? data,
     CategoriaGasto? categoria,
+    String? categoriaPersonalizadaId,
+    String? categoriaPersonalizadaNome,
+    int? categoriaPersonalizadaCorValue,
+    int? categoriaPersonalizadaIconeCodePoint,
     TipoGasto? tipo,
     OrigemGasto? origem,
     String? cartaoId,
@@ -202,6 +227,15 @@ class Gasto {
       valor: valor ?? this.valor,
       data: data ?? this.data,
       categoria: categoria ?? this.categoria,
+      categoriaPersonalizadaId:
+          categoriaPersonalizadaId ?? this.categoriaPersonalizadaId,
+      categoriaPersonalizadaNome:
+          categoriaPersonalizadaNome ?? this.categoriaPersonalizadaNome,
+      categoriaPersonalizadaCorValue:
+          categoriaPersonalizadaCorValue ?? this.categoriaPersonalizadaCorValue,
+      categoriaPersonalizadaIconeCodePoint:
+          categoriaPersonalizadaIconeCodePoint ??
+          this.categoriaPersonalizadaIconeCodePoint,
       tipo: tipo ?? this.tipo,
       origem: origem ?? this.origem,
       cartaoId: cartaoId ?? this.cartaoId,
@@ -219,6 +253,36 @@ class Gasto {
       return null;
     }
     return '${parcelaAtual!}/${parcelaTotal!}';
+  }
+
+  bool get usaCategoriaPersonalizada {
+    return categoriaPersonalizadaId != null &&
+        categoriaPersonalizadaNome != null &&
+        categoriaPersonalizadaNome!.trim().isNotEmpty;
+  }
+
+  String get categoriaLabelExibicao {
+    return usaCategoriaPersonalizada
+        ? categoriaPersonalizadaNome!.trim()
+        : categoria.label;
+  }
+
+  Color get categoriaCorExibicao {
+    if (usaCategoriaPersonalizada && categoriaPersonalizadaCorValue != null) {
+      return Color(categoriaPersonalizadaCorValue!);
+    }
+    return categoria.color;
+  }
+
+  IconData get categoriaIconeExibicao {
+    if (usaCategoriaPersonalizada &&
+        categoriaPersonalizadaIconeCodePoint != null) {
+      return IconData(
+        categoriaPersonalizadaIconeCodePoint!,
+        fontFamily: 'MaterialIcons',
+      );
+    }
+    return categoria.icon;
   }
 
   static DateTime _parseDate(dynamic raw) {

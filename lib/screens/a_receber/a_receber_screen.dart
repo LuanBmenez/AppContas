@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../components/app_confirm_dialog.dart';
+import '../../components/app_empty_state_cta.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../models/conta_model.dart';
 import '../../theme/app_tokens.dart';
@@ -29,26 +31,11 @@ class AReceberScreen extends StatelessWidget {
   }
 
   Future<bool> _confirmarExclusao(BuildContext context, Conta conta) async {
-    final bool? confirmado = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Excluir item'),
-          content: Text('Deseja excluir ${conta.nome}?\n${conta.descricao}'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Excluir'),
-            ),
-          ],
-        );
-      },
+    return AppConfirmDialog.show(
+      context,
+      title: 'Excluir item',
+      message: 'Deseja excluir ${conta.nome}?\n${conta.descricao}',
     );
-    return confirmado ?? false;
   }
 
   @override
@@ -176,47 +163,20 @@ class AReceberScreen extends StatelessWidget {
             children: [
               cardResumo,
               Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.inbox_rounded,
-                          size: 72,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                        const SizedBox(height: AppSpacing.s12),
-                        const Text(
-                          "Nenhuma conta pendente",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.s8),
-                        const Text(
-                          "Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.",
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppSpacing.s16),
-                        FilledButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => NovoRecebivelScreen(db: db),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Adicionar cobrança'),
-                        ),
-                      ],
-                    ),
-                  ),
+                child: AppEmptyStateCta(
+                  icon: Icons.inbox_rounded,
+                  title: 'Nenhuma conta pendente',
+                  description:
+                      'Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.',
+                  buttonLabel: 'Adicionar cobrança',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => NovoRecebivelScreen(db: db),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
