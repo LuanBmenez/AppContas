@@ -82,9 +82,9 @@ class ListSkeleton extends StatelessWidget {
           ],
           Expanded(
             child: ListView.separated(
-              itemBuilder: (_, __) =>
+              itemBuilder: (context, index) =>
                   const AppSkeletonBox(height: 80, radius: 12),
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (context, index) =>
                   const SizedBox(height: AppSpacing.s12),
               itemCount: 4,
             ),

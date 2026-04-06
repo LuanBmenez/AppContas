@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../domain/repositories/finance_repository.dart';
 import '../services/database_service.dart';
 import '../theme/app_tokens.dart';
 import 'a_receber/a_receber_screen.dart';
@@ -18,7 +19,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final DatabaseService db = DatabaseService();
+  final FinanceRepository db = DatabaseService();
   int _indiceAtual = 0;
   bool _somentePendentes = false;
   int _gastosKeyVersion = 0;

@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/repositories/finance_repository.dart';
 import '../../models/conta_model.dart';
-import '../../services/database_service.dart';
 import '../../theme/app_tokens.dart';
+import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 import '../../widgets/app_skeleton.dart';
 import 'nova_conta_screen.dart';
 
 class AReceberScreen extends StatelessWidget {
-  AReceberScreen({super.key, required this.db, this.somentePendentes = false});
+  const AReceberScreen({
+    super.key,
+    required this.db,
+    this.somentePendentes = false,
+  });
 
-  final DatabaseService db;
+  final FinanceRepository db;
   final bool somentePendentes;
 
   String _mensagemErroFirestore(Object? error) {
@@ -238,12 +243,7 @@ class AReceberScreen extends StatelessWidget {
                         await db.deletarRecebivel(conta.id);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Erro: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
+                          AppFeedback.showError(context, 'Erro: $e');
                         }
                       }
                     },
@@ -342,11 +342,9 @@ class AReceberScreen extends StatelessWidget {
                             );
                           } catch (e) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Erro ao atualizar: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
+                              AppFeedback.showError(
+                                context,
+                                'Erro ao atualizar: $e',
                               );
                             }
                           }

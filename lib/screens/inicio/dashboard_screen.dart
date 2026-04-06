@@ -1,15 +1,19 @@
-import 'dart:math' as math;
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../domain/repositories/finance_repository.dart';
 import '../../models/conta_model.dart';
 import '../../models/gasto_model.dart';
-import '../../services/database_service.dart';
+import '../../services/dashboard_summary_service.dart';
+import '../../services/report_export_service.dart';
 import '../../theme/app_tokens.dart';
+import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 import '../../widgets/app_skeleton.dart';
-
-enum _PeriodoRapido { hoje, seteDias, mes, trimestre }
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -19,7 +23,7 @@ class DashboardScreen extends StatefulWidget {
     this.onTapReceber,
   });
 
-  final DatabaseService db;
+  final FinanceRepository db;
 
   final VoidCallback? onTapSaidas;
   final VoidCallback? onTapReceber;
@@ -29,79 +33,36 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  _PeriodoRapido _periodo = _PeriodoRapido.mes;
-
-  ({DateTime inicio, DateTime fimExclusivo}) _faixaAtual(DateTime agora) {
-    final DateTime hoje = DateTime(agora.year, agora.month, agora.day);
-
-    switch (_periodo) {
-      case _PeriodoRapido.hoje:
-        return (inicio: hoje, fimExclusivo: hoje.add(const Duration(days: 1)));
-      case _PeriodoRapido.seteDias:
-        return (
-          inicio: hoje.subtract(const Duration(days: 6)),
-          fimExclusivo: hoje.add(const Duration(days: 1)),
-        );
-      case _PeriodoRapido.mes:
-        final DateTime inicioMes = DateTime(agora.year, agora.month);
-        return (
-          inicio: inicioMes,
-          fimExclusivo: DateTime(inicioMes.year, inicioMes.month + 1),
-        );
-      case _PeriodoRapido.trimestre:
-        final DateTime inicioTrim = DateTime(agora.year, agora.month - 2, 1);
-        return (
-          inicio: inicioTrim,
-          fimExclusivo: hoje.add(const Duration(days: 1)),
-        );
-    }
-  }
-
-  ({DateTime inicio, DateTime fimExclusivo}) _faixaAnterior(
-    DateTime inicioAtual,
-    DateTime fimAtualExclusivo,
-  ) {
-    final Duration duracao = fimAtualExclusivo.difference(inicioAtual);
-    final DateTime fimAnterior = inicioAtual;
-    final DateTime inicioAnterior = fimAnterior.subtract(duracao);
-    return (inicio: inicioAnterior, fimExclusivo: fimAnterior);
-  }
-
-  bool _estaNaFaixa(DateTime data, DateTime inicio, DateTime fimExclusivo) {
-    return !data.isBefore(inicio) && data.isBefore(fimExclusivo);
-  }
+  final DashboardSummaryService _summaryService =
+      const DashboardSummaryService();
+  final ReportExportService _reportExportService = const ReportExportService();
+  DashboardPeriodoRapido _periodo = DashboardPeriodoRapido.mes;
+  bool _exportandoRelatorio = false;
 
   String _tituloPeriodo(DateTime agora) {
     switch (_periodo) {
-      case _PeriodoRapido.hoje:
+      case DashboardPeriodoRapido.hoje:
         return 'Hoje';
-      case _PeriodoRapido.seteDias:
+      case DashboardPeriodoRapido.seteDias:
         return 'Últimos 7 dias';
-      case _PeriodoRapido.mes:
+      case DashboardPeriodoRapido.mes:
         return 'Mês de ${AppFormatters.nomeMes(agora.month)}';
-      case _PeriodoRapido.trimestre:
+      case DashboardPeriodoRapido.trimestre:
         return 'Últimos 3 meses';
     }
   }
 
-  String _labelPeriodo(_PeriodoRapido periodo) {
+  String _labelPeriodo(DashboardPeriodoRapido periodo) {
     switch (periodo) {
-      case _PeriodoRapido.hoje:
+      case DashboardPeriodoRapido.hoje:
         return 'Hoje';
-      case _PeriodoRapido.seteDias:
+      case DashboardPeriodoRapido.seteDias:
         return '7 dias';
-      case _PeriodoRapido.mes:
+      case DashboardPeriodoRapido.mes:
         return 'Mês';
-      case _PeriodoRapido.trimestre:
+      case DashboardPeriodoRapido.trimestre:
         return 'Trimestre';
     }
-  }
-
-  double _variacaoPercentual(double atual, double anterior) {
-    if (anterior == 0) {
-      return atual == 0 ? 0 : 100;
-    }
-    return ((atual - anterior) / anterior.abs()) * 100;
   }
 
   String _mensagemErroDashboard(Object? error) {
@@ -112,6 +73,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Ative o Cloud Firestore no Firebase Console e tente novamente.';
     }
     return 'Erro ao carregar o painel.';
+  }
+
+  DateTime _mesReferenciaExportacao(DateTime agora) {
+    final ({DateTime inicio, DateTime fimExclusivo}) faixa = _summaryService
+        .faixaAtual(_periodo, agora);
+    return DateTime(faixa.inicio.year, faixa.inicio.month, 1);
+  }
+
+  Future<void> _exportarRelatorioMensal() async {
+    if (_exportandoRelatorio) {
+      return;
+    }
+
+    if (kIsWeb) {
+      AppFeedback.showError(
+        context,
+        'Exportacao de arquivo indisponivel no navegador nesta versao.',
+      );
+      return;
+    }
+
+    setState(() => _exportandoRelatorio = true);
+    try {
+      final DateTime referencia = _mesReferenciaExportacao(DateTime.now());
+      final RelatorioMensalFinanceiro relatorio = await widget.db
+          .buscarRelatorioMensal(referencia);
+      final RelatorioExportado exportado = await _reportExportService
+          .gerarRelatorioMensal(relatorio);
+
+      final Directory tempDir = await getTemporaryDirectory();
+      final File arquivo = File(
+        '${tempDir.path}/${exportado.nomeArquivoBase}.pdf',
+      );
+
+      await arquivo.writeAsBytes(exportado.pdfBytes, flush: true);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[XFile(arquivo.path)],
+          subject: 'Relatorio mensal financeiro',
+          text:
+              'Relatorio ${referencia.month.toString().padLeft(2, '0')}/${referencia.year}',
+        ),
+      );
+
+      if (mounted) {
+        AppFeedback.showSuccess(context, 'Relatorio PDF gerado com sucesso.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppFeedback.showError(context, 'Falha ao exportar relatorio: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _exportandoRelatorio = false);
+      }
+    }
   }
 
   @override
@@ -135,91 +153,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        final List<Gasto> gastos = snapshot.data?.gastos ?? [];
-        final List<Conta> contas = snapshot.data?.contas ?? [];
-
         final DateTime agora = DateTime.now();
-        final ({DateTime inicio, DateTime fimExclusivo}) faixaAtual =
-            _faixaAtual(agora);
-        final ({DateTime inicio, DateTime fimExclusivo}) faixaAnterior =
-            _faixaAnterior(faixaAtual.inicio, faixaAtual.fimExclusivo);
-
-        double totalGastosPeriodo = 0;
-        double totalGastosPeriodoAnterior = 0;
-
-        for (final gasto in gastos) {
-          if (_estaNaFaixa(
-            gasto.data,
-            faixaAtual.inicio,
-            faixaAtual.fimExclusivo,
-          )) {
-            totalGastosPeriodo += gasto.valor;
-          } else if (_estaNaFaixa(
-            gasto.data,
-            faixaAnterior.inicio,
-            faixaAnterior.fimExclusivo,
-          )) {
-            totalGastosPeriodoAnterior += gasto.valor;
-          }
-        }
-
-        double totalPendente = 0;
-        double totalRecebidoPeriodo = 0;
-        double totalRecebidoPeriodoAnterior = 0;
-        for (final conta in contas) {
-          if (!conta.foiPago) {
-            totalPendente += conta.valor;
-          } else {
-            if (_estaNaFaixa(
-              conta.data,
-              faixaAtual.inicio,
-              faixaAtual.fimExclusivo,
-            )) {
-              totalRecebidoPeriodo += conta.valor;
-            } else if (_estaNaFaixa(
-              conta.data,
-              faixaAnterior.inicio,
-              faixaAnterior.fimExclusivo,
-            )) {
-              totalRecebidoPeriodoAnterior += conta.valor;
-            }
-          }
-        }
-
-        final double saldo = totalRecebidoPeriodo - totalGastosPeriodo;
-        final double saldoMesAnterior =
-            totalRecebidoPeriodoAnterior - totalGastosPeriodoAnterior;
-        final bool saldoPositivo = saldo >= 0;
-        final double variacaoSaldo = _variacaoPercentual(
-          saldo,
-          saldoMesAnterior,
+        final DashboardResumo resumoBruto =
+            snapshot.data ?? const DashboardResumo(<Gasto>[], <Conta>[]);
+        final DashboardResumoCalculado resumo = _summaryService.calcularResumo(
+          resumo: resumoBruto,
+          periodo: _periodo,
+          agora: agora,
         );
-        final double variacaoGastos = _variacaoPercentual(
-          totalGastosPeriodo,
-          totalGastosPeriodoAnterior,
-        );
-
-        final Map<CategoriaGasto, double> totaisPorCategoria =
-            <CategoriaGasto, double>{};
-        for (final gasto in gastos) {
-          if (_estaNaFaixa(
-            gasto.data,
-            faixaAtual.inicio,
-            faixaAtual.fimExclusivo,
-          )) {
-            totaisPorCategoria[gasto.categoria] =
-                (totaisPorCategoria[gasto.categoria] ?? 0) + gasto.valor;
-          }
-        }
-
-        final List<MapEntry<CategoriaGasto, double>> categoriasOrdenadas =
-            totaisPorCategoria.entries.toList()
-              ..sort((a, b) => b.value.compareTo(a.value));
-
-        final MapEntry<CategoriaGasto, double>? categoriaMaisGasta =
-            categoriasOrdenadas.isEmpty ? null : categoriasOrdenadas.first;
-        final MapEntry<CategoriaGasto, double>? categoriaMenosGasta =
-            categoriasOrdenadas.isEmpty ? null : categoriasOrdenadas.last;
 
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.s16),
@@ -238,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Wrap(
                 spacing: AppSpacing.s8,
                 runSpacing: AppSpacing.s8,
-                children: _PeriodoRapido.values.map((periodo) {
+                children: DashboardPeriodoRapido.values.map((periodo) {
                   final bool selecionado = _periodo == periodo;
                   return ChoiceChip(
                     label: Text(_labelPeriodo(periodo)),
@@ -251,6 +192,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: AppSpacing.s12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _exportandoRelatorio
+                          ? null
+                          : _exportarRelatorioMensal,
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: Text(
+                        _exportandoRelatorio ? 'Gerando...' : 'Exportar PDF',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.s24),
               _DashboardEntry(
                 delayMs: 0,
@@ -261,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     padding: const EdgeInsets.all(AppSpacing.s24),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: saldoPositivo
+                        colors: resumo.saldoPositivo
                             ? [Colors.green.shade400, Colors.teal.shade500]
                             : [Colors.red.shade400, Colors.deepOrange.shade500],
                         begin: Alignment.topLeft,
@@ -281,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(height: AppSpacing.s8),
                         Text(
-                          AppFormatters.moeda(saldo),
+                          AppFormatters.moeda(resumo.saldo),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 36,
@@ -301,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _ComparativoChip(
                         titulo: 'Saldo vs mês anterior',
-                        percentual: variacaoSaldo,
+                        percentual: resumo.variacaoSaldo,
                         positivoEhBom: true,
                       ),
                     ),
@@ -309,7 +266,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _ComparativoChip(
                         titulo: 'Gastos vs mês anterior',
-                        percentual: variacaoGastos,
+                        percentual: resumo.variacaoGastos,
                         positivoEhBom: false,
                       ),
                     ),
@@ -324,7 +281,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _MiniSummaryCard(
                         titulo: 'Saídas',
-                        valor: totalGastosPeriodo,
+                        valor: resumo.totalGastosPeriodo,
                         cor: Colors.red,
                         icone: Icons.arrow_downward,
                         onTap: widget.onTapSaidas,
@@ -334,7 +291,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _MiniSummaryCard(
                         titulo: 'A Receber',
-                        valor: totalPendente,
+                        valor: resumo.totalPendente,
                         cor: Colors.orange,
                         icone: Icons.pending_actions,
                         onTap: widget.onTapReceber,
@@ -347,6 +304,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _DashboardEntry(
                 delayMs: 180,
                 child: Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.s16),
                     child: Column(
@@ -359,62 +323,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.s12),
-                        if (categoriasOrdenadas.isEmpty)
-                          const Text(
-                            'Sem gastos no período para montar gráfico.',
+                        const SizedBox(height: AppSpacing.s4),
+                        Text(
+                          'Distribuição dos gastos no mês',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        Text(
+                          'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s16),
+                        if (resumo.categoriasOrdenadas.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s16,
+                              vertical: AppSpacing.s24,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest
+                                  .withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant
+                                    .withValues(alpha: 0.7),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.pie_chart_outline,
+                                  size: 42,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.35),
+                                ),
+                                const SizedBox(height: AppSpacing.s12),
+                                const Text(
+                                  'Sem gastos no período para montar o gráfico.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: AppSpacing.s4),
+                                Text(
+                                  'Adicione gastos para ver a distribuição por categoria.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           )
                         else
-                          Row(
-                            children: [
-                              SizedBox(
-                                width: 130,
-                                height: 130,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    // Ícone elegante no centro do Donut Chart
-                                    Icon(
-                                      Icons.account_balance_wallet_outlined,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.3),
-                                      size: 36,
-                                    ),
-                                    SizedBox(
-                                      width: 130,
-                                      height: 130,
-                                      child: CustomPaint(
-                                        painter: _PieChartPainter(
-                                          categoriasOrdenadas,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.s16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _CategoriaResumoLinha(
-                                      titulo: '+ gasto',
-                                      categoria: categoriaMaisGasta?.key,
-                                      valor: categoriaMaisGasta?.value ?? 0,
-                                    ),
-                                    const SizedBox(height: AppSpacing.s12),
-                                    _CategoriaResumoLinha(
-                                      titulo: '- gasto',
-                                      categoria: categoriaMenosGasta?.key,
-                                      valor: categoriaMenosGasta?.value ?? 0,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          _CategoriasBarrasCard(
+                            total: resumo.totalGastosPeriodo,
+                            periodo: _tituloPeriodo(agora),
+                            data: resumo.categoriasOrdenadas,
                           ),
+                        const SizedBox(height: AppSpacing.s16),
+                        Wrap(
+                          spacing: AppSpacing.s12,
+                          runSpacing: AppSpacing.s12,
+                          children: [
+                            _InsightResumoCard(
+                              titulo: 'Categoria líder',
+                              categoria: resumo.categoriaMaisGasta?.key,
+                              valor: resumo.categoriaMaisGasta?.value ?? 0,
+                            ),
+                            _InsightResumoCard(
+                              titulo: 'Menor participação',
+                              categoria: resumo.categoriaMenosGasta?.key,
+                              valor: resumo.categoriaMenosGasta?.value ?? 0,
+                            ),
+                            _InsightResumoCard(
+                              titulo: 'Categorias ativas',
+                              valor: resumo.categoriasOrdenadas.length
+                                  .toDouble(),
+                              labelUnico: true,
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -578,99 +579,229 @@ class _DashboardEntry extends StatelessWidget {
   }
 }
 
-class _CategoriaResumoLinha extends StatelessWidget {
-  const _CategoriaResumoLinha({
+class _InsightResumoCard extends StatelessWidget {
+  const _InsightResumoCard({
     required this.titulo,
-    required this.categoria,
+    this.categoria,
     required this.valor,
+    this.labelUnico = false,
   });
 
   final String titulo;
   final CategoriaGasto? categoria;
   final double valor;
+  final bool labelUnico;
 
   @override
   Widget build(BuildContext context) {
-    if (categoria == null) {
-      return Text('$titulo: sem dados');
-    }
+    final Color cor = categoria?.color ?? Theme.of(context).colorScheme.primary;
 
-    return Row(
-      children: [
-        CircleAvatar(radius: 7, backgroundColor: categoria!.color),
-        const SizedBox(width: AppSpacing.s8),
-        Expanded(
-          child: Text(
-            '$titulo: ${categoria!.label}',
-            style: const TextStyle(fontWeight: FontWeight.w600),
+    return Container(
+      constraints: const BoxConstraints(minWidth: 150),
+      padding: const EdgeInsets.all(AppSpacing.s12),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cor.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            titulo,
+            style: TextStyle(
+              fontSize: 12,
+              color: cor,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.s8),
-        Text(
-          AppFormatters.moeda(valor),
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.s4),
+          if (labelUnico)
+            Text(
+              valor.toInt().toString(),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            )
+          else ...[
+            Text(
+              categoria?.label ?? 'Sem dados',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              AppFormatters.moeda(valor),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-// ==========================================
-// PINTOR DO GRÁFICO (PIE CHART MODERNO)
-// ==========================================
-class _PieChartPainter extends CustomPainter {
-  _PieChartPainter(this.data);
+class _CategoriasBarrasCard extends StatelessWidget {
+  const _CategoriasBarrasCard({
+    required this.total,
+    required this.periodo,
+    required this.data,
+  });
 
+  final double total;
+  final String periodo;
   final List<MapEntry<CategoriaGasto, double>> data;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final double total = data.fold(0, (sum, item) => sum + item.value);
-    if (total <= 0) return;
+  Widget build(BuildContext context) {
+    final List<MapEntry<CategoriaGasto, double>> barras = data.take(6).toList();
 
-    // Define a espessura da linha do gráfico
-    const double strokeWidth = 22.0;
-
-    // Ajusta o raio para que a linha não seja cortada (clipped) nas bordas
-    final double radius = (size.width - strokeWidth) / 2;
-    final Offset center = Offset(size.width / 2, size.height / 2);
-    final Rect rect = Rect.fromCircle(center: center, radius: radius);
-
-    // 1. Trilha de fundo (Anel cinza clarinho)
-    final Paint bgPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.15)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, bgPaint);
-
-    // 2. Cores das Categorias com pontas arredondadas
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round; // O segredo da beleza moderna está aqui!
-
-    double startAngle = -math.pi / 2;
-
-    // Adiciona um pequeno espaço entre as cores se houver mais de uma categoria
-    final double gap = data.length > 1 ? 0.12 : 0.0;
-
-    for (final item in data) {
-      final double sweep = (item.value / total) * math.pi * 2;
-
-      // Garante que o segmento seja visível mesmo subtraindo o gap
-      final double actualSweep = math.max(0.01, sweep - gap);
-
-      paint.color = item.key.color;
-
-      // Desenha o segmento deslocando metade do gap para centralizar o espaço
-      canvas.drawArc(rect, startAngle + (gap / 2), actualSweep, false, paint);
-
-      startAngle += sweep;
-    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.s12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+            Theme.of(context).colorScheme.secondary.withValues(alpha: 0.03),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      periodo,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      AppFormatters.moeda(total),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s8,
+                  vertical: AppSpacing.s4,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${data.length} categorias',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          ...barras.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+              child: _BarraCategoriaLinha(
+                categoria: entry.key,
+                valor: entry.value,
+                total: total,
+              ),
+            ),
+          ),
+          if (data.length > barras.length)
+            Text(
+              '+ ${data.length - barras.length} categorias adicionais',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+        ],
+      ),
+    );
   }
+}
+
+class _BarraCategoriaLinha extends StatelessWidget {
+  const _BarraCategoriaLinha({
+    required this.categoria,
+    required this.valor,
+    required this.total,
+  });
+
+  final CategoriaGasto categoria;
+  final double valor;
+  final double total;
 
   @override
-  bool shouldRepaint(covariant _PieChartPainter oldDelegate) {
-    return oldDelegate.data != data;
+  Widget build(BuildContext context) {
+    final double percentual = total <= 0 ? 0 : valor / total;
+    final String percentualTexto = '${(percentual * 100).toStringAsFixed(1)}%';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: categoria.color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: Text(
+                categoria.label,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Text(
+              percentualTexto,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Text(
+              AppFormatters.moeda(valor),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 10,
+            value: percentual,
+            backgroundColor: categoria.color.withValues(alpha: 0.12),
+            valueColor: AlwaysStoppedAnimation<Color>(categoria.color),
+          ),
+        ),
+      ],
+    );
   }
 }

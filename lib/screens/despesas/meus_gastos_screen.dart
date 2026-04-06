@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/repositories/finance_repository.dart';
 import '../../models/gasto_model.dart';
-import '../../services/database_service.dart';
 import '../../theme/app_tokens.dart';
+import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
 import '../../widgets/app_skeleton.dart';
 import 'novo_gasto_screen.dart';
@@ -10,7 +11,7 @@ import 'novo_gasto_screen.dart';
 class MeusGastosScreen extends StatefulWidget {
   const MeusGastosScreen({super.key, required this.db});
 
-  final DatabaseService db;
+  final FinanceRepository db;
 
   @override
   State<MeusGastosScreen> createState() => _MeusGastosScreenState();
@@ -22,13 +23,14 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
     DateTime.now().month,
   );
 
+  DateTime get _inicioMes =>
+      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
+
+  DateTime get _fimMesExclusivo =>
+      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
+
   String _formatarMes(DateTime date) {
     return AppFormatters.mesAno(date);
-  }
-
-  bool _mesCorresponde(DateTime data) {
-    return data.year == _mesSelecionado.year &&
-        data.month == _mesSelecionado.month;
   }
 
   Future<void> _selecionarMes() async {
@@ -178,24 +180,24 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
         );
       }
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Categoria atualizada com sucesso.')),
-        );
-      }
+      if (!mounted) return;
+      AppFeedback.showSuccess(
+        this.context,
+        'Categoria atualizada com sucesso.',
+      );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao atualizar categoria: $e')),
-        );
-      }
+      if (!mounted) return;
+      AppFeedback.showError(this.context, 'Erro ao atualizar categoria: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Gasto>>(
-      stream: widget.db.meusGastos,
+      stream: widget.db.streamGastosPorPeriodo(
+        inicio: _inicioMes,
+        fimExclusivo: _fimMesExclusivo,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const ListSkeleton();
@@ -213,9 +215,7 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
           );
         }
 
-        final List<Gasto> gastosFiltrados = (snapshot.data ?? [])
-            .where((gasto) => _mesCorresponde(gasto.data))
-            .toList();
+        final List<Gasto> gastosFiltrados = snapshot.data ?? <Gasto>[];
 
         if (gastosFiltrados.isEmpty) {
           return Column(
@@ -360,11 +360,9 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                         await widget.db.deletarGasto(gasto.id);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Erro ao excluir gasto: $e'),
-                              backgroundColor: Colors.red,
-                            ),
+                          AppFeedback.showError(
+                            context,
+                            'Erro ao excluir gasto: $e',
                           );
                         }
                       }

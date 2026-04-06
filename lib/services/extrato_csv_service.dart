@@ -4,6 +4,7 @@ import '../models/cartao_credito_model.dart';
 import '../models/gasto_model.dart';
 import '../models/regra_categoria_importacao_model.dart';
 import '../utils/app_formatters.dart';
+import '../utils/text_normalizer.dart';
 
 enum CampoExtrato { dataLancamento, dataCompra, descricao, valor, parcela }
 
@@ -32,6 +33,18 @@ class ResultadoMapeamentoExtrato {
   });
 }
 
+class SugestaoRegraCategoria {
+  final String termo;
+  final CategoriaGasto categoria;
+  final int ocorrencias;
+
+  const SugestaoRegraCategoria({
+    required this.termo,
+    required this.categoria,
+    required this.ocorrencias,
+  });
+}
+
 class ExtratoCsvService {
   static const Map<String, CategoriaGasto> _regrasCategoria =
       <String, CategoriaGasto>{
@@ -48,6 +61,7 @@ class ExtratoCsvService {
         'RESTAURANTE': CategoriaGasto.comida,
         'LANCHONETE': CategoriaGasto.comida,
         'MERCADO': CategoriaGasto.comida,
+        'Ifd': CategoriaGasto.comida,
         'SUPERMERCADO': CategoriaGasto.comida,
         'DROGARIA': CategoriaGasto.saude,
         'FARMACIA': CategoriaGasto.saude,
@@ -60,7 +74,7 @@ class ExtratoCsvService {
         'UNIVERSIDADE': CategoriaGasto.educacao,
         'Lojas Imperador': CategoriaGasto.moradia,
         'Mundodoscolchoes': CategoriaGasto.moradia,
-        'Galegogaseagua': CategoriaGasto.moradia,
+        'Galego': CategoriaGasto.moradia,
       };
 
   ResultadoLeituraCsv lerCsv(String conteudo) {
@@ -217,6 +231,72 @@ class ExtratoCsvService {
       ignorados: ignorados,
       ignoradosPorMotivo: ignoradosPorMotivo,
     );
+  }
+
+  List<SugestaoRegraCategoria> sugerirRegrasParaGastos({
+    required List<Gasto> gastos,
+    required List<RegraCategoriaImportacao> regrasExistentes,
+    int minimoOcorrencias = 2,
+  }) {
+    final Set<String> regrasJaAprendidas = regrasExistentes
+        .map((r) => _normalizarTextoBusca(r.termo))
+        .where((termo) => termo.isNotEmpty)
+        .toSet();
+
+    final Map<String, String> termoOriginalPorChave = <String, String>{};
+    final Map<String, int> ocorrenciasPorChave = <String, int>{};
+    final Map<String, Map<CategoriaGasto, int>> votosPorChave =
+        <String, Map<CategoriaGasto, int>>{};
+
+    for (final Gasto gasto in gastos) {
+      if (gasto.categoria == CategoriaGasto.outros) {
+        continue;
+      }
+
+      final String termoOriginal = gasto.titulo.trim();
+      final String chave = _normalizarTextoBusca(termoOriginal);
+      if (chave.isEmpty ||
+          chave.length < 3 ||
+          regrasJaAprendidas.contains(chave)) {
+        continue;
+      }
+
+      termoOriginalPorChave.putIfAbsent(chave, () => termoOriginal);
+      ocorrenciasPorChave[chave] = (ocorrenciasPorChave[chave] ?? 0) + 1;
+      final Map<CategoriaGasto, int> votos = votosPorChave.putIfAbsent(
+        chave,
+        () => <CategoriaGasto, int>{},
+      );
+      votos[gasto.categoria] = (votos[gasto.categoria] ?? 0) + 1;
+    }
+
+    final List<SugestaoRegraCategoria> sugestoes = <SugestaoRegraCategoria>[];
+    for (final MapEntry<String, int> entry in ocorrenciasPorChave.entries) {
+      if (entry.value < minimoOcorrencias) {
+        continue;
+      }
+
+      final Map<CategoriaGasto, int> votos =
+          votosPorChave[entry.key] ?? const <CategoriaGasto, int>{};
+      if (votos.isEmpty) {
+        continue;
+      }
+
+      final List<MapEntry<CategoriaGasto, int>> ranking = votos.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final MapEntry<CategoriaGasto, int> vencedor = ranking.first;
+
+      sugestoes.add(
+        SugestaoRegraCategoria(
+          termo: termoOriginalPorChave[entry.key] ?? entry.key,
+          categoria: vencedor.key,
+          ocorrencias: entry.value,
+        ),
+      );
+    }
+
+    sugestoes.sort((a, b) => b.ocorrencias.compareTo(a.ocorrencias));
+    return sugestoes;
   }
 
   String _detectarSeparador(String linha) {
@@ -398,19 +478,8 @@ class ExtratoCsvService {
     return temPagamento && temRecebimento;
   }
 
-  String _normalizarTextoBusca(String texto) {
-    return texto
-        .toUpperCase()
-        .replaceAll(RegExp(r'[ÁÀÃÂ]'), 'A')
-        .replaceAll(RegExp(r'[ÉÈÊ]'), 'E')
-        .replaceAll(RegExp(r'[ÍÌÎ]'), 'I')
-        .replaceAll(RegExp(r'[ÓÒÕÔ]'), 'O')
-        .replaceAll(RegExp(r'[ÚÙÛ]'), 'U')
-        .replaceAll('Ç', 'C')
-        .replaceAll(RegExp(r'[^A-Z0-9 ]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-  }
+  String _normalizarTextoBusca(String texto) =>
+      TextNormalizer.normalizeForSearch(texto);
 
   CategoriaGasto _categorizar(
     String descricao,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../domain/repositories/finance_repository.dart';
 import '../../models/conta_model.dart';
-import '../../services/database_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
@@ -10,7 +10,7 @@ import '../../utils/app_formatters.dart';
 class NovoRecebivelScreen extends StatefulWidget {
   const NovoRecebivelScreen({super.key, required this.db});
 
-  final DatabaseService db;
+  final FinanceRepository db;
 
   @override
   State<NovoRecebivelScreen> createState() => _NovoRecebivelScreenState();
@@ -22,6 +22,20 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   final TextEditingController _descricaoController = TextEditingController();
   final TextEditingController _valorController = TextEditingController();
   bool _salvando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nomeController.addListener(_onCamposAlterados);
+    _descricaoController.addListener(_onCamposAlterados);
+    _valorController.addListener(_onCamposAlterados);
+  }
+
+  void _onCamposAlterados() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   String _normalizarMensagemErro(Object error) {
     final String texto = error.toString();
@@ -38,10 +52,51 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
   @override
   void dispose() {
+    _nomeController.removeListener(_onCamposAlterados);
+    _descricaoController.removeListener(_onCamposAlterados);
+    _valorController.removeListener(_onCamposAlterados);
     _nomeController.dispose();
     _descricaoController.dispose();
     _valorController.dispose();
     super.dispose();
+  }
+
+  String _formatarValorPreview() {
+    try {
+      return AppFormatters.moeda(
+        AppFormatters.parseMoedaInput(_valorController.text),
+      );
+    } catch (_) {
+      return 'R\$ 0,00';
+    }
+  }
+
+  Widget _buildSectionCard({required Widget child}) {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle({required String title, required IconData icon}) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: AppSpacing.s8),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        ),
+      ],
+    );
   }
 
   Future<void> _salvarConta() async {
@@ -69,8 +124,11 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
         }
       } catch (e) {
         if (mounted) {
-          setState(() => _salvando = false);
           AppFeedback.showError(context, _normalizarMensagemErro(e));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _salvando = false);
         }
       }
     }
@@ -78,10 +136,66 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String nomePreview = _nomeController.text.trim().isEmpty
+        ? 'Sem nome'
+        : _nomeController.text.trim();
+    final String descricaoPreview = _descricaoController.text.trim().isEmpty
+        ? 'Sem referência'
+        : _descricaoController.text.trim();
+    final String valorPreview = _formatarValorPreview();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Novo Item a Receber'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s16,
+          AppSpacing.s12,
+          AppSpacing.s16,
+          AppSpacing.s16,
+        ),
+        child: SafeArea(
+          top: false,
+          left: false,
+          right: false,
+          minimum: const EdgeInsets.only(bottom: AppSpacing.s8),
+          child: SizedBox(
+            height: 54,
+            child: FilledButton(
+              onPressed: _salvando ? null : _salvarConta,
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: _salvando
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        SizedBox(width: AppSpacing.s8),
+                        Text('Salvando...'),
+                      ],
+                    )
+                  : const Text(
+                      'SALVAR ITEM A RECEBER',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),
@@ -89,85 +203,186 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
           key: _formKey,
           child: ListView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.only(bottom: 96),
             children: [
-              TextFormField(
-                controller: _nomeController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Nome de quem deve',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Prévia rápida',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.s16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: Text(
+                              nomePreview,
+                              key: ValueKey<String>(nomePreview),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s8),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: Text(
+                              descricaoPreview,
+                              key: ValueKey<String>(descricaoPreview),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s12),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            child: Text(
+                              valorPreview,
+                              key: ValueKey<String>(valorPreview),
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: Theme.of(context).colorScheme.primary,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, digite um nome.';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: AppSpacing.s16),
-              TextFormField(
-                controller: _descricaoController,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição (Ex: Internet de Abril)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.description),
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle(title: 'Pessoa', icon: Icons.person),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextFormField(
+                      controller: _nomeController,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Quem vai pagar',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Informe o nome.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Por favor, descreva o que esta sendo cobrado.';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: AppSpacing.s16),
-              TextFormField(
-                controller: _valorController,
-                textInputAction: TextInputAction.done,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle(
+                      title: 'Cobrança',
+                      icon: Icons.description_outlined,
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextFormField(
+                      controller: _descricaoController,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Referência da cobrança',
+                        helperText: 'Ex: Internet de abril',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.receipt_long_outlined),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Descreva a cobrança.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
-                inputFormatters: <TextInputFormatter>[MoedaInputFormatter()],
-                decoration: const InputDecoration(
-                  labelText: 'Valor (Ex: 45.50)',
-                  border: OutlineInputBorder(),
-                  prefixText: 'R\$ ',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, informe o valor.';
-                  }
-
-                  try {
-                    final double valor = AppFormatters.parseMoedaInput(value);
-                    if (valor <= 0) {
-                      return 'Informe um valor numérico maior que zero.';
-                    }
-                  } catch (_) {
-                    return 'Informe um valor numérico maior que zero.';
-                  }
-
-                  return null;
-                },
               ),
-              const SizedBox(height: AppSpacing.s24),
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _salvando ? null : _salvarConta,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _salvando
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'SALVAR ITEM A RECEBER',
-                          style: TextStyle(fontSize: 16),
-                        ),
+              const SizedBox(height: AppSpacing.s16),
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle(
+                      title: 'Valor',
+                      icon: Icons.payments_outlined,
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextFormField(
+                      controller: _valorController,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: <TextInputFormatter>[
+                        MoedaInputFormatter(),
+                      ],
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Valor da cobrança',
+                        helperText: 'Valor em reais',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.attach_money),
+                        prefixText: 'R\$ ',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Valor inválido.';
+                        }
+
+                        try {
+                          final double valor = AppFormatters.parseMoedaInput(
+                            value,
+                          );
+                          if (valor <= 0) {
+                            return 'Valor inválido.';
+                          }
+                        } catch (_) {
+                          return 'Valor inválido.';
+                        }
+
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],

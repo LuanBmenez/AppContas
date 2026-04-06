@@ -4,19 +4,22 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../domain/repositories/finance_repository.dart';
 import '../../models/cartao_credito_model.dart';
 import '../../models/gasto_model.dart';
 import '../../models/regra_categoria_importacao_model.dart';
-import '../../services/database_service.dart';
 import '../../services/extrato_csv_service.dart';
 import '../../theme/app_tokens.dart';
+import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
+import '../../utils/text_normalizer.dart';
 import 'cartoes_credito_screen.dart';
+import 'importar_extrato/importar_extrato_sections.dart';
 
 class ImportarExtratoScreen extends StatefulWidget {
   const ImportarExtratoScreen({super.key, required this.db});
 
-  final DatabaseService db;
+  final FinanceRepository db;
 
   @override
   State<ImportarExtratoScreen> createState() => _ImportarExtratoScreenState();
@@ -27,6 +30,7 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
 
   bool _carregandoArquivo = false;
   bool _salvando = false;
+  bool _salvandoSugestoes = false;
   String? _nomeArquivo;
   ResultadoLeituraCsv? _csv;
   CartaoCredito? _cartaoSelecionado;
@@ -98,9 +102,7 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao importar CSV: $e')));
+        AppFeedback.showError(context, 'Erro ao importar CSV: $e');
       }
     } finally {
       if (mounted) {
@@ -111,28 +113,22 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
 
   Future<void> _importar(List<Gasto> gastos) async {
     if (gastos.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nenhum gasto valido para importar.')),
-      );
+      AppFeedback.showError(context, 'Nenhum gasto valido para importar.');
       return;
     }
 
     setState(() => _salvando = true);
 
     try {
-      final ResultadoImportacaoGastos resultado = await widget.db
-          .importarGastosComDeduplicacao(gastos);
+      final resultado = await widget.db.importarGastosComDeduplicacao(gastos);
 
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Importacao concluida: ${resultado.importados} novos, ${resultado.duplicados} duplicados ignorados.',
-          ),
-        ),
+      AppFeedback.showSuccess(
+        context,
+        'Importacao concluida: ${resultado.importados} novos, ${resultado.duplicados} duplicados ignorados.',
       );
 
       Navigator.pop(context);
@@ -141,9 +137,7 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Falha ao salvar importacao: $e')));
+      AppFeedback.showError(context, 'Falha ao salvar importacao: $e');
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -186,6 +180,11 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
               final ResultadoMapeamentoExtrato preview = _gerarPreview(
                 regrasAprendidas,
               );
+              final List<SugestaoRegraCategoria> sugestoesRegras =
+                  _extratoService.sugerirRegrasParaGastos(
+                    gastos: preview.gastos,
+                    regrasExistentes: regrasAprendidas,
+                  );
               final Future<int> duplicadosFuture = _obterDuplicadosFuture(
                 preview.gastos,
               );
@@ -193,212 +192,70 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
               return ListView(
                 padding: const EdgeInsets.all(AppSpacing.s16),
                 children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.s16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '1) Escolha o cartao',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: AppSpacing.s12),
-                          DropdownButtonFormField<CartaoCredito>(
-                            value: _cartaoSelecionado, // Corrigido para value
-                            decoration: const InputDecoration(
-                              labelText: 'Cartao',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: cartoes
-                                .map(
-                                  (cartao) => DropdownMenuItem<CartaoCredito>(
-                                    value: cartao,
-                                    child: Text(cartao.label),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _cartaoSelecionado = value);
-                              }
-                            },
-                          ),
-                          const SizedBox(height: AppSpacing.s12),
-                          TextButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      CartoesCreditoScreen(db: widget.db),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.credit_card),
-                            label: const Text('Gerenciar cartoes'),
-                          ),
-                        ],
-                      ),
-                    ),
+                  CartaoStepSection(
+                    cartoes: cartoes,
+                    cartaoSelecionado: _cartaoSelecionado,
+                    onCartaoChanged: (value) {
+                      if (value != null) {
+                        setState(() => _cartaoSelecionado = value);
+                      }
+                    },
+                    onGerenciarCartoes: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CartoesCreditoScreen(db: widget.db),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: AppSpacing.s12),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.s16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '2) Selecione o CSV da fatura',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: AppSpacing.s12),
-                          OutlinedButton.icon(
-                            onPressed: _carregandoArquivo
-                                ? null
-                                : _selecionarArquivoCsv,
-                            icon: const Icon(Icons.upload_file_outlined),
-                            label: Text(
-                              _nomeArquivo == null
-                                  ? 'Escolher arquivo CSV'
-                                  : 'Arquivo: $_nomeArquivo',
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s8),
-                          const Text(
-                            'OFX ainda nao implementado nesta primeira versao.',
-                          ),
-                        ],
-                      ),
-                    ),
+                  ArquivoCsvStepSection(
+                    carregandoArquivo: _carregandoArquivo,
+                    nomeArquivo: _nomeArquivo,
+                    onSelecionarArquivo: _selecionarArquivoCsv,
                   ),
                   if (_csv != null) ...[
                     const SizedBox(height: AppSpacing.s12),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.s16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '3) Mapeie as colunas',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-                            _buildCampoMapeamento(
-                              label: 'Data de lancamento*',
-                              campo: CampoExtrato.dataLancamento,
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-                            _buildCampoMapeamento(
-                              label: 'Descricao*',
-                              campo: CampoExtrato.descricao,
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-                            _buildCampoMapeamento(
-                              label: 'Valor*',
-                              campo: CampoExtrato.valor,
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-                            _buildCampoMapeamento(
-                              label: 'Data da compra (opcional)',
-                              campo: CampoExtrato.dataCompra,
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-                            _buildCampoMapeamento(
-                              label: 'Parcela (opcional)',
-                              campo: CampoExtrato.parcela,
-                            ),
-                          ],
-                        ),
+                    MapeamentoColunasSection(
+                      campoDataLancamento: _buildCampoMapeamento(
+                        label: 'Data de lancamento*',
+                        campo: CampoExtrato.dataLancamento,
+                      ),
+                      campoDescricao: _buildCampoMapeamento(
+                        label: 'Descricao*',
+                        campo: CampoExtrato.descricao,
+                      ),
+                      campoValor: _buildCampoMapeamento(
+                        label: 'Valor*',
+                        campo: CampoExtrato.valor,
+                      ),
+                      campoDataCompra: _buildCampoMapeamento(
+                        label: 'Data da compra (opcional)',
+                        campo: CampoExtrato.dataCompra,
+                      ),
+                      campoParcela: _buildCampoMapeamento(
+                        label: 'Parcela (opcional)',
+                        campo: CampoExtrato.parcela,
                       ),
                     ),
+                    if (sugestoesRegras.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.s12),
+                      _buildSugestoesRegrasCard(sugestoesRegras),
+                    ],
                     const SizedBox(height: AppSpacing.s12),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.s16),
-                        child: FutureBuilder<int>(
-                          future: duplicadosFuture,
-                          builder: (context, duplicadosSnapshot) {
-                            final int duplicadosDetectados =
-                                duplicadosSnapshot.data ?? 0;
-                            final int importaveis =
-                                preview.gastos.length - duplicadosDetectados;
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '4) Previa antes de salvar',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: AppSpacing.s8),
-                                Text(
-                                  '${importaveis < 0 ? 0 : importaveis} gastos serao importados',
-                                ),
-                                Text('${preview.ignorados} linhas ignoradas'),
-                                if (duplicadosSnapshot.connectionState ==
-                                    ConnectionState.waiting)
-                                  const Text('Analisando duplicados...')
-                                else
-                                  Text(
-                                    '$duplicadosDetectados duplicados detectados',
-                                  ),
-                                if (preview.ignoradosPorMotivo.isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.s8),
-                                  const Text(
-                                    'Motivos de ignorados:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s4),
-                                  ...preview.ignoradosPorMotivo.entries.map(
-                                    (entry) =>
-                                        Text('• ${entry.value}x ${entry.key}'),
-                                  ),
-                                ],
-                                const SizedBox(height: AppSpacing.s12),
-                                ...preview.gastos
-                                    .take(8)
-                                    .map((gasto) => _buildItemPreview(gasto)),
-                                if (preview.gastos.length > 8)
-                                  Text(
-                                    '... e mais ${preview.gastos.length - 8} registros',
-                                  ),
-                                const SizedBox(height: AppSpacing.s16),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed:
-                                        _salvando || !_mapeamentoObrigatorioOk
-                                        ? null
-                                        : () => _importar(preview.gastos),
-                                    icon: _salvando
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : const Icon(Icons.save_alt_outlined),
-                                    label: Text(
-                                      _salvando
-                                          ? 'Importando...'
-                                          : 'Salvar gastos importados',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
+                    PreviewImportacaoSection(
+                      preview: preview,
+                      duplicadosFuture: duplicadosFuture,
+                      salvando: _salvando,
+                      podeImportar: _mapeamentoObrigatorioOk && !_salvando,
+                      onImportar: () => _importar(preview.gastos),
+                      itensPreview: preview.gastos
+                          .take(8)
+                          .map((gasto) => _buildItemPreview(gasto))
+                          .toList(),
                     ),
-                  ], // Fim do if(_csv != null)
+                  ],
                 ],
               );
             },
@@ -406,7 +263,7 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
         },
       ),
     );
-  } // Fim do método build
+  }
 
   bool get _mapeamentoObrigatorioOk {
     return _mapeamento[CampoExtrato.dataLancamento] != null &&
@@ -455,6 +312,99 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
     return _duplicadosCache!;
   }
 
+  Future<void> _aceitarSugestoesRegras(
+    List<SugestaoRegraCategoria> sugestoes,
+  ) async {
+    if (sugestoes.isEmpty) {
+      return;
+    }
+
+    setState(() => _salvandoSugestoes = true);
+    try {
+      for (final SugestaoRegraCategoria sugestao in sugestoes) {
+        await widget.db.salvarRegraCategoriaImportacao(
+          termo: sugestao.termo,
+          categoria: sugestao.categoria,
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+      AppFeedback.showSuccess(
+        context,
+        '${sugestoes.length} sugestoes aplicadas e aprendidas.',
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppFeedback.showError(context, 'Falha ao salvar sugestoes: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _salvandoSugestoes = false);
+      }
+    }
+  }
+
+  Widget _buildSugestoesRegrasCard(List<SugestaoRegraCategoria> sugestoes) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '4) Sugestoes de categorizacao',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            const Text(
+              'Revise e aceite em lote para treinar regras das proximas importacoes.',
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            ...sugestoes
+                .take(8)
+                .map(
+                  (s) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+                    child: Text(
+                      '${s.ocorrencias}x ${s.termo} -> ${s.categoria.label}',
+                    ),
+                  ),
+                ),
+            if (sugestoes.length > 8)
+              Text('... e mais ${sugestoes.length - 8} sugestoes'),
+            const SizedBox(height: AppSpacing.s12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _salvandoSugestoes
+                    ? null
+                    : () => _aceitarSugestoesRegras(sugestoes),
+                icon: _salvandoSugestoes
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.auto_fix_high),
+                label: Text(
+                  _salvandoSugestoes
+                      ? 'Aplicando sugestoes...'
+                      : 'Aceitar ${sugestoes.length} sugestoes',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSemCartoes() {
     return Center(
       child: Padding(
@@ -497,8 +447,7 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
     }
 
     return DropdownButtonFormField<String?>(
-      value:
-          _mapeamento[campo], // Trocado initialValue por value para funcionar corretamente o onChanged
+      initialValue: _mapeamento[campo],
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -559,22 +508,5 @@ class _ImportarExtratoScreenState extends State<ImportarExtratoScreen> {
     return null;
   }
 
-  String _normalizar(String texto) {
-    return texto
-        .toLowerCase()
-        .replaceAll('á', 'a')
-        .replaceAll('à', 'a')
-        .replaceAll('â', 'a')
-        .replaceAll('ã', 'a')
-        .replaceAll('é', 'e')
-        .replaceAll('ê', 'e')
-        .replaceAll('í', 'i')
-        .replaceAll('ó', 'o')
-        .replaceAll('ô', 'o')
-        .replaceAll('õ', 'o')
-        .replaceAll('ú', 'u')
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
-        .replaceAll(RegExp(r'_+'), '_')
-        .replaceAll(RegExp(r'^_|_$'), '');
-  }
+  String _normalizar(String texto) => TextNormalizer.normalizeForHeader(texto);
 }

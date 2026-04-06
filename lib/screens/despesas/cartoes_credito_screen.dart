@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/repositories/finance_repository.dart';
 import '../../models/cartao_credito_model.dart';
-import '../../services/database_service.dart';
 import '../../theme/app_tokens.dart';
 
 class CartoesCreditoScreen extends StatelessWidget {
   const CartoesCreditoScreen({super.key, required this.db});
 
-  final DatabaseService db;
+  final FinanceRepository db;
 
   @override
   Widget build(BuildContext context) {
