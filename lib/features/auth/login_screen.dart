@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -44,15 +45,38 @@ class _LoginScreenState extends State<LoginScreen> {
       final FirebaseAuth auth = FirebaseAuth.instance;
       final String email = _emailController.text.trim();
       final String senha = _senhaController.text;
+      final String nomeBase = email.contains('@')
+          ? email.split('@').first
+          : 'Usuario';
 
       if (_modoCadastro) {
         await auth.createUserWithEmailAndPassword(
           email: email,
           password: senha,
         );
+        final User? novoUser = auth.currentUser;
+        if (novoUser != null &&
+            (novoUser.displayName == null ||
+                novoUser.displayName!.trim().isEmpty)) {
+          await novoUser.updateDisplayName(nomeBase);
+        }
       } else {
         await auth.signInWithEmailAndPassword(email: email, password: senha);
       }
+
+      final String uid = auth.currentUser!.uid;
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      await firestore.collection('users').doc(uid).set({
+        'email': email,
+        'nome': nomeBase,
+        'workspaceId': uid,
+        'atualizadoEm': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await firestore.collection('workspaces').doc(uid).set({
+        'ownerUid': uid,
+        'nome': 'Workspace de $email',
+        'atualizadoEm': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       if (!mounted) {
         return;

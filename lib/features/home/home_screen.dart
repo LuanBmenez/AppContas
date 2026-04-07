@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/repositories/finance_repository.dart';
 
-enum HomeTab { inicio, despesas, receber }
+enum HomeTab { inicio, despesas, receber, perfil }
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -20,13 +20,15 @@ class HomeScreen extends StatelessWidget {
   String get _titulo {
     if (currentTab == HomeTab.inicio) return 'Visão Geral';
     if (currentTab == HomeTab.despesas) return 'Meus Gastos';
-    return 'A Receber';
+    if (currentTab == HomeTab.receber) return 'A Receber';
+    return 'Perfil';
   }
 
   int get _indiceAtual => switch (currentTab) {
     HomeTab.inicio => 0,
     HomeTab.despesas => 1,
     HomeTab.receber => 2,
+    HomeTab.perfil => 3,
   };
 
   Future<void> _onAdicionar(BuildContext context) async {
@@ -45,7 +47,6 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titulo),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: currentTab == HomeTab.despesas
             ? <Widget>[
                 IconButton(
@@ -62,7 +63,8 @@ class HomeScreen extends StatelessWidget {
             : null,
       ),
       body: child,
-      floatingActionButton: currentTab == HomeTab.inicio
+      floatingActionButton:
+          currentTab == HomeTab.inicio || currentTab == HomeTab.perfil
           ? null
           : FloatingActionButton(
               onPressed: () => _onAdicionar(context),
@@ -92,7 +94,11 @@ class HomeScreen extends StatelessWidget {
               context.go('/despesas');
               return;
             }
-            context.go('/receber');
+            if (index == 2) {
+              context.go('/receber');
+              return;
+            }
+            context.go('/perfil');
           },
           destinations: const [
             NavigationDestination(
@@ -109,6 +115,11 @@ class HomeScreen extends StatelessWidget {
               icon: Icon(Icons.handshake_outlined),
               selectedIcon: Icon(Icons.handshake),
               label: 'A Receber',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil',
             ),
           ],
         ),

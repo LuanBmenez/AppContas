@@ -24,26 +24,28 @@ class DatabaseService implements FinanceRepository {
     return user.uid;
   }
 
-  DocumentReference<Map<String, dynamic>> get _usuarioDoc =>
-      FirebaseFirestore.instance.collection('users').doc(_uid);
+  String get _workspaceId => _uid;
+
+  DocumentReference<Map<String, dynamic>> get _workspaceDoc =>
+      FirebaseFirestore.instance.collection('workspaces').doc(_workspaceId);
 
   CollectionReference<Map<String, dynamic>> get _receberCollection =>
-      _usuarioDoc.collection('a_receber');
+      _workspaceDoc.collection('recebiveis');
 
   CollectionReference<Map<String, dynamic>> get _gastosCollection =>
-      _usuarioDoc.collection('meus_gastos');
+      _workspaceDoc.collection('gastos');
 
   CollectionReference<Map<String, dynamic>> get _cartoesCollection =>
-      _usuarioDoc.collection('cartoes_credito');
+      _workspaceDoc.collection('cartoes');
 
   CollectionReference<Map<String, dynamic>> get _regrasCategoriaCollection =>
-      _usuarioDoc.collection('regras_categoria_importacao');
+      _workspaceDoc.collection('regras_importacao');
 
   CollectionReference<Map<String, dynamic>> get _categoriasPersonalizadas =>
-      _usuarioDoc.collection('categorias_personalizadas');
+      _workspaceDoc.collection('categorias_personalizadas');
 
   CollectionReference<Map<String, dynamic>> get _preferenciasCollection =>
-      _usuarioDoc.collection('preferencias_app');
+      _workspaceDoc.collection('preferencias');
 
   @override
   Future<void> adicionarRecebivel(Conta conta) async {

@@ -6,12 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../app/router/app_routes.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/utils.dart';
 import '../../domain/models/models.dart';
 import '../../domain/repositories/finance_repository.dart';
-import '../../services/app_telemetry_service.dart';
 import '../../services/dashboard_summary_service.dart';
 import '../../services/report_export_service.dart';
 import '../../ui/ui.dart';
@@ -21,10 +19,16 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.db,
     this.exportadorRelatorio,
+    this.onTapSaidas,
+    this.onTapReceber,
+    this.onTapSaidasFiltradas,
   });
 
   final FinanceRepository db;
   final Future<void> Function(DateTime referencia)? exportadorRelatorio;
+  final VoidCallback? onTapSaidas;
+  final VoidCallback? onTapReceber;
+  final ValueChanged<DashboardDrillDownFilter>? onTapSaidasFiltradas;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -33,26 +37,14 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardSummaryService _summaryService = DashboardSummaryService();
   final ReportExportService _reportExportService = const ReportExportService();
-  final AppTelemetryService _telemetryService = AppTelemetryService();
-  Stream<DashboardResumo>? _dashboardResumoStream;
+
   DashboardPeriodoRapido _periodo = DashboardPeriodoRapido.mes;
   DateTime? _mesEspecifico;
   bool _exportandoRelatorio = false;
+  int _retryTick = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _dashboardResumoStream = widget.db.dashboardResumo;
-  }
-
-  @override
-  void didUpdateWidget(covariant DashboardScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.db != widget.db) {
-      _summaryService.clearCache();
-      _dashboardResumoStream = widget.db.dashboardResumo;
-    }
-  }
+  String _memoKey = '';
+  DashboardResumoCalculado? _memoResumo;
 
   String _tituloPeriodo(DateTime agora) {
     if (_mesEspecifico != null) {
@@ -87,7 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final String erro = (error ?? '').toString().toLowerCase();
     if (erro.contains('firestore.googleapis.com') ||
         erro.contains('permission_denied')) {
-      return 'Firestore sem permissao ou desativado no projeto.\n'
+      return 'Firestore sem permissão ou desativado no projeto.\n'
           'Ative o Cloud Firestore no Firebase Console e tente novamente.';
     }
     return 'Erro ao carregar o painel.';
@@ -140,10 +132,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  void _recarregarDashboard() {
+  void _tentarNovamente() {
     setState(() {
-      _summaryService.clearCache();
-      _dashboardResumoStream = widget.db.dashboardResumo;
+      _retryTick++;
     });
   }
 
@@ -159,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '${lider.label} concentra ${participacao.toStringAsFixed(1)}% das saídas. Considere revisar esse grupo primeiro.';
   }
 
-  DashboardResumoCalculado _calcularResumo(
+  DashboardResumoCalculado _calcularResumoMemoizado(
     DashboardResumo bruto,
     DateTime agora,
   ) {
@@ -167,73 +158,115 @@ class _DashboardScreenState extends State<DashboardScreen> {
       agora,
     );
 
-    return _summaryService.calcularResumo(
+    final String chave = [
+      bruto.gastos.length,
+      bruto.contas.length,
+      faixa.inicio.millisecondsSinceEpoch,
+      faixa.fimExclusivo.millisecondsSinceEpoch,
+      _periodo.name,
+      _mesEspecifico?.millisecondsSinceEpoch ?? 0,
+    ].join('|');
+
+    if (_memoResumo != null && _memoKey == chave) {
+      return _memoResumo!;
+    }
+
+    final DashboardResumoCalculado resumo = _summaryService.calcularResumo(
       resumo: bruto,
       periodo: _periodo,
       inicioOverride: faixa.inicio,
       fimExclusivoOverride: faixa.fimExclusivo,
       agora: agora,
     );
+
+    _memoKey = chave;
+    _memoResumo = resumo;
+    return resumo;
   }
 
-  void _irParaDespesas({DashboardDrillDownFilter? filter}) {
-    final Map<String, dynamic> query = filter == null
-        ? <String, dynamic>{}
-        : <String, dynamic>{...AppRoutes.despesasQueryFromFilter(filter)};
-    context.goNamed(AppRoutes.despesasName, queryParameters: query);
-  }
-
-  void _abrirDrillDownCategoria(
-    DashboardCategoriaResumo categoria,
-    double totalGastosPeriodo,
-  ) {
+  void _abrirDrillDownCategoria(DashboardCategoriaResumo categoria) {
     showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (context) {
-        final double percentual = totalGastosPeriodo <= 0
+        final double totalBase = _memoResumo?.totalGastosPeriodo ?? 0;
+        final double percentual = totalBase <= 0
             ? 0
-            : (categoria.valor / totalGastosPeriodo) * 100;
+            : (categoria.valor / totalBase) * 100;
+
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.s16),
+            padding: const EdgeInsets.all(AppSpacing.s20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s20),
                 Row(
                   children: [
-                    Icon(categoria.icon, color: categoria.color),
-                    const SizedBox(width: AppSpacing.s8),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: categoria.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(categoria.icon, color: categoria.color),
+                    ),
+                    const SizedBox(width: AppSpacing.s12),
                     Expanded(
                       child: Text(
                         categoria.label,
-                        style: const TextStyle(
-                          fontSize: 16,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.s8),
-                Text('Valor: ${AppFormatters.moeda(categoria.valor)}'),
-                Text('Participação: ${percentual.toStringAsFixed(1)}%'),
                 const SizedBox(height: AppSpacing.s16),
+                Text(
+                  'Valor: ${AppFormatters.moeda(categoria.valor)}',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: AppSpacing.s4),
+                Text(
+                  'Participação: ${percentual.toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s20),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      _irParaDespesas(
-                        filter: DashboardDrillDownFilter(
-                          mesReferencia: _mesEspecifico,
+                      widget.onTapSaidasFiltradas?.call(
+                        DashboardDrillDownFilter(
+                          mesReferencia: _mesEspecifico ?? DateTime.now(),
                           categoriaPadrao: categoria.categoriaPadrao,
                           categoriaPersonalizadaId:
                               categoria.categoriaPersonalizadaId,
                         ),
                       );
                     },
-                    icon: const Icon(Icons.open_in_new),
+                    icon: const Icon(Icons.open_in_new_rounded),
                     label: const Text('Ver gastos desta categoria'),
                   ),
                 ),
@@ -245,53 +278,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _exportarRelatorioMensal({required String origemAcao}) async {
+  Future<void> _exportarRelatorioMensal() async {
     if (_exportandoRelatorio) {
-      _telemetryService.logEvent(
-        AppTelemetryEvents.dashboardExportPdfIgnoredBusy,
-        params: <String, Object?>{'origemAcao': origemAcao},
-      );
       return;
     }
 
-    final Stopwatch cronometro = Stopwatch()..start();
-    final DateTime referencia = _mesReferenciaExportacao(DateTime.now());
-    bool sucesso = false;
-    bool fallbackCompartilhamento = false;
-    String? erroTipo;
-    String? mensagemFeedback;
-
-    _telemetryService.logEvent(
-      AppTelemetryEvents.dashboardExportPdfStarted,
-      params: <String, Object?>{
-        'origemAcao': origemAcao,
-        'referenciaAno': referencia.year,
-        'referenciaMes': referencia.month,
-      },
-    );
-
     if (kIsWeb) {
-      _telemetryService.logEvent(
-        AppTelemetryEvents.dashboardExportPdfUnsupportedPlatform,
-        params: <String, Object?>{
-          'origemAcao': origemAcao,
-          'platform': 'web',
-          'duracaoMs': cronometro.elapsedMilliseconds,
-        },
-      );
       AppFeedback.showError(
         context,
-        'Exportacao de arquivo indisponivel no navegador nesta versao.',
+        'Exportação de arquivo indisponível no navegador nesta versão.',
       );
       return;
     }
 
     setState(() => _exportandoRelatorio = true);
     try {
+      final DateTime referencia = _mesReferenciaExportacao(DateTime.now());
+
       if (widget.exportadorRelatorio != null) {
         await widget.exportadorRelatorio!(referencia);
-        sucesso = true;
-        mensagemFeedback = 'Relatorio PDF gerado com sucesso.';
+        if (mounted) {
+          AppFeedback.showSuccess(context, 'Relatório PDF gerado com sucesso.');
+        }
         return;
       }
 
@@ -311,64 +319,311 @@ class _DashboardScreenState extends State<DashboardScreen> {
         await SharePlus.instance.share(
           ShareParams(
             files: <XFile>[XFile(arquivo.path)],
-            subject: 'Relatorio mensal financeiro',
+            subject: 'Relatório mensal financeiro',
             text:
-                'Relatorio ${referencia.month.toString().padLeft(2, '0')}/${referencia.year}',
+                'Relatório ${referencia.month.toString().padLeft(2, '0')}/${referencia.year}',
           ),
         );
-        sucesso = true;
-        mensagemFeedback = 'Relatorio PDF gerado com sucesso.';
       } catch (_) {
-        sucesso = true;
-        fallbackCompartilhamento = true;
-        mensagemFeedback =
-            'PDF gerado em ${arquivo.path}. Compartilhe manualmente se necessário.';
+        if (mounted) {
+          AppFeedback.showSuccess(
+            context,
+            'PDF gerado em ${arquivo.path}. Compartilhe manualmente se necessário.',
+          );
+        }
+      }
+
+      if (mounted) {
+        AppFeedback.showSuccess(context, 'Relatório PDF gerado com sucesso.');
       }
     } catch (e) {
-      erroTipo = e.runtimeType.toString();
-      _telemetryService.logEvent(
-        AppTelemetryEvents.dashboardExportPdfException,
-        params: <String, Object?>{
-          'origemAcao': origemAcao,
-          'erroTipo': erroTipo,
-          'erroMensagem': e.toString(),
-        },
-      );
       if (mounted) {
-        AppFeedback.showError(
-          context,
-          'Falha ao exportar relatorio. Tente novamente.',
-        );
+        AppFeedback.showError(context, 'Falha ao exportar relatório: $e');
       }
     } finally {
-      cronometro.stop();
-      _telemetryService.logEvent(
-        AppTelemetryEvents.dashboardExportPdfFinished,
-        params: <String, Object?>{
-          'origemAcao': origemAcao,
-          'referenciaAno': referencia.year,
-          'referenciaMes': referencia.month,
-          'duracaoMs': cronometro.elapsedMilliseconds,
-          'sucesso': sucesso,
-          'fallbackCompartilhamento': fallbackCompartilhamento,
-          'erroTipo': erroTipo,
-        },
-      );
-
-      if (mounted && sucesso && mensagemFeedback != null) {
-        AppFeedback.showSuccess(context, mensagemFeedback);
-      }
-
       if (mounted) {
         setState(() => _exportandoRelatorio = false);
       }
     }
   }
 
+  Widget _buildHeader(ThemeData theme, DateTime agora) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Resumo financeiro',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _tituloPeriodo(agora),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _memoResumo == null ? '' : _insightPrincipal(_memoResumo!),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPeriodChip(ThemeData theme, DashboardPeriodoRapido periodo) {
+    final bool selecionado = _periodo == periodo && _mesEspecifico == null;
+
+    return ChoiceChip(
+      label: Text(_labelPeriodo(periodo)),
+      selected: selecionado,
+      showCheckmark: false,
+      labelStyle: theme.textTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+        color: selecionado
+            ? theme.colorScheme.onPrimary
+            : theme.colorScheme.onSurface,
+      ),
+      selectedColor: theme.colorScheme.primary,
+      backgroundColor: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: BorderSide(
+          color: selecionado
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outline.withValues(alpha: 0.12),
+        ),
+      ),
+      onSelected: (_) {
+        setState(() {
+          _periodo = periodo;
+          _mesEspecifico = null;
+        });
+      },
+    );
+  }
+
+  Widget _buildActionPill({
+    required ThemeData theme,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.10),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroSaldoCard(ThemeData theme, DashboardResumoCalculado resumo) {
+    const AppSemanticColors fallbackSemantic = AppSemanticColors(
+      success: Color(0xFF0F9D7A),
+      successContainer: Color(0xFFE5F6F2),
+      warning: Color(0xFFC26A00),
+      warningContainer: Color(0xFFFFEED9),
+      error: Color(0xFFD64545),
+      errorContainer: Color(0xFFFDE8E8),
+    );
+    final AppSemanticColors semantic =
+        theme.extension<AppSemanticColors>() ?? fallbackSemantic;
+    final bool saldoPositivo = resumo.saldoPositivo;
+    final List<Color> colors = saldoPositivo
+        ? [semantic.success, semantic.success.withValues(alpha: 0.85)]
+        : [semantic.error, semantic.error.withValues(alpha: 0.85)];
+
+    return _DashboardEntry(
+      delayMs: 0,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: colors.last.withValues(alpha: 0.25),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(30),
+          onTap: () {
+            widget.onTapSaidasFiltradas?.call(
+              DashboardDrillDownFilter(
+                mesReferencia: _mesEspecifico ?? DateTime.now(),
+              ),
+            );
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_outlined,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      saldoPositivo ? 'Saldo positivo' : 'Atenção',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Saldo do período',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                AppFormatters.moeda(resumo.saldo),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 38,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1.1,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Recebido - gastos no período selecionado',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExportCard(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              Icons.picture_as_pdf_outlined,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _exportandoRelatorio
+                  ? 'Gerando e compartilhando relatório...'
+                  : 'Exportar relatório PDF',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: _exportandoRelatorio ? null : _exportarRelatorioMensal,
+            child: Text(_exportandoRelatorio ? 'Gerando...' : 'Exportar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    const AppSemanticColors fallbackSemantic = AppSemanticColors(
+      success: Color(0xFF0F9D7A),
+      successContainer: Color(0xFFE5F6F2),
+      warning: Color(0xFFC26A00),
+      warningContainer: Color(0xFFFFEED9),
+      error: Color(0xFFD64545),
+      errorContainer: Color(0xFFFDE8E8),
+    );
+    final AppSemanticColors semantic =
+        theme.extension<AppSemanticColors>() ?? fallbackSemantic;
+
     return StreamBuilder<DashboardResumo>(
-      stream: _dashboardResumoStream,
+      key: ValueKey<int>(_retryTick),
+      stream: widget.db.dashboardResumo,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Padding(
@@ -378,13 +633,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: const [
                 AppSkeletonBox(height: 28, width: 220),
                 SizedBox(height: AppSpacing.s8),
-                AppSkeletonBox(height: 18, width: 160),
-                SizedBox(height: AppSpacing.s12),
-                AppSkeletonBox(height: 34),
-                SizedBox(height: AppSpacing.s12),
-                AppSkeletonBox(height: 44),
-                SizedBox(height: AppSpacing.s24),
-                AppSkeletonBox(height: 160, radius: 20),
+                AppSkeletonBox(height: 18, width: 180),
+                SizedBox(height: AppSpacing.s20),
+                AppSkeletonBox(height: 210, radius: 30),
+                SizedBox(height: AppSpacing.s16),
+                AppSkeletonBox(height: 44, radius: 999),
+                SizedBox(height: AppSpacing.s16),
+                AppSkeletonBox(height: 64, radius: 22),
               ],
             ),
           );
@@ -408,7 +663,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: AppSpacing.s12),
                   FilledButton.icon(
-                    onPressed: _recarregarDashboard,
+                    onPressed: _tentarNovamente,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Tentar novamente'),
                   ),
@@ -421,479 +676,346 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final DateTime agora = DateTime.now();
         final DashboardResumo resumoBruto =
             snapshot.data ?? const DashboardResumo(<Gasto>[], <Conta>[]);
-        final DashboardResumoCalculado resumo = _calcularResumo(
+        final DashboardResumoCalculado resumo = _calcularResumoMemoizado(
           resumoBruto,
           agora,
         );
 
-        return Padding(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bool telaCompacta = constraints.maxHeight < 700;
-              return ListView(
-                children: [
-                  _DashboardHeaderPeriodoSection(
-                    periodoTitulo: _tituloPeriodo(agora),
-                    insight: _insightPrincipal(resumo),
-                    acaoPrincipalLabel: 'Ver gastos do mês',
-                    periodoSelecionado: _periodo,
-                    labelPeriodo: _labelPeriodo,
-                    onSelecionarPeriodo: (periodo) {
-                      setState(() {
-                        _periodo = periodo;
-                        _mesEspecifico = null;
-                      });
-                    },
-                    mesEspecifico: _mesEspecifico,
-                    onSelecionarMes: _selecionarMesEspecifico,
-                    onLimparMes: _limparMesEspecifico,
-                    exportandoRelatorio: _exportandoRelatorio,
-                    onAcaoPrincipal: () {
-                      _irParaDespesas(
-                        filter: DashboardDrillDownFilter(
-                          mesReferencia: _mesEspecifico ?? DateTime.now(),
+        return Container(
+          color: theme.colorScheme.surface,
+          child: SafeArea(
+            bottom: false,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isWide = constraints.maxWidth >= 1100;
+                final bool isMedium = constraints.maxWidth >= 840;
+                final double horizontalPadding = isWide
+                    ? 28
+                    : (isMedium ? 20 : 16);
+
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1080),
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        20,
+                        horizontalPadding,
+                        28,
+                      ),
+                      children: [
+                        _buildHeader(theme, agora),
+                        const SizedBox(height: 18),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: DashboardPeriodoRapido.values
+                              .map(
+                                (periodo) => _buildPeriodChip(theme, periodo),
+                              )
+                              .toList(),
                         ),
-                      );
-                    },
-                    onExportarPdf: () => _exportarRelatorioMensal(
-                      origemAcao: 'dashboard_top_secondary',
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s24),
-                  _DashboardEntry(
-                    delayMs: 0,
-                    child: _DashboardSaldoSection(
-                      saldo: resumo.saldo,
-                      saldoPositivo: resumo.saldoPositivo,
-                      onTap: () {
-                        _irParaDespesas(
-                          filter: DashboardDrillDownFilter(
-                            mesReferencia: _mesEspecifico,
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildActionPill(
+                              theme: theme,
+                              icon: Icons.calendar_month_outlined,
+                              label: _mesEspecifico == null
+                                  ? 'Escolher mês'
+                                  : AppFormatters.mesAno(_mesEspecifico!),
+                              onTap: _selecionarMesEspecifico,
+                            ),
+                            if (_mesEspecifico != null)
+                              InputChip(
+                                label: const Text('Mês específico'),
+                                onDeleted: _limparMesEspecifico,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        _buildHeroSaldoCard(theme, resumo),
+                        const SizedBox(height: 14),
+                        _DashboardEntry(
+                          delayMs: 50,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _ComparativoChip(
+                                  titulo: 'Saldo vs ${resumo.comparativoLabel}',
+                                  percentual: resumo.variacaoSaldo,
+                                  positivoEhBom: true,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.s12),
+                              Expanded(
+                                child: _ComparativoChip(
+                                  titulo:
+                                      'Gastos vs ${resumo.comparativoLabel}',
+                                  percentual: resumo.variacaoGastos,
+                                  positivoEhBom: false,
+                                ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  _DashboardEntry(
-                    delayMs: 70,
-                    child: _DashboardComparativosSection(
-                      comparativoLabel: resumo.comparativoLabel,
-                      variacaoSaldo: resumo.variacaoSaldo,
-                      variacaoGastos: resumo.variacaoGastos,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s24),
-                  _DashboardEntry(
-                    delayMs: 130,
-                    child: _DashboardResumoCardsSection(
-                      totalGastosPeriodo: resumo.totalGastosPeriodo,
-                      totalPendente: resumo.totalPendente,
-                      onTapSaidas: () {
-                        _irParaDespesas(
-                          filter: DashboardDrillDownFilter(
-                            mesReferencia: _mesEspecifico,
+                        ),
+                        const SizedBox(height: 16),
+                        _DashboardEntry(
+                          delayMs: 100,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _MiniSummaryCard(
+                                  titulo: 'Saídas',
+                                  valor: resumo.totalGastosPeriodo,
+                                  cor: semantic.error,
+                                  icone: Icons.arrow_downward_rounded,
+                                  onTap: () {
+                                    widget.onTapSaidasFiltradas?.call(
+                                      DashboardDrillDownFilter(
+                                        mesReferencia:
+                                            _mesEspecifico ?? DateTime.now(),
+                                      ),
+                                    );
+                                    if (widget.onTapSaidasFiltradas == null) {
+                                      widget.onTapSaidas?.call();
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.s12),
+                              Expanded(
+                                child: _MiniSummaryCard(
+                                  titulo: 'A receber',
+                                  valor: resumo.totalPendente,
+                                  cor: semantic.warning,
+                                  icone: Icons.pending_actions_rounded,
+                                  onTap: widget.onTapReceber,
+                                ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 16),
+                        _DashboardEntry(
+                          delayMs: 130,
+                          child: _buildExportCard(theme),
+                        ),
+                        const SizedBox(height: 20),
+                        _DashboardEntry(
+                          delayMs: 180,
+                          child: Card(
+                            elevation: 0,
+                            color: theme.colorScheme.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                              side: BorderSide(
+                                color: theme.colorScheme.outline.withValues(
+                                  alpha: 0.08,
+                                ),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.s18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Categorias de gastos',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Distribuição do período selecionado',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  if (resumo.categoriasOrdenadas.isEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.s16,
+                                        vertical: AppSpacing.s24,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(22),
+                                        border: Border.all(
+                                          color: theme
+                                              .colorScheme
+                                              .outlineVariant
+                                              .withValues(alpha: 0.7),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                            Icons.pie_chart_outline_rounded,
+                                            size: 42,
+                                            color: theme.colorScheme.primary
+                                                .withValues(alpha: 0.35),
+                                          ),
+                                          const SizedBox(
+                                            height: AppSpacing.s12,
+                                          ),
+                                          const Text(
+                                            'Sem gastos no período para montar o gráfico.',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: AppSpacing.s4),
+                                          Text(
+                                            'Adicione gastos para ver a distribuição por categoria.',
+                                            textAlign: TextAlign.center,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                          ),
+                                          const SizedBox(
+                                            height: AppSpacing.s16,
+                                          ),
+                                          Wrap(
+                                            spacing: AppSpacing.s10,
+                                            runSpacing: AppSpacing.s10,
+                                            alignment: WrapAlignment.center,
+                                            children: [
+                                              FilledButton.icon(
+                                                onPressed: () {
+                                                  if (widget.onTapSaidas !=
+                                                      null) {
+                                                    widget.onTapSaidas!.call();
+                                                    return;
+                                                  }
+                                                  context.push(
+                                                    '/despesas/novo',
+                                                  );
+                                                },
+                                                icon: const Icon(
+                                                  Icons.add_rounded,
+                                                ),
+                                                label: const Text(
+                                                  'Adicionar gasto',
+                                                ),
+                                              ),
+                                              OutlinedButton.icon(
+                                                onPressed: () => context.push(
+                                                  '/despesas/importar',
+                                                ),
+                                                icon: const Icon(
+                                                  Icons.upload_file_outlined,
+                                                ),
+                                                label: const Text(
+                                                  'Importar CSV',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    _CategoriasBarrasCard(
+                                      total: resumo.totalGastosPeriodo,
+                                      periodo: _tituloPeriodo(agora),
+                                      data: resumo.categoriasOrdenadas,
+                                      onTapCategoria: _abrirDrillDownCategoria,
+                                    ),
+                                  const SizedBox(height: AppSpacing.s16),
+                                  LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final Widget
+                                      cardLider = _InsightResumoCard(
+                                        titulo: 'Categoria líder',
+                                        categoria: resumo.categoriaMaisGasta,
+                                        valor:
+                                            resumo.categoriaMaisGasta?.valor ??
+                                            0,
+                                      );
+                                      final Widget
+                                      cardMenor = _InsightResumoCard(
+                                        titulo: 'Menor participação',
+                                        categoria: resumo.categoriaMenosGasta,
+                                        valor:
+                                            resumo.categoriaMenosGasta?.valor ??
+                                            0,
+                                      );
+                                      final Widget cardAtivas =
+                                          _InsightResumoCard(
+                                            titulo: 'Categorias ativas',
+                                            valor: resumo
+                                                .categoriasOrdenadas
+                                                .length
+                                                .toDouble(),
+                                            labelUnico: true,
+                                          );
+
+                                      if (constraints.maxWidth < 820) {
+                                        return Column(
+                                          children: [
+                                            cardLider,
+                                            const SizedBox(
+                                              height: AppSpacing.s12,
+                                            ),
+                                            cardMenor,
+                                            const SizedBox(
+                                              height: AppSpacing.s12,
+                                            ),
+                                            cardAtivas,
+                                          ],
+                                        );
+                                      }
+
+                                      return Row(
+                                        children: [
+                                          Expanded(child: cardLider),
+                                          const SizedBox(width: AppSpacing.s12),
+                                          Expanded(child: cardMenor),
+                                          const SizedBox(width: AppSpacing.s12),
+                                          Expanded(child: cardAtivas),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.s24),
-                  _DashboardEntry(
-                    delayMs: 180,
-                    child: _DashboardCategoriasSection(
-                      tituloPeriodo: _tituloPeriodo(agora),
-                      resumo: resumo,
-                      onTapCategoria: (categoria) => _abrirDrillDownCategoria(
-                        categoria,
-                        resumo.totalGastosPeriodo,
-                      ),
-                    ),
-                  ),
-                  if (!telaCompacta) ...[
-                    const SizedBox(height: AppSpacing.s24),
-                    Center(
-                      child: Icon(
-                        Icons.insights,
-                        size: 100,
-                        color: Colors.grey.shade300,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s24),
-                  ],
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         );
       },
-    );
-  }
-}
-
-class _DashboardHeaderPeriodoSection extends StatelessWidget {
-  const _DashboardHeaderPeriodoSection({
-    required this.periodoTitulo,
-    required this.insight,
-    required this.acaoPrincipalLabel,
-    required this.periodoSelecionado,
-    required this.labelPeriodo,
-    required this.onSelecionarPeriodo,
-    required this.mesEspecifico,
-    required this.onSelecionarMes,
-    required this.onLimparMes,
-    required this.exportandoRelatorio,
-    required this.onAcaoPrincipal,
-    required this.onExportarPdf,
-  });
-
-  final String periodoTitulo;
-  final String insight;
-  final String acaoPrincipalLabel;
-  final DashboardPeriodoRapido periodoSelecionado;
-  final String Function(DashboardPeriodoRapido) labelPeriodo;
-  final ValueChanged<DashboardPeriodoRapido> onSelecionarPeriodo;
-  final DateTime? mesEspecifico;
-  final VoidCallback onSelecionarMes;
-  final VoidCallback onLimparMes;
-  final bool exportandoRelatorio;
-  final VoidCallback onAcaoPrincipal;
-  final VoidCallback onExportarPdf;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Resumo Financeiro',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Text(
-          periodoTitulo,
-          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Text(
-          insight,
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-        ),
-        const SizedBox(height: AppSpacing.s12),
-        Wrap(
-          spacing: AppSpacing.s8,
-          runSpacing: AppSpacing.s8,
-          children: DashboardPeriodoRapido.values.map((periodo) {
-            final bool selecionado = periodoSelecionado == periodo;
-            return ChoiceChip(
-              label: Text(labelPeriodo(periodo)),
-              selected: selecionado,
-              onSelected: (_) => onSelecionarPeriodo(periodo),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Wrap(
-          spacing: AppSpacing.s8,
-          runSpacing: AppSpacing.s8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: onSelecionarMes,
-              icon: const Icon(Icons.calendar_month_outlined),
-              label: Text(
-                mesEspecifico == null
-                    ? 'Escolher mês'
-                    : AppFormatters.mesAno(mesEspecifico!),
-              ),
-            ),
-            if (mesEspecifico != null)
-              InputChip(
-                label: const Text('Mês específico'),
-                onDeleted: onLimparMes,
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.s16),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: onAcaoPrincipal,
-                icon: const Icon(Icons.open_in_new),
-                label: Text(acaoPrincipalLabel),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: exportandoRelatorio ? null : onExportarPdf,
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: Text(
-                  exportandoRelatorio
-                      ? 'Gerando e compartilhando...'
-                      : 'Exportar PDF',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _DashboardSaldoSection extends StatelessWidget {
-  const _DashboardSaldoSection({
-    required this.saldo,
-    required this.saldoPositivo,
-    this.onTap,
-  });
-
-  final double saldo;
-  final bool saldoPositivo;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.06),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.s24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: saldoPositivo
-                  ? [Colors.green.shade700, Colors.teal.shade700]
-                  : [Colors.red.shade700, Colors.deepOrange.shade700],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            children: [
-              const Text(
-                'Saldo Mensal (Recebido - Gastos)',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Text(
-                AppFormatters.moeda(saldo),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardComparativosSection extends StatelessWidget {
-  const _DashboardComparativosSection({
-    required this.comparativoLabel,
-    required this.variacaoSaldo,
-    required this.variacaoGastos,
-  });
-
-  final String comparativoLabel;
-  final double variacaoSaldo;
-  final double variacaoGastos;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ComparativoChip(
-            titulo: 'Saldo vs $comparativoLabel',
-            percentual: variacaoSaldo,
-            positivoEhBom: true,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s12),
-        Expanded(
-          child: _ComparativoChip(
-            titulo: 'Gastos vs $comparativoLabel',
-            percentual: variacaoGastos,
-            positivoEhBom: false,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DashboardResumoCardsSection extends StatelessWidget {
-  const _DashboardResumoCardsSection({
-    required this.totalGastosPeriodo,
-    required this.totalPendente,
-    this.onTapSaidas,
-  });
-
-  final double totalGastosPeriodo;
-  final double totalPendente;
-  final VoidCallback? onTapSaidas;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _MiniSummaryCard(
-            titulo: 'Saídas',
-            valor: totalGastosPeriodo,
-            cor: Colors.red,
-            icone: Icons.arrow_downward,
-            onTap: onTapSaidas,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s12),
-        Expanded(
-          child: _MiniSummaryCard(
-            titulo: 'Pendências',
-            valor: totalPendente,
-            cor: Colors.orange,
-            icone: Icons.pending_actions,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DashboardCategoriasSection extends StatelessWidget {
-  const _DashboardCategoriasSection({
-    required this.tituloPeriodo,
-    required this.resumo,
-    this.onTapCategoria,
-  });
-
-  final String tituloPeriodo;
-  final DashboardResumoCalculado resumo;
-  final ValueChanged<DashboardCategoriaResumo>? onTapCategoria;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Categorias de gastos',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              'Distribuição dos gastos no mês',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-            Text(
-              'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: AppSpacing.s16),
-            if (resumo.categoriasOrdenadas.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s16,
-                  vertical: AppSpacing.s24,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outlineVariant.withValues(alpha: 0.7),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.pie_chart_outline,
-                      size: 42,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.35),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    const Text(
-                      'Sem gastos no período para montar o gráfico.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      'Adicione gastos para ver a distribuição por categoria.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              _CategoriasBarrasCard(
-                total: resumo.totalGastosPeriodo,
-                periodo: tituloPeriodo,
-                data: resumo.categoriasOrdenadas,
-                onTapCategoria: onTapCategoria,
-              ),
-            const SizedBox(height: AppSpacing.s16),
-            Wrap(
-              spacing: AppSpacing.s12,
-              runSpacing: AppSpacing.s12,
-              children: [
-                _InsightResumoCard(
-                  titulo: 'Categoria líder',
-                  categoria: resumo.categoriaMaisGasta,
-                  valor: resumo.categoriaMaisGasta?.valor ?? 0,
-                ),
-                _InsightResumoCard(
-                  titulo: 'Menor participação',
-                  categoria: resumo.categoriaMenosGasta,
-                  valor: resumo.categoriaMenosGasta?.valor ?? 0,
-                ),
-                _InsightResumoCard(
-                  titulo: 'Categorias ativas',
-                  valor: resumo.categoriasOrdenadas.length.toDouble(),
-                  labelUnico: true,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -915,44 +1037,65 @@ class _MiniSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: cor.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cor.withValues(alpha: 0.2)),
-      ),
+    final ThemeData theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.s16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icone, size: 16, color: cor),
-                  const SizedBox(width: AppSpacing.s8),
-                  Text(
-                    titulo,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s12),
-              Text(
-                AppFormatters.moeda(valor),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: cor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: cor.withValues(alpha: 0.16)),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: cor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icone, size: 20, color: cor),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  titulo,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: cor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppFormatters.moeda(valor),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Toque para ver detalhes',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -973,40 +1116,72 @@ class _ComparativoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    const AppSemanticColors fallbackSemantic = AppSemanticColors(
+      success: Color(0xFF0F9D7A),
+      successContainer: Color(0xFFE5F6F2),
+      warning: Color(0xFFC26A00),
+      warningContainer: Color(0xFFFFEED9),
+      error: Color(0xFFD64545),
+      errorContainer: Color(0xFFFDE8E8),
+    );
+    final AppSemanticColors semantic =
+        theme.extension<AppSemanticColors>() ?? fallbackSemantic;
+
     final bool subiu = percentual >= 0;
     final bool bom = positivoEhBom ? subiu : !subiu;
-    final Color cor = bom ? Colors.green : Colors.red;
-    final IconData icone = subiu ? Icons.trending_up : Icons.trending_down;
+    final Color cor = bom ? semantic.success : semantic.error;
+    final IconData icone = subiu
+        ? Icons.trending_up_rounded
+        : Icons.trending_down_rounded;
 
-    return Card(
-      elevation: 0,
-      color: cor.withValues(alpha: 0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cor.withValues(alpha: 0.25)),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s12,
+        vertical: AppSpacing.s12,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s12,
-          vertical: AppSpacing.s8,
-        ),
-        child: Row(
-          children: [
-            Icon(icone, color: cor, size: 16),
-            const SizedBox(width: AppSpacing.s8),
-            Expanded(
-              child: Text(
-                '$titulo: ${percentual.toStringAsFixed(1)}%',
-                style: TextStyle(
-                  color: cor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cor.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: cor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
-          ],
-        ),
+            child: Icon(icone, color: cor, size: 18),
+          ),
+          const SizedBox(width: AppSpacing.s10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${percentual.toStringAsFixed(1)}%',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: cor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1020,6 +1195,15 @@ class _DashboardEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final MediaQueryData? mediaQuery = MediaQuery.maybeOf(context);
+    final bool reduzirAnimacoes =
+        (mediaQuery?.disableAnimations ?? false) ||
+        (mediaQuery?.accessibleNavigation ?? false);
+
+    if (reduzirAnimacoes) {
+      return child;
+    }
+
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
       duration: Duration(milliseconds: AppMotion.fast.inMilliseconds + delayMs),
@@ -1034,7 +1218,6 @@ class _DashboardEntry extends StatelessWidget {
           ),
         );
       },
-      onEnd: () {},
     );
   }
 }
@@ -1054,43 +1237,70 @@ class _InsightResumoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color cor = categoria?.color ?? Theme.of(context).colorScheme.primary;
+    final ThemeData theme = Theme.of(context);
+    final Color cor = categoria?.color ?? theme.colorScheme.primary;
 
     return Container(
-      constraints: const BoxConstraints(minWidth: 150),
-      padding: const EdgeInsets.all(AppSpacing.s12),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cor.withValues(alpha: 0.16)),
+        color: cor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cor.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             titulo,
-            style: TextStyle(
-              fontSize: 12,
+            style: theme.textTheme.bodySmall?.copyWith(
               color: cor,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: AppSpacing.s4),
+          const SizedBox(height: AppSpacing.s8),
           if (labelUnico)
             Text(
               valor.toInt().toString(),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
             )
           else ...[
-            Text(
-              categoria?.label ?? 'Sem dados',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            Row(
+              children: [
+                if (categoria != null) ...[
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: cor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(categoria!.icon, size: 14, color: cor),
+                  ),
+                  const SizedBox(width: AppSpacing.s8),
+                ],
+                Expanded(
+                  child: Text(
+                    categoria?.label ?? 'Sem dados',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.s4),
+            const SizedBox(height: AppSpacing.s8),
             Text(
               AppFormatters.moeda(valor),
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ],
@@ -1114,20 +1324,25 @@ class _CategoriasBarrasCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
     final List<DashboardCategoriaResumo> barras = data.take(6).toList();
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.s12),
+      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
-            Theme.of(context).colorScheme.secondary.withValues(alpha: 0.03),
+            theme.colorScheme.primary.withValues(alpha: 0.05),
+            theme.colorScheme.secondary.withValues(alpha: 0.025),
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.08),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1140,17 +1355,16 @@ class _CategoriasBarrasCard extends StatelessWidget {
                   children: [
                     Text(
                       periodo,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.s4),
                     Text(
                       AppFormatters.moeda(total),
-                      style: const TextStyle(
-                        fontSize: 22,
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ],
@@ -1158,30 +1372,27 @@ class _CategoriasBarrasCard extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s8,
-                  vertical: AppSpacing.s4,
+                  horizontal: AppSpacing.s10,
+                  vertical: AppSpacing.s6,
                 ),
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.08),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '${data.length} categorias',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.primary,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s16),
+          const SizedBox(height: AppSpacing.s18),
           ...barras.map(
             (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+              padding: const EdgeInsets.only(bottom: AppSpacing.s14),
               child: _BarraCategoriaLinha(
                 categoria: entry,
                 total: total,
@@ -1194,7 +1405,9 @@ class _CategoriasBarrasCard extends StatelessWidget {
           if (data.length > barras.length)
             Text(
               '+ ${data.length - barras.length} categorias adicionais',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
         ],
       ),
@@ -1215,55 +1428,75 @@ class _BarraCategoriaLinha extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
     final double percentual = total <= 0 ? 0 : categoria.valor / total;
     final String percentualTexto = '${(percentual * 100).toStringAsFixed(1)}%';
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(categoria.icon, size: 14, color: categoria.color),
-                const SizedBox(width: AppSpacing.s8),
-                Expanded(
-                  child: Text(
-                    categoria.label,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                    overflow: TextOverflow.ellipsis,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: categoria.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      categoria.icon,
+                      size: 16,
+                      color: categoria.color,
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Text(
-                  percentualTexto,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: AppSpacing.s10),
+                  Expanded(
+                    child: Text(
+                      categoria.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Text(
-                  AppFormatters.moeda(categoria.valor),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                minHeight: 10,
-                value: percentual,
-                backgroundColor: categoria.color.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(categoria.color),
+                  const SizedBox(width: AppSpacing.s8),
+                  Text(
+                    percentualTexto,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s8),
+                  Text(
+                    AppFormatters.moeda(categoria.valor),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.s8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 10,
+                  value: percentual,
+                  backgroundColor: categoria.color.withValues(alpha: 0.12),
+                  valueColor: AlwaysStoppedAnimation<Color>(categoria.color),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

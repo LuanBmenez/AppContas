@@ -1,11 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isOwnWorkspace(workspaceId) {
+      return isSignedIn() && request.auth.uid == workspaceId;
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwnUser(userId);
+    }
+
+    match /workspaces/{workspaceId} {
+      allow read, write: if isOwnWorkspace(workspaceId);
 
       match /{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwnWorkspace(workspaceId);
       }
     }
   }

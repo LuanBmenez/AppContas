@@ -11,6 +11,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/despesas/despesas.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/inicio/inicio.dart';
+import '../../features/perfil/perfil_screen.dart';
 import '../../features/receber/receber.dart';
 import 'app_routes.dart';
 
@@ -93,6 +94,17 @@ class AppRouter {
             db: _db,
             currentTab: HomeTab.receber,
             child: AReceberScreen(db: _db),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.perfilPath,
+        name: AppRoutes.perfilName,
+        builder: (BuildContext context, GoRouterState state) {
+          return HomeScreen(
+            db: _db,
+            currentTab: HomeTab.perfil,
+            child: const PerfilScreen(),
           );
         },
       ),

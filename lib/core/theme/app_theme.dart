@@ -1,5 +1,64 @@
 import 'package:flutter/material.dart';
 
+@immutable
+class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
+  const AppSemanticColors({
+    required this.success,
+    required this.successContainer,
+    required this.warning,
+    required this.warningContainer,
+    required this.error,
+    required this.errorContainer,
+  });
+
+  final Color success;
+  final Color successContainer;
+  final Color warning;
+  final Color warningContainer;
+  final Color error;
+  final Color errorContainer;
+
+  @override
+  AppSemanticColors copyWith({
+    Color? success,
+    Color? successContainer,
+    Color? warning,
+    Color? warningContainer,
+    Color? error,
+    Color? errorContainer,
+  }) {
+    return AppSemanticColors(
+      success: success ?? this.success,
+      successContainer: successContainer ?? this.successContainer,
+      warning: warning ?? this.warning,
+      warningContainer: warningContainer ?? this.warningContainer,
+      error: error ?? this.error,
+      errorContainer: errorContainer ?? this.errorContainer,
+    );
+  }
+
+  @override
+  AppSemanticColors lerp(ThemeExtension<AppSemanticColors>? other, double t) {
+    if (other is! AppSemanticColors) {
+      return this;
+    }
+
+    return AppSemanticColors(
+      success: Color.lerp(success, other.success, t) ?? success,
+      successContainer:
+          Color.lerp(successContainer, other.successContainer, t) ??
+          successContainer,
+      warning: Color.lerp(warning, other.warning, t) ?? warning,
+      warningContainer:
+          Color.lerp(warningContainer, other.warningContainer, t) ??
+          warningContainer,
+      error: Color.lerp(error, other.error, t) ?? error,
+      errorContainer:
+          Color.lerp(errorContainer, other.errorContainer, t) ?? errorContainer,
+    );
+  }
+}
+
 class AppTheme {
   AppTheme._();
 
@@ -11,11 +70,55 @@ class AppTheme {
       seedColor: const Color(0xFF0F766E),
       brightness: Brightness.light,
     );
+    final TextTheme baseTextTheme = ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+    ).textTheme;
+
+    final TextTheme textTheme = baseTextTheme.copyWith(
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+        fontSize: 30,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.6,
+      ),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.2,
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+      ),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(fontSize: 16, height: 1.4),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.4),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(fontSize: 12, height: 1.35),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.1,
+      ),
+    );
+
+    const AppSemanticColors semanticColors = AppSemanticColors(
+      success: Color(0xFF0F9D7A),
+      successContainer: Color(0xFFE5F6F2),
+      warning: Color(0xFFC26A00),
+      warningContainer: Color(0xFFFFEED9),
+      error: Color(0xFFD64545),
+      errorContainer: Color(0xFFFDE8E8),
+    );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      textTheme: textTheme,
       scaffoldBackgroundColor: const Color(0xFFF7FAFC),
+      extensions: const <ThemeExtension<dynamic>>[semanticColors],
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -60,11 +163,8 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 }
-
