@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/theme.dart';
-import '../features/home/home_screen.dart';
+import 'router/app_router.dart';
 
 class PagaOQueMeDeveApp extends StatelessWidget {
   const PagaOQueMeDeveApp({super.key, this.home});
@@ -10,11 +10,20 @@ class PagaOQueMeDeveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    if (home != null) {
+      return MaterialApp(
+        title: 'Paga o que me deve',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: home,
+      );
+    }
+
+    return MaterialApp.router(
       title: 'Paga o que me deve',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: home ?? const HomeScreen(),
+      routerConfig: AppRouter.router,
     );
   }
 }

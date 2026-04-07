@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../domain/repositories/finance_repository.dart';
-import '../../domain/models/models.dart';
-import '../../ui/ui.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/utils.dart';
+import '../../domain/models/models.dart';
+import '../../domain/repositories/finance_repository.dart';
+import '../../ui/ui.dart';
 import 'components/novo_gasto_sections.dart';
 import 'controllers/novo_gasto_categoria_controller.dart';
 
@@ -28,6 +28,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       TextEditingController();
 
   StreamSubscription<List<CategoriaPersonalizada>>? _categoriasSub;
+  StreamSubscription<List<RegraCategoriaImportacao>>? _regrasSub;
+  Timer? _timerSugestaoRecorrencia;
+  Timer? _timerDuplicados;
 
   CategoriaGasto _categoriaSelecionada = CategoriaGasto.outros;
   String? _categoriaPersonalizadaSelecionadaId;
@@ -38,10 +41,19 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   bool _salvando = false;
   bool _carregandoPreferencias = true;
   bool _selecaoCategoriaManual = false;
+  bool _recorrenciaAtiva = false;
+  bool _recorrenciaConfiguradaManual = false;
+  bool _carregandoSugestaoRecorrencia = false;
+  bool _carregandoDuplicados = false;
+  int _recorrenciaMesesFuturos = 3;
+  int _possiveisDuplicados = 0;
+  SugestaoRecorrenciaDespesa? _sugestaoRecorrencia;
 
   PreferenciasNovoGasto _preferencias = const PreferenciasNovoGasto();
   List<CategoriaPersonalizada> _categoriasPersonalizadas =
       <CategoriaPersonalizada>[];
+  List<RegraCategoriaImportacao> _regrasAprendidas =
+      <RegraCategoriaImportacao>[];
 
   static const List<Color> _coresCategoria = <Color>[
     Color(0xFF0D9488),
@@ -81,11 +93,14 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     _valorController.addListener(_onCamposAlterados);
     _buscaCategoriaController.addListener(_onCamposAlterados);
     _inicializarCategorias();
+    _agendarSugestaoRecorrencia();
   }
 
   @override
   void dispose() {
     _categoriasSub?.cancel();
+    _regrasSub?.cancel();
+    _timerSugestaoRecorrencia?.cancel();
     _tituloController.removeListener(_onCamposAlterados);
     _tituloController.removeListener(_onTituloAlteradoParaSugestao);
     _valorController.removeListener(_onCamposAlterados);
@@ -93,6 +108,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     _tituloController.dispose();
     _valorController.dispose();
     _buscaCategoriaController.dispose();
+    _timerDuplicados?.cancel();
     super.dispose();
   }
 
@@ -131,9 +147,24 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
       _atualizarSugestaoPorTitulo(aplicarAutomaticamente: true);
     });
+
+    _regrasSub = widget.db.regrasCategoriaImportacao.listen((regras) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _regrasAprendidas = regras;
+      });
+
+      _atualizarSugestaoPorTitulo(
+        aplicarAutomaticamente: !_selecaoCategoriaManual,
+      );
+    });
   }
 
   void _onCamposAlterados() {
+    _agendarVerificacaoDuplicados();
     if (mounted) {
       setState(() {});
     }
@@ -143,6 +174,131 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     _atualizarSugestaoPorTitulo(
       aplicarAutomaticamente: !_selecaoCategoriaManual,
     );
+    _agendarSugestaoRecorrencia();
+  }
+
+  void _agendarSugestaoRecorrencia() {
+    _timerSugestaoRecorrencia?.cancel();
+    _timerSugestaoRecorrencia = Timer(
+      const Duration(milliseconds: 350),
+      _buscarSugestaoRecorrenciaPorHistorico,
+    );
+  }
+
+  void _agendarVerificacaoDuplicados() {
+    _timerDuplicados?.cancel();
+    _timerDuplicados = Timer(
+      const Duration(milliseconds: 300),
+      _verificarPossiveisDuplicados,
+    );
+  }
+
+  Future<void> _verificarPossiveisDuplicados() async {
+    final String titulo = _tituloController.text.trim();
+    if (titulo.length < 3) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _possiveisDuplicados = 0;
+        _carregandoDuplicados = false;
+      });
+      return;
+    }
+
+    final double? valor = _valorAtualOuNull();
+    if (valor == null || valor <= 0) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _possiveisDuplicados = 0;
+        _carregandoDuplicados = false;
+      });
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() => _carregandoDuplicados = true);
+
+    final List<Gasto> gastos = await widget.db.meusGastos.first;
+    final String tituloNormalizado = TextNormalizer.normalizeForSearch(titulo);
+    final DateTime dataBase = DateTime(
+      _dataSelecionada.year,
+      _dataSelecionada.month,
+      _dataSelecionada.day,
+    );
+
+    int duplicados = 0;
+    for (final Gasto gasto in gastos) {
+      final DateTime dataGasto = DateTime(
+        gasto.data.year,
+        gasto.data.month,
+        gasto.data.day,
+      );
+      if (dataGasto != dataBase) {
+        continue;
+      }
+
+      if ((gasto.valor - valor).abs() > 0.001) {
+        continue;
+      }
+
+      final String tituloExistente = TextNormalizer.normalizeForSearch(
+        gasto.titulo,
+      );
+      if (tituloExistente == tituloNormalizado) {
+        duplicados++;
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _carregandoDuplicados = false;
+      _possiveisDuplicados = duplicados;
+    });
+  }
+
+  Future<void> _buscarSugestaoRecorrenciaPorHistorico() async {
+    final String titulo = _tituloController.text.trim();
+    if (titulo.length < 3) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _carregandoSugestaoRecorrencia = false;
+        _sugestaoRecorrencia = null;
+      });
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() => _carregandoSugestaoRecorrencia = true);
+
+    final SugestaoRecorrenciaDespesa? sugestao = await widget.db
+        .sugerirRecorrenciaPorTitulo(titulo);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _carregandoSugestaoRecorrencia = false;
+      _sugestaoRecorrencia = sugestao;
+
+      if (!_recorrenciaConfiguradaManual && sugestao != null) {
+        _recorrenciaAtiva = true;
+        if (_tipoSelecionado != TipoGasto.fixo) {
+          _tipoSelecionado = TipoGasto.fixo;
+        }
+      }
+    });
   }
 
   void _atualizarSugestaoPorTitulo({required bool aplicarAutomaticamente}) {
@@ -150,6 +306,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         NovoGastoCategoriaController.sugerirPorTitulo(
           titulo: _tituloController.text,
           categoriasAtivas: _categoriasAtivas,
+          regrasAprendidas: _regrasAprendidas,
         );
 
     if (sugestao.categoriaPadrao == null &&
@@ -199,6 +356,14 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       );
     } catch (_) {
       return 'R\$ 0,00';
+    }
+  }
+
+  double? _valorAtualOuNull() {
+    try {
+      return AppFormatters.parseMoedaInput(_valorController.text);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -258,6 +423,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
     if (novaData != null) {
       setState(() => _dataSelecionada = novaData);
+      _agendarVerificacaoDuplicados();
     }
   }
 
@@ -288,6 +454,17 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       );
 
       await widget.db.adicionarGasto(novoGasto);
+
+      if (_recorrenciaAtiva) {
+        final List<Gasto> futuros = _gerarRecorrenciasFuturas(
+          base: novoGasto,
+          mesesFuturos: _recorrenciaMesesFuturos,
+        );
+        for (final Gasto gasto in futuros) {
+          await widget.db.adicionarGasto(gasto);
+        }
+      }
+
       await widget.db.registrarUsoNovoGasto(
         categoriaPadrao: custom == null ? _categoriaSelecionada : null,
         categoriaPersonalizadaId: custom?.id,
@@ -309,8 +486,91 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
   }
 
+  DateTime _adicionarMesesPreservandoDia(DateTime dataBase, int meses) {
+    final int ano = dataBase.year + ((dataBase.month - 1 + meses) ~/ 12);
+    final int mes = ((dataBase.month - 1 + meses) % 12) + 1;
+    final int ultimoDiaMes = DateTime(ano, mes + 1, 0).day;
+    final int dia = dataBase.day > ultimoDiaMes ? ultimoDiaMes : dataBase.day;
+    return DateTime(ano, mes, dia);
+  }
+
+  List<Gasto> _gerarRecorrenciasFuturas({
+    required Gasto base,
+    required int mesesFuturos,
+  }) {
+    final List<Gasto> futuros = <Gasto>[];
+    for (int i = 1; i <= mesesFuturos; i++) {
+      futuros.add(
+        base.copyWith(
+          id: '',
+          data: _adicionarMesesPreservandoDia(base.data, i),
+          dataCompra: base.dataCompra == null
+              ? null
+              : _adicionarMesesPreservandoDia(base.dataCompra!, i),
+          dataLancamento: base.dataLancamento == null
+              ? null
+              : _adicionarMesesPreservandoDia(base.dataLancamento!, i),
+          hashImportacao: null,
+        ),
+      );
+    }
+    return futuros;
+  }
+
+  void _aplicarSugestaoRecorrencia() {
+    setState(() {
+      _recorrenciaAtiva = true;
+      _recorrenciaConfiguradaManual = true;
+      _tipoSelecionado = TipoGasto.fixo;
+    });
+  }
+
   Widget _buildSectionCard({required Widget child}) {
     return AppSectionCard(child: child);
+  }
+
+  Widget _buildAvisoDuplicados() {
+    if (_carregandoDuplicados) {
+      return const Padding(
+        padding: EdgeInsets.only(top: AppSpacing.s8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: AppSpacing.s8),
+            Text('Verificando duplicados...'),
+          ],
+        ),
+      );
+    }
+
+    if (_possiveisDuplicados <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.s12),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.amber.shade700.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Text(
+          _possiveisDuplicados == 1
+              ? 'Atenção: 1 lançamento parecido já existe nesta data.'
+              : 'Atenção: $_possiveisDuplicados lançamentos parecidos já existem nesta data.',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
   }
 
   void _selecionarCategoriaPadrao(CategoriaGasto categoria) {
@@ -941,6 +1201,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                         },
                       ),
                     ),
+                    _buildAvisoDuplicados(),
                     const SizedBox(height: AppSpacing.s16),
                     _buildCategoriaSection(),
                     const SizedBox(height: AppSpacing.s16),
@@ -951,6 +1212,29 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                           _tipoSelecionado = tipo;
                         });
                       },
+                    ),
+                    const SizedBox(height: AppSpacing.s16),
+                    NovoGastoRecorrenciaSection(
+                      ativo: _recorrenciaAtiva,
+                      mesesFuturos: _recorrenciaMesesFuturos,
+                      carregandoSugestao: _carregandoSugestaoRecorrencia,
+                      sugestao: _sugestaoRecorrencia,
+                      onAlterarAtivo: (ativo) {
+                        setState(() {
+                          _recorrenciaAtiva = ativo;
+                          _recorrenciaConfiguradaManual = true;
+                          if (ativo) {
+                            _tipoSelecionado = TipoGasto.fixo;
+                          }
+                        });
+                      },
+                      onAlterarMeses: (meses) {
+                        setState(() {
+                          _recorrenciaMesesFuturos = meses;
+                          _recorrenciaConfiguradaManual = true;
+                        });
+                      },
+                      onAplicarSugestao: _aplicarSugestaoRecorrencia,
                     ),
                     const SizedBox(height: AppSpacing.s16),
                     NovoGastoDataSection(

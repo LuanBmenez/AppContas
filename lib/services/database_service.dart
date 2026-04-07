@@ -1,28 +1,49 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:rxdart/rxdart.dart';
 
-import '../domain/repositories/finance_repository.dart';
 import '../domain/models/cartao_credito.dart';
 import '../domain/models/categoria_personalizada.dart';
 import '../domain/models/conta.dart';
 import '../domain/models/gasto.dart';
 import '../domain/models/preferencias_novo_gasto.dart';
 import '../domain/models/regra_categoria_importacao.dart';
+import '../domain/repositories/finance_repository.dart';
 import '../utils/text_normalizer.dart';
+import 'recorrencia_despesa_service.dart';
 
 class DatabaseService implements FinanceRepository {
-  final CollectionReference<Map<String, dynamic>> _receberCollection =
-      FirebaseFirestore.instance.collection('a_receber');
-  final CollectionReference<Map<String, dynamic>> _gastosCollection =
-      FirebaseFirestore.instance.collection('meus_gastos');
-  final CollectionReference<Map<String, dynamic>> _cartoesCollection =
-      FirebaseFirestore.instance.collection('cartoes_credito');
-  final CollectionReference<Map<String, dynamic>> _regrasCategoriaCollection =
-      FirebaseFirestore.instance.collection('regras_categoria_importacao');
-  final CollectionReference<Map<String, dynamic>> _categoriasPersonalizadas =
-      FirebaseFirestore.instance.collection('categorias_personalizadas');
-  final CollectionReference<Map<String, dynamic>> _preferenciasCollection =
-      FirebaseFirestore.instance.collection('preferencias_app');
+  final RecorrenciaDespesaService _recorrenciaDespesaService =
+      const RecorrenciaDespesaService();
+
+  String get _uid {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Usuario nao autenticado.');
+    }
+    return user.uid;
+  }
+
+  DocumentReference<Map<String, dynamic>> get _usuarioDoc =>
+      FirebaseFirestore.instance.collection('users').doc(_uid);
+
+  CollectionReference<Map<String, dynamic>> get _receberCollection =>
+      _usuarioDoc.collection('a_receber');
+
+  CollectionReference<Map<String, dynamic>> get _gastosCollection =>
+      _usuarioDoc.collection('meus_gastos');
+
+  CollectionReference<Map<String, dynamic>> get _cartoesCollection =>
+      _usuarioDoc.collection('cartoes_credito');
+
+  CollectionReference<Map<String, dynamic>> get _regrasCategoriaCollection =>
+      _usuarioDoc.collection('regras_categoria_importacao');
+
+  CollectionReference<Map<String, dynamic>> get _categoriasPersonalizadas =>
+      _usuarioDoc.collection('categorias_personalizadas');
+
+  CollectionReference<Map<String, dynamic>> get _preferenciasCollection =>
+      _usuarioDoc.collection('preferencias_app');
 
   @override
   Future<void> adicionarRecebivel(Conta conta) async {
@@ -182,6 +203,7 @@ class DatabaseService implements FinanceRepository {
     final Gasto gastoComId = gasto.copyWith(id: docRef.id);
 
     await docRef.set(gastoComId.toMap());
+    await _registrarRegraCategoriaAutomatica(gastoComId);
   }
 
   @override
@@ -242,6 +264,21 @@ class DatabaseService implements FinanceRepository {
             .runTransaction((transaction) async {
               int importadosLote = 0;
               int duplicadosLote = 0;
+              final List<
+                ({
+                  DocumentReference<Map<String, dynamic>> ref,
+                  Gasto gasto,
+                  DocumentSnapshot<Map<String, dynamic>> snap,
+                })
+              >
+              verificacoes =
+                  <
+                    ({
+                      DocumentReference<Map<String, dynamic>> ref,
+                      Gasto gasto,
+                      DocumentSnapshot<Map<String, dynamic>> snap,
+                    })
+                  >[];
 
               for (final MapEntry<String, Gasto> entry in lote) {
                 final DocumentReference<Map<String, dynamic>> docRef =
@@ -251,14 +288,22 @@ class DatabaseService implements FinanceRepository {
                 final DocumentSnapshot<Map<String, dynamic>> existente =
                     await transaction.get(docRef);
 
-                if (existente.exists) {
+                verificacoes.add((
+                  ref: docRef,
+                  gasto: entry.value,
+                  snap: existente,
+                ));
+              }
+
+              for (final verificacao in verificacoes) {
+                if (verificacao.snap.exists) {
                   duplicadosLote++;
                   continue;
                 }
 
                 transaction.set(
-                  docRef,
-                  entry.value.copyWith(id: docRef.id).toMap(),
+                  verificacao.ref,
+                  verificacao.gasto.copyWith(id: verificacao.ref.id).toMap(),
                 );
                 importadosLote++;
               }
@@ -386,6 +431,7 @@ class DatabaseService implements FinanceRepository {
   @override
   Future<void> atualizarGasto(Gasto gasto) async {
     await _gastosCollection.doc(gasto.id).set(gasto.toMap());
+    await _registrarRegraCategoriaAutomatica(gasto);
   }
 
   @override
@@ -592,6 +638,43 @@ class DatabaseService implements FinanceRepository {
   }
 
   @override
+  Future<SugestaoRecorrenciaDespesa?> sugerirRecorrenciaPorTitulo(
+    String titulo,
+  ) async {
+    final String tituloNormalizado = _normalizarTextoBusca(titulo);
+    if (tituloNormalizado.length < 3) {
+      return null;
+    }
+
+    List<Gasto> candidatos = <Gasto>[];
+
+    final QuerySnapshot<Map<String, dynamic>> queryDireta =
+        await _gastosCollection
+            .where('tituloNormalizado', isEqualTo: tituloNormalizado)
+            .limit(24)
+            .get();
+    candidatos = queryDireta.docs
+        .map((doc) => Gasto.fromMap(doc.data(), doc.id))
+        .toList();
+
+    if (candidatos.length < 3) {
+      final QuerySnapshot<Map<String, dynamic>> fallback =
+          await _gastosCollection
+              .orderBy('data', descending: true)
+              .limit(300)
+              .get();
+      candidatos = fallback.docs
+          .map((doc) => Gasto.fromMap(doc.data(), doc.id))
+          .where(
+            (gasto) => _normalizarTextoBusca(gasto.titulo) == tituloNormalizado,
+          )
+          .toList();
+    }
+
+    return _recorrenciaDespesaService.detectarMensal(candidatos);
+  }
+
+  @override
   Future<RelatorioMensalFinanceiro> buscarRelatorioMensal(
     DateTime referencia,
   ) async {
@@ -716,5 +799,62 @@ class DatabaseService implements FinanceRepository {
 
   String _idDeterministicoImportacao(String hash) {
     return 'imp_$hash';
+  }
+
+  Future<void> _registrarRegraCategoriaAutomatica(Gasto gasto) async {
+    if (gasto.origem != OrigemGasto.manual) {
+      return;
+    }
+    if (gasto.categoria == CategoriaGasto.outros) {
+      return;
+    }
+
+    final String? termo = _extrairTermoAprendizado(gasto.titulo);
+    if (termo == null) {
+      return;
+    }
+
+    await salvarRegraCategoriaImportacao(
+      termo: termo,
+      categoria: gasto.categoria,
+    );
+  }
+
+  String? _extrairTermoAprendizado(String titulo) {
+    final String normalizado = _normalizarTextoBusca(titulo);
+    if (normalizado.isEmpty) {
+      return null;
+    }
+
+    const Set<String> stopwords = <String>{
+      'COMPRA',
+      'PAGAMENTO',
+      'PAGTO',
+      'PGTO',
+      'PARCELA',
+      'FATURA',
+      'CREDITO',
+      'DEBITO',
+      'CARTAO',
+      'TRANSFERENCIA',
+      'ONLINE',
+      'PIX',
+      'VIA',
+      'APP',
+    };
+
+    final List<String> tokens = normalizado
+        .split(' ')
+        .map((t) => t.trim())
+        .where((t) => t.length >= 3)
+        .where((t) => !RegExp(r'^\d+$').hasMatch(t))
+        .where((t) => !stopwords.contains(t))
+        .toList();
+
+    if (tokens.isEmpty) {
+      return null;
+    }
+
+    return tokens.first;
   }
 }

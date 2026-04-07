@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../utils/text_normalizer.dart';
+
 enum CategoriaGasto {
   moradia,
   comida,
@@ -181,6 +183,7 @@ class Gasto {
   Map<String, dynamic> toMap() {
     return {
       'titulo': titulo,
+      'tituloNormalizado': TextNormalizer.normalizeForSearch(titulo),
       'valor': valor,
       'data': data,
       'categoria': categoria.name,
@@ -328,4 +331,3 @@ class Gasto {
     return int.tryParse(raw.toString());
   }
 }
-

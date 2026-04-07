@@ -220,7 +220,25 @@ class _AReceberScreenState extends State<AReceberScreen> {
   Widget _buildHeader(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.somentePendentes ? 'Contas pendentes' : 'A receber',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Organize entradas e acompanhe pagamentos.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -264,28 +282,28 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: cor.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: cor.withValues(alpha: 0.18)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: cor, size: 20),
-            const SizedBox(height: 12),
+            Icon(icon, color: cor, size: 18),
+            const SizedBox(height: 8),
             Text(
               titulo,
-              style: theme.textTheme.labelLarge?.copyWith(
+              style: theme.textTheme.labelMedium?.copyWith(
                 color: cor,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               valor,
-              style: theme.textTheme.titleLarge?.copyWith(
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: cor.withValues(alpha: 0.95),
                 letterSpacing: -0.2,
@@ -308,10 +326,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -340,14 +358,14 @@ class _AReceberScreenState extends State<AReceberScreen> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             'Veja o quanto já entrou e o que ainda está pendente.',
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Row(
             children: [
               _buildResumoFinanceiroCard(
@@ -367,17 +385,17 @@ class _AReceberScreenState extends State<AReceberScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: progresso,
-              minHeight: 10,
+              minHeight: 8,
               backgroundColor: Colors.red.withValues(alpha: 0.14),
               valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
             style: theme.textTheme.bodySmall?.copyWith(
@@ -386,7 +404,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
             ),
           ),
           if (widget.somentePendentes) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _buildResumoPill(
               theme: theme,
               icon: Icons.filter_alt_outlined,

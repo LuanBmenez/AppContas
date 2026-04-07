@@ -12,9 +12,9 @@ import 'package:paga_o_que_me_deve/main.dart';
 void main() {
   testWidgets('App carrega tela inicial', (WidgetTester tester) async {
     await tester.pumpWidget(
-      const PagaOQueMeDeveApp(home: Scaffold(body: Text('Tela Fake'))),
+      const PagaOQueMeDeveApp(home: Scaffold(body: Text('Tela Inicial'))),
     );
 
-    expect(find.text('Tela Fake'), findsOneWidget);
+    expect(find.text('Tela Inicial'), findsOneWidget);
   });
 }

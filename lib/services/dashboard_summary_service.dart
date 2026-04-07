@@ -1,8 +1,10 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 
-import '../domain/repositories/finance_repository.dart';
 import '../domain/models/conta.dart';
 import '../domain/models/gasto.dart';
+import '../domain/repositories/finance_repository.dart';
 import '../utils/app_formatters.dart';
 
 enum DashboardPeriodoRapido { hoje, seteDias, mes, trimestre }
@@ -56,7 +58,22 @@ class DashboardResumoCalculado {
 }
 
 class DashboardSummaryService {
-  const DashboardSummaryService();
+  DashboardSummaryService({
+    int maxCacheEntries = 150,
+    Duration cacheTtl = const Duration(minutes: 10),
+  }) : _maxCacheEntries = maxCacheEntries,
+       _cacheTtl = cacheTtl;
+
+  final int _maxCacheEntries;
+  final Duration _cacheTtl;
+  final LinkedHashMap<String, _DashboardCacheEntry> _cacheLru =
+      LinkedHashMap<String, _DashboardCacheEntry>();
+
+  int get cacheEntryCount => _cacheLru.length;
+
+  void clearCache() {
+    _cacheLru.clear();
+  }
 
   DashboardResumoCalculado calcularResumo({
     required DashboardResumo resumo,
@@ -69,10 +86,35 @@ class DashboardSummaryService {
     DateTime? agora,
   }) {
     final DateTime referencia = agora ?? DateTime.now();
+    _evictExpired(referencia);
+
     final ({DateTime inicio, DateTime fimExclusivo}) faixaAtual =
         inicioOverride != null && fimExclusivoOverride != null
         ? (inicio: inicioOverride, fimExclusivo: fimExclusivoOverride)
         : _faixaAtual(periodo, referencia);
+
+    final String cacheKey = [
+      identityHashCode(resumo),
+      resumo.gastos.length,
+      resumo.contas.length,
+      periodo.name,
+      faixaAtual.inicio.millisecondsSinceEpoch,
+      faixaAtual.fimExclusivo.millisecondsSinceEpoch,
+      filtroCategoriaPadrao?.name ?? '',
+      filtroCategoriaPersonalizadaId ?? '',
+      filtroTipo?.name ?? '',
+    ].join('|');
+
+    final _DashboardCacheEntry? cacheEntry = _cacheLru.remove(cacheKey);
+    if (cacheEntry != null) {
+      final bool expirado =
+          referencia.difference(cacheEntry.criadoEm) > _cacheTtl;
+      if (!expirado) {
+        _cacheLru[cacheKey] = cacheEntry;
+        return cacheEntry.valor;
+      }
+    }
+
     final ({DateTime inicio, DateTime fimExclusivo}) faixaAnterior =
         _faixaAnterior(faixaAtual.inicio, faixaAtual.fimExclusivo);
 
@@ -190,7 +232,7 @@ class DashboardSummaryService {
 
     final String comparativoLabel = _labelComparativo(faixaAnterior.inicio);
 
-    return DashboardResumoCalculado(
+    final DashboardResumoCalculado calculado = DashboardResumoCalculado(
       totalGastosPeriodo: totalGastosPeriodo,
       totalPendente: totalPendente,
       saldo: saldo,
@@ -206,6 +248,33 @@ class DashboardSummaryService {
           ? null
           : categoriasOrdenadas.last,
     );
+
+    _cacheLru[cacheKey] = _DashboardCacheEntry(calculado, referencia);
+    _evictOverflow();
+    return calculado;
+  }
+
+  void _evictExpired(DateTime now) {
+    if (_cacheLru.isEmpty) {
+      return;
+    }
+
+    final List<String> expirados = <String>[];
+    _cacheLru.forEach((String key, _DashboardCacheEntry entry) {
+      if (now.difference(entry.criadoEm) > _cacheTtl) {
+        expirados.add(key);
+      }
+    });
+
+    for (final String key in expirados) {
+      _cacheLru.remove(key);
+    }
+  }
+
+  void _evictOverflow() {
+    while (_cacheLru.length > _maxCacheEntries) {
+      _cacheLru.remove(_cacheLru.keys.first);
+    }
   }
 
   ({DateTime inicio, DateTime fimExclusivo}) faixaAtual(
@@ -291,4 +360,11 @@ class DashboardSummaryService {
   String _labelComparativo(DateTime referencia) {
     return AppFormatters.nomeMes(referencia.month);
   }
+}
+
+class _DashboardCacheEntry {
+  _DashboardCacheEntry(this.valor, this.criadoEm);
+
+  final DashboardResumoCalculado valor;
+  final DateTime criadoEm;
 }

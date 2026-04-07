@@ -56,6 +56,22 @@ class RelatorioMensalFinanceiro {
       contasPendentes.fold<double>(0, (total, conta) => total + conta.valor);
 }
 
+class SugestaoRecorrenciaDespesa {
+  final String periodicidade;
+  final int ocorrencias;
+  final int diaPreferencial;
+  final double valorMedio;
+  final double confianca;
+
+  const SugestaoRecorrenciaDespesa({
+    required this.periodicidade,
+    required this.ocorrencias,
+    required this.diaPreferencial,
+    required this.valorMedio,
+    required this.confianca,
+  });
+}
+
 abstract class FinanceRepository {
   Stream<List<Conta>> get contasAReceber;
   Stream<List<Gasto>> get meusGastos;
@@ -110,6 +126,9 @@ abstract class FinanceRepository {
     required String termo,
     required CategoriaGasto categoria,
   });
+  Future<SugestaoRecorrenciaDespesa?> sugerirRecorrenciaPorTitulo(
+    String titulo,
+  );
 
   Future<RelatorioMensalFinanceiro> buscarRelatorioMensal(DateTime referencia);
 }

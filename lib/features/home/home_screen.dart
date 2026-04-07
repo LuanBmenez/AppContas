@@ -1,75 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../data/services/services.dart';
-import '../../domain/models/models.dart';
 import '../../domain/repositories/finance_repository.dart';
-import '../despesas/despesas.dart';
-import '../inicio/inicio.dart';
-import '../receber/receber.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+enum HomeTab { inicio, despesas, receber }
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({
+    super.key,
+    required this.db,
+    required this.currentTab,
+    required this.child,
+  });
 
-class _HomeScreenState extends State<HomeScreen> {
-  final FinanceRepository db = DatabaseService();
-  int _indiceAtual = 0;
-  int _gastosKeyVersion = 0;
-  DashboardDrillDownFilter? _dashboardDrillDownFilter;
-
-  List<Widget> get _abas => [
-    DashboardScreen(
-      db: db,
-      onTapSaidas: _abrirDespesasMesAtual,
-      onTapSaidasFiltradas: _abrirDespesasComFiltro,
-    ),
-    MeusGastosScreen(
-      key: ValueKey(_gastosKeyVersion),
-      db: db,
-      initialFilter: _dashboardDrillDownFilter,
-    ),
-    AReceberScreen(db: db),
-  ];
+  final FinanceRepository db;
+  final HomeTab currentTab;
+  final Widget child;
 
   String get _titulo {
-    if (_indiceAtual == 0) return 'Visão Geral';
-    if (_indiceAtual == 1) return 'Meus Gastos';
+    if (currentTab == HomeTab.inicio) return 'Visão Geral';
+    if (currentTab == HomeTab.despesas) return 'Meus Gastos';
     return 'A Receber';
   }
 
-  Future<void> _onAdicionar() async {
-    if (_indiceAtual == 1) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => NovoGastoScreen(db: db)),
-      );
+  int get _indiceAtual => switch (currentTab) {
+    HomeTab.inicio => 0,
+    HomeTab.despesas => 1,
+    HomeTab.receber => 2,
+  };
+
+  Future<void> _onAdicionar(BuildContext context) async {
+    if (currentTab == HomeTab.despesas) {
+      context.push('/despesas/novo');
       return;
     }
 
-    if (_indiceAtual == 2) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => NovoRecebivelScreen(db: db)),
-      );
+    if (currentTab == HomeTab.receber) {
+      context.push('/receber/nova');
     }
-  }
-
-  void _abrirDespesasMesAtual() {
-    setState(() {
-      _gastosKeyVersion++;
-      _dashboardDrillDownFilter = null;
-    });
-  }
-
-  void _abrirDespesasComFiltro(DashboardDrillDownFilter filter) {
-    setState(() {
-      _gastosKeyVersion++;
-      _indiceAtual = 1;
-      _dashboardDrillDownFilter = filter;
-    });
   }
 
   @override
@@ -78,40 +46,26 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_titulo),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: _indiceAtual == 1
+        actions: currentTab == HomeTab.despesas
             ? <Widget>[
                 IconButton(
                   tooltip: 'Cartoes',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CartoesCreditoScreen(db: db),
-                      ),
-                    );
-                  },
+                  onPressed: () => context.push('/despesas/cartoes'),
                   icon: const Icon(Icons.credit_card_outlined),
                 ),
                 IconButton(
                   tooltip: 'Importar extrato CSV',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ImportarExtratoScreen(db: db),
-                      ),
-                    );
-                  },
+                  onPressed: () => context.push('/despesas/importar'),
                   icon: const Icon(Icons.upload_file_outlined),
                 ),
               ]
             : null,
       ),
-      body: _abas[_indiceAtual],
-      floatingActionButton: _indiceAtual == 0
+      body: child,
+      floatingActionButton: currentTab == HomeTab.inicio
           ? null
           : FloatingActionButton(
-              onPressed: _onAdicionar,
+              onPressed: () => _onAdicionar(context),
               child: const Icon(Icons.add),
             ),
       bottomNavigationBar: NavigationBarTheme(
@@ -130,9 +84,15 @@ class _HomeScreenState extends State<HomeScreen> {
         child: NavigationBar(
           selectedIndex: _indiceAtual,
           onDestinationSelected: (index) {
-            setState(() {
-              _indiceAtual = index;
-            });
+            if (index == 0) {
+              context.go('/inicio');
+              return;
+            }
+            if (index == 1) {
+              context.go('/despesas');
+              return;
+            }
+            context.go('/receber');
           },
           destinations: const [
             NavigationDestination(

@@ -1,6 +1,7 @@
+import '../../../core/utils/text_normalizer.dart';
 import '../../../domain/models/categoria_personalizada.dart';
 import '../../../domain/models/gasto.dart';
-import '../../../core/utils/text_normalizer.dart';
+import '../../../domain/models/regra_categoria_importacao.dart';
 
 class CategoriaSugestaoResultado {
   const CategoriaSugestaoResultado({
@@ -30,6 +31,8 @@ class NovoGastoCategoriaController {
   static CategoriaSugestaoResultado sugerirPorTitulo({
     required String titulo,
     required List<CategoriaPersonalizada> categoriasAtivas,
+    List<RegraCategoriaImportacao> regrasAprendidas =
+        const <RegraCategoriaImportacao>[],
   }) {
     final String normalizado = TextNormalizer.normalizeForSearch(
       titulo,
@@ -58,6 +61,21 @@ class NovoGastoCategoriaController {
         categoriaPadrao: null,
         categoriaPersonalizadaId: customId,
       );
+    }
+
+    final List<RegraCategoriaImportacao> regrasOrdenadas =
+        List<RegraCategoriaImportacao>.from(regrasAprendidas)
+          ..sort((a, b) => b.termo.length.compareTo(a.termo.length));
+    for (final RegraCategoriaImportacao regra in regrasOrdenadas) {
+      final String termo = TextNormalizer.normalizeForSearch(
+        regra.termo,
+      ).toLowerCase();
+      if (termo.isNotEmpty && normalizado.contains(termo)) {
+        return CategoriaSugestaoResultado(
+          categoriaPadrao: regra.categoria,
+          categoriaPersonalizadaId: null,
+        );
+      }
     }
 
     CategoriaGasto? sugerida;

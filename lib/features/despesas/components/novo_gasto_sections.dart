@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../domain/models/models.dart';
-import '../../../ui/ui.dart';
 import '../../../core/theme/theme.dart';
+import '../../../core/utils/utils.dart';
+import '../../../domain/models/models.dart';
+import '../../../domain/repositories/finance_repository.dart';
+import '../../../ui/ui.dart';
 
 class NovoGastoPreviewCard extends StatelessWidget {
   const NovoGastoPreviewCard({
@@ -451,6 +453,117 @@ class NovoGastoTipoSection extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class NovoGastoRecorrenciaSection extends StatelessWidget {
+  const NovoGastoRecorrenciaSection({
+    super.key,
+    required this.ativo,
+    required this.mesesFuturos,
+    required this.carregandoSugestao,
+    required this.sugestao,
+    required this.onAlterarAtivo,
+    required this.onAlterarMeses,
+    required this.onAplicarSugestao,
+  });
+
+  final bool ativo;
+  final int mesesFuturos;
+  final bool carregandoSugestao;
+  final SugestaoRecorrenciaDespesa? sugestao;
+  final ValueChanged<bool> onAlterarAtivo;
+  final ValueChanged<int> onAlterarMeses;
+  final VoidCallback onAplicarSugestao;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Recorrencia',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const Spacer(),
+              if (carregandoSugestao)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: ativo,
+            onChanged: onAlterarAtivo,
+            title: const Text('Criar despesas recorrentes mensais'),
+            subtitle: const Text(
+              'Gera os próximos lançamentos automaticamente.',
+            ),
+          ),
+          if (ativo) ...[
+            const SizedBox(height: AppSpacing.s8),
+            DropdownButtonFormField<int>(
+              initialValue: mesesFuturos,
+              decoration: const InputDecoration(
+                labelText: 'Gerar próximos meses',
+                border: OutlineInputBorder(),
+              ),
+              items: const <DropdownMenuItem<int>>[
+                DropdownMenuItem<int>(value: 2, child: Text('2 meses')),
+                DropdownMenuItem<int>(value: 3, child: Text('3 meses')),
+                DropdownMenuItem<int>(value: 6, child: Text('6 meses')),
+                DropdownMenuItem<int>(value: 12, child: Text('12 meses')),
+              ],
+              onChanged: (valor) {
+                if (valor != null) {
+                  onAlterarMeses(valor);
+                }
+              },
+            ),
+          ],
+          if (sugestao != null) ...[
+            const SizedBox(height: AppSpacing.s12),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.s12),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sugestao automatica: parece ${sugestao!.periodicidade}.',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(
+                    '${sugestao!.ocorrencias} ocorrencias, dia ${sugestao!.diaPreferencial}, media ${AppFormatters.moeda(sugestao!.valorMedio)}.',
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  OutlinedButton.icon(
+                    onPressed: onAplicarSugestao,
+                    icon: const Icon(Icons.auto_fix_high),
+                    label: const Text('Aplicar sugestao'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
