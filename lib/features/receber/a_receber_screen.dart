@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/repositories/finance_repository.dart';
-import '../../domain/models/models.dart';
-import '../../ui/ui.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/utils.dart';
+import '../../domain/models/models.dart';
+import '../../domain/repositories/finance_repository.dart';
+import '../../ui/ui.dart';
 import 'nova_conta_screen.dart';
 
 class AReceberScreen extends StatefulWidget {
@@ -22,12 +22,19 @@ class AReceberScreen extends StatefulWidget {
 }
 
 class _AReceberScreenState extends State<AReceberScreen> {
+  final ScrollController _listController = ScrollController();
+  Stream<List<Conta>>? _contasStream;
   final TextEditingController _buscaController = TextEditingController();
+
   String _termoBusca = '';
+  bool _selecionandoLote = false;
+  bool _processandoLote = false;
+  final Set<String> _idsSelecionados = <String>{};
 
   @override
   void initState() {
     super.initState();
+    _contasStream = widget.db.contasAReceber;
     _buscaController.addListener(_onBuscaAlterada);
   }
 
@@ -35,7 +42,30 @@ class _AReceberScreenState extends State<AReceberScreen> {
   void dispose() {
     _buscaController.removeListener(_onBuscaAlterada);
     _buscaController.dispose();
+    _listController.dispose();
     super.dispose();
+  }
+
+  Stream<List<Conta>> _obterContasStream() {
+    return _contasStream ??= widget.db.contasAReceber;
+  }
+
+  void _setStatePreservandoScroll(VoidCallback fn) {
+    final bool tinhaClientes = _listController.hasClients;
+    final double offsetAntes = tinhaClientes ? _listController.offset : 0;
+
+    setState(fn);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_listController.hasClients) {
+        return;
+      }
+      final double max = _listController.position.maxScrollExtent;
+      final double destino = offsetAntes.clamp(0, max).toDouble();
+      if ((_listController.offset - destino).abs() > 0.5) {
+        _listController.jumpTo(destino);
+      }
+    });
   }
 
   void _onBuscaAlterada() {
@@ -75,10 +105,765 @@ class _AReceberScreenState extends State<AReceberScreen> {
     return conta.nome.toLowerCase().contains(_termoBusca.trim().toLowerCase());
   }
 
+  void _iniciarSelecaoLoteCom(String id) {
+    _setStatePreservandoScroll(() {
+      _selecionandoLote = true;
+      _idsSelecionados.add(id);
+    });
+  }
+
+  void _alternarSelecaoItem(String id) {
+    _setStatePreservandoScroll(() {
+      if (_idsSelecionados.contains(id)) {
+        _idsSelecionados.remove(id);
+      } else {
+        _idsSelecionados.add(id);
+      }
+
+      if (_idsSelecionados.isEmpty) {
+        _selecionandoLote = false;
+      }
+    });
+  }
+
+  void _encerrarSelecaoLote() {
+    _setStatePreservandoScroll(() {
+      _selecionandoLote = false;
+      _idsSelecionados.clear();
+    });
+  }
+
+  List<Conta> _selecionadosDe(List<Conta> contas) {
+    return contas
+        .where((conta) => _idsSelecionados.contains(conta.id))
+        .toList();
+  }
+
+  Future<void> _excluirSelecionados(List<Conta> selecionados) async {
+    if (selecionados.isEmpty || _processandoLote) {
+      return;
+    }
+
+    final bool confirmar = await AppConfirmDialog.show(
+      context,
+      title: 'Excluir em lote',
+      message: 'Deseja excluir ${selecionados.length} cobranças selecionadas?',
+      confirmText: 'Excluir',
+    );
+    if (!confirmar) {
+      return;
+    }
+
+    setState(() => _processandoLote = true);
+    try {
+      for (final Conta conta in selecionados) {
+        await widget.db.deletarRecebivel(conta.id);
+      }
+      if (!mounted) return;
+
+      AppFeedback.showSuccess(
+        context,
+        '${selecionados.length} cobranças excluídas.',
+      );
+      _encerrarSelecaoLote();
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.showError(context, 'Erro ao excluir em lote: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _processandoLote = false);
+      }
+    }
+  }
+
+  Future<void> _marcarSelecionadosComo(
+    List<Conta> selecionados,
+    bool pago,
+  ) async {
+    if (selecionados.isEmpty || _processandoLote) {
+      return;
+    }
+
+    setState(() => _processandoLote = true);
+    try {
+      for (final Conta conta in selecionados) {
+        if (conta.foiPago != pago) {
+          await widget.db.alternarStatusRecebivel(conta.id, conta.foiPago);
+        }
+      }
+      if (!mounted) return;
+
+      AppFeedback.showSuccess(
+        context,
+        pago
+            ? 'Cobranças marcadas como recebidas.'
+            : 'Cobranças marcadas como pendentes.',
+      );
+      _encerrarSelecaoLote();
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.showError(context, 'Erro ao atualizar em lote: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _processandoLote = false);
+      }
+    }
+  }
+
+  void _abrirNovaCobranca() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NovoRecebivelScreen(db: widget.db)),
+    );
+  }
+
+  Widget _buildHeader(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start),
+    );
+  }
+
+  Widget _buildResumoPill({
+    required ThemeData theme,
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResumoFinanceiroCard({
+    required ThemeData theme,
+    required String titulo,
+    required String valor,
+    required Color cor,
+    required IconData icon,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cor.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: cor.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: cor, size: 20),
+            const SizedBox(height: 12),
+            Text(
+              titulo,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: cor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              valor,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: cor.withValues(alpha: 0.95),
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardResumo({
+    required ThemeData theme,
+    required double totalReceber,
+    required double totalPendente,
+    required double progresso,
+  }) {
+    final Color base = theme.colorScheme.primaryContainer;
+    final Color accent = theme.colorScheme.secondaryContainer;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(base, Colors.white, 0.12) ?? base,
+            Color.lerp(accent, base, 0.40) ?? accent,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Resumo financeiro',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Veja o quanto já entrou e o que ainda está pendente.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildResumoFinanceiroCard(
+                theme: theme,
+                titulo: 'Recebido',
+                valor: AppFormatters.moeda(totalReceber),
+                cor: Colors.green.shade700,
+                icon: Icons.check_circle_outline_rounded,
+              ),
+              const SizedBox(width: 12),
+              _buildResumoFinanceiroCard(
+                theme: theme,
+                titulo: 'Pendente',
+                valor: AppFormatters.moeda(totalPendente),
+                cor: Colors.red.shade700,
+                icon: Icons.pending_actions_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progresso,
+              minHeight: 10,
+              backgroundColor: Colors.red.withValues(alpha: 0.14),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (widget.somentePendentes) ...[
+            const SizedBox(height: 14),
+            _buildResumoPill(
+              theme: theme,
+              icon: Icons.filter_alt_outlined,
+              label: 'Filtro ativo: somente pendentes',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBuscaField(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      child: TextField(
+        controller: _buscaController,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Buscar por nome do devedor',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _termoBusca.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Limpar busca',
+                  onPressed: () => _buscaController.clear(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+          filled: true,
+          fillColor: theme.colorScheme.surface,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.08),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary.withValues(alpha: 0.45),
+              width: 1.4,
+            ),
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoteCard({
+    required ThemeData theme,
+    required List<Conta> selecionados,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.shadow.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.done_all_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${selecionados.length} selecionado${selecionados.length == 1 ? '' : 's'}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _processandoLote ? null : _encerrarSelecaoLote,
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Escolha uma ação para aplicar aos itens marcados.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: selecionados.isEmpty || _processandoLote
+                        ? null
+                        : () => _marcarSelecionadosComo(selecionados, true),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Marcar recebido'),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: selecionados.isEmpty || _processandoLote
+                        ? null
+                        : () => _marcarSelecionadosComo(selecionados, false),
+                    icon: const Icon(Icons.pending_actions_outlined),
+                    label: const Text('Marcar pendente'),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: selecionados.isEmpty || _processandoLote
+                        ? null
+                        : () => _excluirSelecionados(selecionados),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Excluir'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip({required ThemeData theme, required bool foiPago}) {
+    final Color cor = foiPago ? Colors.green.shade700 : Colors.red.shade700;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        foiPago ? 'RECEBIDO' : 'PENDENTE',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: cor,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContaTile({
+    required ThemeData theme,
+    required Conta conta,
+    required bool selecionado,
+  }) {
+    final bool pago = conta.foiPago;
+    final Color statusColor = pago
+        ? Colors.green.shade700
+        : Colors.red.shade700;
+
+    final Widget tile = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: selecionado
+              ? theme.colorScheme.primary.withValues(alpha: 0.26)
+              : theme.colorScheme.outline.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        onTap: () async {
+          if (_selecionandoLote) {
+            _alternarSelecaoItem(conta.id);
+            return;
+          }
+
+          try {
+            await widget.db.alternarStatusRecebivel(conta.id, conta.foiPago);
+          } catch (e) {
+            if (context.mounted) {
+              AppFeedback.showError(context, 'Erro ao atualizar: $e');
+            }
+          }
+        },
+        onLongPress: () {
+          if (_selecionandoLote) {
+            _alternarSelecaoItem(conta.id);
+            return;
+          }
+          _iniciarSelecaoLoteCom(conta.id);
+        },
+        leading: _selecionandoLote
+            ? Checkbox(
+                value: selecionado,
+                onChanged: (_) => _alternarSelecaoItem(conta.id),
+              )
+            : Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  pago ? Icons.check_rounded : Icons.schedule_rounded,
+                  color: statusColor,
+                ),
+              ),
+        title: Text(
+          conta.nome,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            decoration: pago ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            conta.descricao.isEmpty ? 'Sem descrição' : conta.descricao,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.25,
+            ),
+          ),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              AppFormatters.moeda(conta.valor),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _buildStatusChip(theme: theme, foiPago: pago),
+          ],
+        ),
+      ),
+    );
+
+    return Dismissible(
+      key: Key(conta.id),
+      direction: _selecionandoLote
+          ? DismissDirection.none
+          : DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        if (_selecionandoLote) {
+          return false;
+        }
+        return _confirmarExclusao(context, conta);
+      },
+      onDismissed: (direction) async {
+        if (_selecionandoLote) {
+          return;
+        }
+        try {
+          await widget.db.deletarRecebivel(conta.id);
+        } catch (e) {
+          if (context.mounted) {
+            AppFeedback.showError(context, 'Erro: $e');
+          }
+        }
+      },
+      background: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.red.shade400,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Icon(Icons.delete_rounded, color: Colors.white),
+      ),
+      child: tile,
+    );
+  }
+
+  Widget _buildEmptyActionCard({
+    required ThemeData theme,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: theme.colorScheme.primary),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme, bool buscando) {
+    return Expanded(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          children: [
+            if (!buscando) ...[
+              Row(
+                children: [
+                  _buildEmptyActionCard(
+                    theme: theme,
+                    icon: Icons.add_rounded,
+                    title: 'Nova cobrança',
+                    subtitle: 'Cadastre um novo valor a receber',
+                    onTap: _abrirNovaCobranca,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildEmptyActionCard(
+                    theme: theme,
+                    icon: Icons.person_search_outlined,
+                    title: 'Organizar',
+                    subtitle: 'Mantenha controle de quem te deve',
+                    onTap: () {},
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+            ],
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.06),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(
+                        alpha: 0.5,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Icon(
+                      buscando
+                          ? Icons.search_off_rounded
+                          : Icons.attach_money_rounded,
+                      size: 38,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    buscando
+                        ? 'Nenhum devedor encontrado'
+                        : (widget.somentePendentes
+                              ? 'Nenhuma conta pendente'
+                              : 'Nenhuma cobrança cadastrada'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    buscando
+                        ? 'Tente outro nome do devedor para encontrar a cobrança desejada.'
+                        : 'Cadastre uma nova cobrança para acompanhar quem ainda precisa te pagar.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (!buscando) ...[
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: _abrirNovaCobranca,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Adicionar cobrança'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
     return StreamBuilder<List<Conta>>(
-      stream: widget.db.contasAReceber,
+      stream: _obterContasStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const ListSkeleton();
@@ -96,16 +881,21 @@ class _AReceberScreenState extends State<AReceberScreen> {
           );
         }
 
-        final List<Conta> todasAsContas = snapshot.data ?? [];
+        final List<Conta> todasAsContas = snapshot.data ?? <Conta>[];
+
         final List<Conta> listaContas = widget.somentePendentes
             ? todasAsContas.where((conta) => !conta.foiPago).toList()
             : todasAsContas;
+
         final List<Conta> contasFiltradas = listaContas
             .where(_filtrarPorNome)
             .toList();
 
+        final List<Conta> selecionados = _selecionadosDe(contasFiltradas);
+
         double totalReceber = 0;
         double totalPendente = 0;
+
         for (final conta in todasAsContas) {
           if (conta.foiPago) {
             totalReceber += conta.valor;
@@ -118,319 +908,52 @@ class _AReceberScreenState extends State<AReceberScreen> {
         final double progresso = totalGeral == 0
             ? 0
             : totalReceber / totalGeral;
+        final bool buscando = _termoBusca.trim().isNotEmpty;
 
-        final Widget cardResumo = Card(
-          elevation: 1,
-          margin: const EdgeInsets.all(AppSpacing.s16),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(20),
-            ),
+        return Container(
+          color: theme.colorScheme.surface,
+          child: SafeArea(
+            bottom: false,
             child: Column(
               children: [
-                const Text(
-                  'Resumo Financeiro',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: AppSpacing.s16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ResumoFinanceiroCard(
-                        titulo: 'Recebido',
-                        valor: AppFormatters.moeda(totalReceber),
-                        cor: Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.s12),
-                    Expanded(
-                      child: _ResumoFinanceiroCard(
-                        titulo: 'Pendente',
-                        valor: AppFormatters.moeda(totalPendente),
-                        cor: Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progresso,
-                    minHeight: 8,
-                    backgroundColor: Colors.red.withValues(alpha: 0.2),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Colors.green,
+                _buildHeader(theme),
+                if (!_selecionandoLote)
+                  _buildCardResumo(
+                    theme: theme,
+                    totalReceber: totalReceber,
+                    totalPendente: totalPendente,
+                    progresso: progresso,
+                  ),
+                _buildBuscaField(theme),
+                if (_selecionandoLote)
+                  _buildLoteCard(theme: theme, selecionados: selecionados),
+                if (contasFiltradas.isEmpty)
+                  _buildEmptyState(theme, buscando)
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _listController,
+                      padding: const EdgeInsets.only(bottom: 16),
+                      itemCount: contasFiltradas.length,
+                      itemBuilder: (context, index) {
+                        final Conta conta = contasFiltradas[index];
+                        final bool selecionado = _idsSelecionados.contains(
+                          conta.id,
+                        );
+
+                        return _buildContaTile(
+                          theme: theme,
+                          conta: conta,
+                          selecionado: selecionado,
+                        );
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                Text(
-                  '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                ),
-                if (widget.somentePendentes) ...[
-                  const SizedBox(height: AppSpacing.s12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Filtro ativo: somente pendentes',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         );
-
-        return Column(
-          children: [
-            cardResumo,
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.s16,
-                0,
-                AppSpacing.s16,
-                AppSpacing.s12,
-              ),
-              child: TextField(
-                controller: _buscaController,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  labelText: 'Buscar por nome do devedor',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _termoBusca.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Limpar busca',
-                          onPressed: () {
-                            _buscaController.clear();
-                          },
-                          icon: const Icon(Icons.close),
-                        ),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-            ),
-            Expanded(
-              child: contasFiltradas.isEmpty
-                  ? AppEmptyStateCta(
-                      icon: Icons.search_off_outlined,
-                      title: _termoBusca.trim().isEmpty
-                          ? 'Nenhuma conta pendente'
-                          : 'Nenhum devedor encontrado',
-                      description: _termoBusca.trim().isEmpty
-                          ? 'Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.'
-                          : 'Tente outro nome do devedor para encontrar a cobrança desejada.',
-                      buttonLabel: 'Adicionar cobrança',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => NovoRecebivelScreen(db: widget.db),
-                          ),
-                        );
-                      },
-                    )
-                  : ListView.builder(
-                      itemCount: contasFiltradas.length,
-                      itemBuilder: (context, index) {
-                        final Conta conta = contasFiltradas[index];
-
-                        return Dismissible(
-                          key: Key(conta.id),
-                          direction: DismissDirection.endToStart,
-                          confirmDismiss: (direction) async {
-                            return _confirmarExclusao(context, conta);
-                          },
-                          onDismissed: (direction) async {
-                            try {
-                              await widget.db.deletarRecebivel(conta.id);
-                            } catch (e) {
-                              if (context.mounted) {
-                                AppFeedback.showError(context, 'Erro: $e');
-                              }
-                            }
-                          },
-                          background: Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s16,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade400,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(
-                              Icons.delete,
-                              color: Colors.white,
-                            ),
-                          ),
-                          child: Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s16,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: conta.foiPago
-                                    ? Colors.green[100]
-                                    : Colors.red[100],
-                                child: Icon(
-                                  conta.foiPago
-                                      ? Icons.check
-                                      : Icons.pending_actions,
-                                  color: conta.foiPago
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                              ),
-                              title: Text(
-                                conta.nome,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  decoration: conta.foiPago
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                              ),
-                              subtitle: Text(
-                                conta.descricao.isEmpty
-                                    ? 'Sem descrição'
-                                    : conta.descricao,
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyMedium?.color,
-                                ),
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    AppFormatters.moeda(conta.valor),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: conta.foiPago
-                                          ? Colors.green.withValues(alpha: 0.1)
-                                          : Colors.red.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      conta.foiPago ? 'PAGO' : 'PENDENTE',
-                                      style: TextStyle(
-                                        color: conta.foiPago
-                                            ? Colors.green
-                                            : Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              onTap: () async {
-                                try {
-                                  await widget.db.alternarStatusRecebivel(
-                                    conta.id,
-                                    conta.foiPago,
-                                  );
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    AppFeedback.showError(
-                                      context,
-                                      'Erro ao atualizar: $e',
-                                    );
-                                  }
-                                }
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        );
       },
-    );
-  }
-}
-
-class _ResumoFinanceiroCard extends StatelessWidget {
-  const _ResumoFinanceiroCard({
-    required this.titulo,
-    required this.valor,
-    required this.cor,
-  });
-
-  final String titulo;
-  final String valor;
-  final Color cor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cor.withValues(alpha: 0.20)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            titulo,
-            style: TextStyle(
-              color: cor,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            valor,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: cor.withValues(alpha: 0.9),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

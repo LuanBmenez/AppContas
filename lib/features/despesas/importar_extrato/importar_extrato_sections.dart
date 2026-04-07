@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/theme.dart';
 import '../../../domain/models/models.dart';
 import '../../../services/extrato_csv_service.dart';
-import '../../../core/theme/theme.dart';
 
 class CartaoStepSection extends StatelessWidget {
   const CartaoStepSection({
@@ -206,6 +206,39 @@ class PreviewImportacaoSection extends StatelessWidget {
                     (entry) => Text('- ${entry.value}x ${entry.key}'),
                   ),
                 ],
+                if (preview.categoriasPorFonte.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  const Text(
+                    'Categorias sugeridas (origem):',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  ...preview.categoriasPorFonte.entries.map(
+                    (entry) => Text(
+                      '- ${entry.value}x ${_labelFonteCategoria(entry.key)}',
+                    ),
+                  ),
+                ],
+                if (preview.possiveisErros.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  const Text(
+                    'Possiveis erros encontrados:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  ...preview.possiveisErros.map((erro) => Text('- $erro')),
+                ],
+                if (preview.amostraLinhasIgnoradas.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  const Text(
+                    'Amostra de linhas ignoradas:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  ...preview.amostraLinhasIgnoradas.map(
+                    (item) => Text('- $item'),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.s12),
                 ...itensPreview,
                 if (preview.gastos.length > 8)
@@ -236,5 +269,20 @@ class PreviewImportacaoSection extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _labelFonteCategoria(String fonte) {
+    switch (fonte) {
+      case 'historico_exato':
+        return 'historico (exato)';
+      case 'historico_aproximado':
+        return 'historico (aproximado)';
+      case 'regra_padrao':
+        return 'regras padrao';
+      case 'fallback_outros':
+        return 'sem sugestao (outros)';
+      default:
+        return fonte;
+    }
   }
 }

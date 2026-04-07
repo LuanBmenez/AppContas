@@ -25,12 +25,25 @@ class ResultadoMapeamentoExtrato {
   final List<Gasto> gastos;
   final int ignorados;
   final Map<String, int> ignoradosPorMotivo;
+  final Map<String, int> categoriasPorFonte;
+  final List<String> possiveisErros;
+  final List<String> amostraLinhasIgnoradas;
 
   const ResultadoMapeamentoExtrato({
     required this.gastos,
     required this.ignorados,
     this.ignoradosPorMotivo = const <String, int>{},
+    this.categoriasPorFonte = const <String, int>{},
+    this.possiveisErros = const <String>[],
+    this.amostraLinhasIgnoradas = const <String>[],
   });
+}
+
+class CategoriaResolvida {
+  final CategoriaGasto categoria;
+  final String fonte;
+
+  const CategoriaResolvida({required this.categoria, required this.fonte});
 }
 
 class SugestaoRegraCategoria {
@@ -140,39 +153,96 @@ class ExtratoCsvService {
     int ignorados = 0;
     final List<Gasto> gastos = <Gasto>[];
     final Map<String, int> ignoradosPorMotivo = <String, int>{};
+    final Map<String, int> categoriasPorFonte = <String, int>{};
+    final List<String> possiveisErros = <String>[];
+    final List<String> amostraLinhasIgnoradas = <String>[];
+    final Set<String> hashesNoArquivo = <String>{};
     final List<RegraCategoriaImportacao> regrasAprendidasOrdenadas =
         List<RegraCategoriaImportacao>.from(regrasAprendidas)
           ..sort((a, b) => b.termo.length.compareTo(a.termo.length));
 
-    void contarIgnorado(String motivo) {
-      ignorados++;
-      ignoradosPorMotivo[motivo] = (ignoradosPorMotivo[motivo] ?? 0) + 1;
+    void registrarPossivelErro(String mensagem) {
+      if (!possiveisErros.contains(mensagem)) {
+        possiveisErros.add(mensagem);
+      }
     }
 
-    for (final LinhaExtratoCsv linha in csv.linhas) {
+    void contarIgnorado(
+      String motivo, {
+      int? linhaCsv,
+      String? descricao,
+      String? valor,
+      String? data,
+    }) {
+      ignorados++;
+      ignoradosPorMotivo[motivo] = (ignoradosPorMotivo[motivo] ?? 0) + 1;
+
+      if (amostraLinhasIgnoradas.length < 10) {
+        final StringBuffer detalhe = StringBuffer();
+        if (linhaCsv != null) {
+          detalhe.write('Linha $linhaCsv');
+        } else {
+          detalhe.write('Linha');
+        }
+        detalhe.write(': $motivo');
+
+        if ((descricao ?? '').trim().isNotEmpty) {
+          detalhe.write(' | desc="${descricao!.trim()}"');
+        }
+        if ((valor ?? '').trim().isNotEmpty) {
+          detalhe.write(' | valor="$valor"');
+        }
+        if ((data ?? '').trim().isNotEmpty) {
+          detalhe.write(' | data="$data"');
+        }
+
+        amostraLinhasIgnoradas.add(detalhe.toString());
+      }
+    }
+
+    for (int idx = 0; idx < csv.linhas.length; idx++) {
+      final LinhaExtratoCsv linha = csv.linhas[idx];
+      final int linhaCsv = idx + 2;
+
       final String descricao = (linha.colunas[colunaDescricao] ?? '').trim();
       if (descricao.isEmpty) {
-        contarIgnorado('Descricao vazia');
+        contarIgnorado('Descricao vazia', linhaCsv: linhaCsv);
         continue;
       }
 
-      final double? valor = _parseValor(linha.colunas[colunaValor] ?? '');
+      final String valorRaw = linha.colunas[colunaValor] ?? '';
+      final double? valor = _parseValor(valorRaw);
       if (valor == null) {
-        contarIgnorado('Valor invalido');
+        contarIgnorado(
+          'Valor invalido',
+          linhaCsv: linhaCsv,
+          descricao: descricao,
+          valor: valorRaw,
+        );
         continue;
       }
 
-      final DateTime? dataLancamento = _parseData(
-        linha.colunas[colunaDataLancamento] ?? '',
-      );
+      final String dataLancamentoRaw =
+          linha.colunas[colunaDataLancamento] ?? '';
+      final DateTime? dataLancamento = _parseData(dataLancamentoRaw);
 
       if (dataLancamento == null) {
-        contarIgnorado('Data de lancamento invalida');
+        contarIgnorado(
+          'Data de lancamento invalida',
+          linhaCsv: linhaCsv,
+          descricao: descricao,
+          data: dataLancamentoRaw,
+        );
         continue;
       }
 
       if (_ehPagamentoRecebido(descricao)) {
-        contarIgnorado('Pagamento recebido');
+        contarIgnorado(
+          'Pagamento recebido',
+          linhaCsv: linhaCsv,
+          descricao: descricao,
+          valor: valorRaw,
+        );
         continue;
       }
 
@@ -183,6 +253,15 @@ class ExtratoCsvService {
           ? null
           : _parseData(linha.colunas[colunaDataCompra] ?? '');
 
+      if (colunaDataCompra != null) {
+        final String dataCompraRaw = linha.colunas[colunaDataCompra] ?? '';
+        if (dataCompraRaw.trim().isNotEmpty && dataCompra == null) {
+          registrarPossivelErro(
+            'Algumas linhas possuem data de compra invalida; foi usada a data de lancamento.',
+          );
+        }
+      }
+
       final String textoParcela = colunaParcela == null
           ? descricao
           : '${linha.colunas[colunaParcela] ?? ''} $descricao';
@@ -190,10 +269,13 @@ class ExtratoCsvService {
 
       final bool ehEstorno = _ehEstornoOuAjuste(descricao);
       final double valorNormalizado = ehEstorno ? -valor.abs() : valor;
-      final CategoriaGasto categoria = _categorizar(
+      final CategoriaResolvida categoriaResolvida = _categorizar(
         descricao,
         regrasAprendidasOrdenadas,
       );
+      categoriasPorFonte[categoriaResolvida.fonte] =
+          (categoriasPorFonte[categoriaResolvida.fonte] ?? 0) + 1;
+
       final DateTime dataCompetencia = _calcularDataCompetenciaFatura(
         dataCompra ?? dataLancamento,
         cartao.diaFechamento,
@@ -206,6 +288,16 @@ class ExtratoCsvService {
         valor: valorNormalizado,
       );
 
+      if (!hashesNoArquivo.add(hash)) {
+        contarIgnorado(
+          'Duplicado no arquivo',
+          linhaCsv: linhaCsv,
+          descricao: descricao,
+          valor: valorRaw,
+        );
+        continue;
+      }
+
       gastos.add(
         Gasto(
           id: '',
@@ -214,7 +306,7 @@ class ExtratoCsvService {
           data: dataCompetencia,
           dataCompra: dataCompra,
           dataLancamento: dataLancamento,
-          categoria: categoria,
+          categoria: categoriaResolvida.categoria,
           tipo: TipoGasto.variavel,
           origem: OrigemGasto.cartaoCredito,
           cartaoId: cartao.id,
@@ -230,6 +322,9 @@ class ExtratoCsvService {
       gastos: gastos,
       ignorados: ignorados,
       ignoradosPorMotivo: ignoradosPorMotivo,
+      categoriasPorFonte: categoriasPorFonte,
+      possiveisErros: possiveisErros,
+      amostraLinhasIgnoradas: amostraLinhasIgnoradas,
     );
   }
 
@@ -481,28 +576,83 @@ class ExtratoCsvService {
   String _normalizarTextoBusca(String texto) =>
       TextNormalizer.normalizeForSearch(texto);
 
-  CategoriaGasto _categorizar(
+  CategoriaResolvida _categorizar(
     String descricao,
     List<RegraCategoriaImportacao> regrasAprendidas,
   ) {
     final String d = _normalizarTextoBusca(descricao);
+    final Set<String> tokensDescricao = _tokensRelevantes(d);
 
     for (final RegraCategoriaImportacao regra in regrasAprendidas) {
       final String chave = _normalizarTextoBusca(regra.termo);
       if (chave.isNotEmpty && d.contains(chave)) {
-        return regra.categoria;
+        return CategoriaResolvida(
+          categoria: regra.categoria,
+          fonte: 'historico_exato',
+        );
       }
+    }
+
+    double melhorScore = 0;
+    CategoriaGasto? melhorCategoria;
+    for (final RegraCategoriaImportacao regra in regrasAprendidas) {
+      final Set<String> tokensRegra = _tokensRelevantes(
+        _normalizarTextoBusca(regra.termo),
+      );
+      if (tokensRegra.isEmpty || tokensDescricao.isEmpty) {
+        continue;
+      }
+
+      final double score = _jaccard(tokensDescricao, tokensRegra);
+      if (score > melhorScore) {
+        melhorScore = score;
+        melhorCategoria = regra.categoria;
+      }
+    }
+
+    if (melhorCategoria != null && melhorScore >= 0.6) {
+      return CategoriaResolvida(
+        categoria: melhorCategoria,
+        fonte: 'historico_aproximado',
+      );
     }
 
     for (final MapEntry<String, CategoriaGasto> entry
         in _regrasCategoria.entries) {
       final String chave = _normalizarTextoBusca(entry.key);
       if (chave.isNotEmpty && d.contains(chave)) {
-        return entry.value;
+        return CategoriaResolvida(
+          categoria: entry.value,
+          fonte: 'regra_padrao',
+        );
       }
     }
 
-    return CategoriaGasto.outros;
+    return const CategoriaResolvida(
+      categoria: CategoriaGasto.outros,
+      fonte: 'fallback_outros',
+    );
+  }
+
+  Set<String> _tokensRelevantes(String valor) {
+    return valor
+        .split(' ')
+        .map((t) => t.trim())
+        .where((t) => t.length >= 3)
+        .toSet();
+  }
+
+  double _jaccard(Set<String> a, Set<String> b) {
+    if (a.isEmpty || b.isEmpty) {
+      return 0;
+    }
+
+    final Set<String> inter = a.intersection(b);
+    final Set<String> uniao = a.union(b);
+    if (uniao.isEmpty) {
+      return 0;
+    }
+    return inter.length / uniao.length;
   }
 
   String _hashImportacao({

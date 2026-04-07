@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../domain/repositories/finance_repository.dart';
-import '../../domain/models/models.dart';
-import '../../ui/ui.dart';
 import '../../core/theme/theme.dart';
 import '../../core/utils/utils.dart';
+import '../../domain/models/models.dart';
+import '../../domain/repositories/finance_repository.dart';
+import '../../ui/ui.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
   const NovoRecebivelScreen({super.key, required this.db});

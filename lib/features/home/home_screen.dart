@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/repositories/finance_repository.dart';
-import '../../domain/models/models.dart';
 import '../../data/services/services.dart';
+import '../../domain/models/models.dart';
+import '../../domain/repositories/finance_repository.dart';
 import '../despesas/despesas.dart';
 import '../inicio/inicio.dart';
 import '../receber/receber.dart';
@@ -122,30 +122,44 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _onAdicionar,
               child: const Icon(Icons.add),
             ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _indiceAtual,
-        onDestinationSelected: (index) {
-          setState(() {
-            _indiceAtual = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Início',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Despesas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.handshake_outlined),
-            selectedIcon: Icon(Icons.handshake),
-            label: 'A Receber',
-          ),
-        ],
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          height: 70,
+          elevation: 4,
+          labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
+            final bool ativo = states.contains(WidgetState.selected);
+            return TextStyle(
+              fontSize: 12,
+              fontWeight: ativo ? FontWeight.w700 : FontWeight.w500,
+            );
+          }),
+          indicatorColor: Theme.of(context).colorScheme.primaryContainer,
+        ),
+        child: NavigationBar(
+          selectedIndex: _indiceAtual,
+          onDestinationSelected: (index) {
+            setState(() {
+              _indiceAtual = index;
+            });
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Início',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet),
+              label: 'Despesas',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.handshake_outlined),
+              selectedIcon: Icon(Icons.handshake),
+              label: 'A Receber',
+            ),
+          ],
+        ),
       ),
     );
   }
