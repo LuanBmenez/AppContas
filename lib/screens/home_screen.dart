@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../domain/repositories/finance_repository.dart';
+import '../models/dashboard_drilldown_filter.dart';
 import '../services/database_service.dart';
-import '../theme/app_tokens.dart';
 import 'a_receber/a_receber_screen.dart';
 import 'a_receber/nova_conta_screen.dart';
 import 'despesas/cartoes_credito_screen.dart';
@@ -21,17 +21,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FinanceRepository db = DatabaseService();
   int _indiceAtual = 0;
-  bool _somentePendentes = false;
   int _gastosKeyVersion = 0;
+  DashboardDrillDownFilter? _dashboardDrillDownFilter;
 
   List<Widget> get _abas => [
     DashboardScreen(
       db: db,
       onTapSaidas: _abrirDespesasMesAtual,
       onTapReceber: _abrirReceberPendentes,
+      onTapSaidasFiltradas: _abrirDespesasComFiltro,
     ),
-    MeusGastosScreen(key: ValueKey(_gastosKeyVersion), db: db),
-    AReceberScreen(db: db, somentePendentes: _somentePendentes),
+    MeusGastosScreen(
+      key: ValueKey(_gastosKeyVersion),
+      db: db,
+      initialFilter: _dashboardDrillDownFilter,
+    ),
+    AReceberScreen(db: db),
   ];
 
   String get _titulo {
@@ -56,77 +61,27 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-
-    _mostrarMenuDeOpcoes(context);
   }
 
   void _abrirDespesasMesAtual() {
     setState(() {
       _gastosKeyVersion++;
+      _dashboardDrillDownFilter = null;
+    });
+  }
+
+  void _abrirDespesasComFiltro(DashboardDrillDownFilter filter) {
+    setState(() {
+      _gastosKeyVersion++;
       _indiceAtual = 1;
-      _somentePendentes = false;
+      _dashboardDrillDownFilter = filter;
     });
   }
 
   void _abrirReceberPendentes() {
     setState(() {
       _indiceAtual = 2;
-      _somentePendentes = true;
     });
-  }
-
-  void _mostrarMenuDeOpcoes(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'O que você deseja registrar?',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: AppSpacing.s16),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Colors.redAccent,
-                  child: Icon(Icons.money_off, color: Colors.white),
-                ),
-                title: const Text('Um novo gasto (Saiu do meu bolso)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => NovoGastoScreen(db: db)),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Colors.green,
-                  child: Icon(Icons.handshake, color: Colors.white),
-                ),
-                title: const Text('Uma dívida (Alguém me deve)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => NovoRecebivelScreen(db: db),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -165,18 +120,17 @@ class _HomeScreenState extends State<HomeScreen> {
             : null,
       ),
       body: _abas[_indiceAtual],
-      floatingActionButton: FloatingActionButton(
-        onPressed: _onAdicionar,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _indiceAtual == 0
+          ? null
+          : FloatingActionButton(
+              onPressed: _onAdicionar,
+              child: const Icon(Icons.add),
+            ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _indiceAtual,
         onDestinationSelected: (index) {
           setState(() {
             _indiceAtual = index;
-            if (index != 2) {
-              _somentePendentes = false;
-            }
           });
         },
         destinations: const [

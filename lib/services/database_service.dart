@@ -28,7 +28,28 @@ class DatabaseService implements FinanceRepository {
   Future<void> adicionarRecebivel(Conta conta) async {
     final DocumentReference<Map<String, dynamic>> docRef = _receberCollection
         .doc();
-    final Conta contaComId = conta.copyWith(id: docRef.id);
+    final DateTime agora = DateTime.now();
+    final Conta contaComId = conta.copyWith(
+      id: docRef.id,
+      data: conta.data,
+      atualizadaEm: agora,
+      recebidaEm: conta.foiPago ? agora : conta.recebidaEm,
+      historico: conta.historico.isEmpty
+          ? <ContaHistoricoEvento>[
+              ContaHistoricoEvento(
+                tipo: ContaHistoricoTipo.criada,
+                descricao: 'Cobrança criada',
+                data: agora,
+              ),
+              if (conta.foiPago)
+                ContaHistoricoEvento(
+                  tipo: ContaHistoricoTipo.recebida,
+                  descricao: 'Cobrança marcada como recebida',
+                  data: agora,
+                ),
+            ]
+          : conta.historico,
+    );
 
     await docRef.set(contaComId.toMap());
   }
@@ -46,7 +67,48 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> alternarStatusRecebivel(String id, bool statusAtual) async {
-    await _receberCollection.doc(id).update({'foiPago': !statusAtual});
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final DocumentReference<Map<String, dynamic>> docRef = _receberCollection
+          .doc(id);
+      final DocumentSnapshot<Map<String, dynamic>> snapshot = await transaction
+          .get(docRef);
+
+      if (!snapshot.exists) {
+        return;
+      }
+
+      final Conta atual = Conta.fromMap(
+        snapshot.data() ?? <String, dynamic>{},
+        id,
+      );
+      final bool novoStatus = !statusAtual;
+      final DateTime agora = DateTime.now();
+      final List<ContaHistoricoEvento> historico = <ContaHistoricoEvento>[
+        ...atual.historico,
+        ContaHistoricoEvento(
+          tipo: novoStatus
+              ? ContaHistoricoTipo.recebida
+              : ContaHistoricoTipo.reaberta,
+          descricao: novoStatus
+              ? 'Cobrança marcada como recebida'
+              : 'Cobrança reaberta como pendente',
+          data: agora,
+        ),
+      ];
+
+      transaction.set(
+        docRef,
+        atual
+            .copyWith(
+              foiPago: novoStatus,
+              recebidaEm: novoStatus ? agora : null,
+              atualizadaEm: agora,
+              historico: historico,
+            )
+            .toMap(),
+        SetOptions(merge: false),
+      );
+    });
   }
 
   @override
@@ -56,12 +118,61 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> atualizarRecebivel(Conta conta) async {
-    await _receberCollection.doc(conta.id).set(conta.toMap());
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final DocumentReference<Map<String, dynamic>> docRef = _receberCollection
+          .doc(conta.id);
+      final DocumentSnapshot<Map<String, dynamic>> snapshot = await transaction
+          .get(docRef);
+
+      final Conta atual = snapshot.exists
+          ? Conta.fromMap(snapshot.data() ?? <String, dynamic>{}, conta.id)
+          : conta;
+      final DateTime agora = DateTime.now();
+      final List<ContaHistoricoEvento> historico = <ContaHistoricoEvento>[
+        ...atual.historico,
+        ContaHistoricoEvento(
+          tipo: ContaHistoricoTipo.atualizada,
+          descricao: 'Cobrança atualizada',
+          data: agora,
+        ),
+      ];
+
+      transaction.set(
+        docRef,
+        conta
+            .copyWith(
+              id: conta.id,
+              data: atual.data,
+              recebidaEm: atual.recebidaEm,
+              atualizadaEm: agora,
+              historico: historico,
+            )
+            .toMap(),
+        SetOptions(merge: false),
+      );
+    });
   }
 
   @override
   Future<void> restaurarRecebivel(Conta conta) async {
-    await _receberCollection.doc(conta.id).set(conta.toMap());
+    await _receberCollection
+        .doc(conta.id)
+        .set(
+          conta
+              .copyWith(
+                atualizadaEm: DateTime.now(),
+                historico: <ContaHistoricoEvento>[
+                  ...conta.historico,
+                  ContaHistoricoEvento(
+                    tipo: ContaHistoricoTipo.atualizada,
+                    descricao: 'Cobrança restaurada',
+                    data: DateTime.now(),
+                  ),
+                ],
+              )
+              .toMap(),
+          SetOptions(merge: false),
+        );
   }
 
   @override

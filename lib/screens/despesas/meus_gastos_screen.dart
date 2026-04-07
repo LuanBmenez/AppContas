@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../components/app_confirm_dialog.dart';
 import '../../components/app_empty_state_cta.dart';
 import '../../domain/repositories/finance_repository.dart';
+import '../../models/dashboard_drilldown_filter.dart';
 import '../../models/gasto_model.dart';
 import '../../theme/app_tokens.dart';
 import '../../utils/app_feedback.dart';
@@ -11,9 +12,10 @@ import '../../widgets/app_skeleton.dart';
 import 'novo_gasto_screen.dart';
 
 class MeusGastosScreen extends StatefulWidget {
-  const MeusGastosScreen({super.key, required this.db});
+  const MeusGastosScreen({super.key, required this.db, this.initialFilter});
 
   final FinanceRepository db;
+  final DashboardDrillDownFilter? initialFilter;
 
   @override
   State<MeusGastosScreen> createState() => _MeusGastosScreenState();
@@ -30,6 +32,27 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
 
   DateTime get _fimMesExclusivo =>
       DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
+
+  CategoriaGasto? _filtroCategoriaPadrao;
+  String? _filtroCategoriaPersonalizadaId;
+  TipoGasto? _filtroTipo;
+
+  @override
+  void initState() {
+    super.initState();
+    final DashboardDrillDownFilter? filtro = widget.initialFilter;
+    if (filtro != null) {
+      _filtroCategoriaPadrao = filtro.categoriaPadrao;
+      _filtroCategoriaPersonalizadaId = filtro.categoriaPersonalizadaId;
+      _filtroTipo = filtro.tipo;
+      if (filtro.mesReferencia != null) {
+        _mesSelecionado = DateTime(
+          filtro.mesReferencia!.year,
+          filtro.mesReferencia!.month,
+        );
+      }
+    }
+  }
 
   String _formatarMes(DateTime date) {
     return AppFormatters.mesAno(date);
@@ -78,6 +101,21 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
     }
 
     return partes.join(' • ');
+  }
+
+  bool _passaFiltrosAtivos(Gasto gasto) {
+    if (_filtroTipo != null && gasto.tipo != _filtroTipo) {
+      return false;
+    }
+    if (_filtroCategoriaPersonalizadaId != null &&
+        _filtroCategoriaPersonalizadaId!.isNotEmpty) {
+      return gasto.categoriaPersonalizadaId == _filtroCategoriaPersonalizadaId;
+    }
+    if (_filtroCategoriaPadrao != null) {
+      return !gasto.usaCategoriaPersonalizada &&
+          gasto.categoria == _filtroCategoriaPadrao;
+    }
+    return true;
   }
 
   Future<void> _editarCategoria(Gasto gasto) async {
@@ -201,7 +239,10 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
           );
         }
 
-        final List<Gasto> gastosFiltrados = snapshot.data ?? <Gasto>[];
+        final List<Gasto> gastosBrutos = snapshot.data ?? <Gasto>[];
+        final List<Gasto> gastosFiltrados = gastosBrutos
+            .where(_passaFiltrosAtivos)
+            .toList();
 
         if (gastosFiltrados.isEmpty) {
           return Column(
@@ -300,6 +341,47 @@ class _MeusGastosScreenState extends State<MeusGastosScreen> {
                     icon: const Icon(Icons.calendar_month),
                     label: Text(_formatarMes(_mesSelecionado)),
                   ),
+                  if (_filtroCategoriaPadrao != null ||
+                      _filtroCategoriaPersonalizadaId != null ||
+                      _filtroTipo != null) ...[
+                    const SizedBox(height: AppSpacing.s8),
+                    Wrap(
+                      spacing: AppSpacing.s8,
+                      runSpacing: AppSpacing.s8,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        if (_filtroCategoriaPadrao != null)
+                          InputChip(
+                            label: Text(
+                              'Categoria: ${_filtroCategoriaPadrao!.label}',
+                            ),
+                            onDeleted: () {
+                              setState(() {
+                                _filtroCategoriaPadrao = null;
+                              });
+                            },
+                          ),
+                        if (_filtroCategoriaPersonalizadaId != null)
+                          InputChip(
+                            label: const Text('Categoria custom'),
+                            onDeleted: () {
+                              setState(() {
+                                _filtroCategoriaPersonalizadaId = null;
+                              });
+                            },
+                          ),
+                        if (_filtroTipo != null)
+                          InputChip(
+                            label: Text('Tipo: ${_filtroTipo!.label}'),
+                            onDeleted: () {
+                              setState(() {
+                                _filtroTipo = null;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

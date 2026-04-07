@@ -10,7 +10,7 @@ import '../../utils/app_formatters.dart';
 import '../../widgets/app_skeleton.dart';
 import 'nova_conta_screen.dart';
 
-class AReceberScreen extends StatelessWidget {
+class AReceberScreen extends StatefulWidget {
   const AReceberScreen({
     super.key,
     required this.db,
@@ -19,6 +19,38 @@ class AReceberScreen extends StatelessWidget {
 
   final FinanceRepository db;
   final bool somentePendentes;
+
+  @override
+  State<AReceberScreen> createState() => _AReceberScreenState();
+}
+
+class _AReceberScreenState extends State<AReceberScreen> {
+  final TextEditingController _buscaController = TextEditingController();
+  String _termoBusca = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _buscaController.addListener(_onBuscaAlterada);
+  }
+
+  @override
+  void dispose() {
+    _buscaController.removeListener(_onBuscaAlterada);
+    _buscaController.dispose();
+    super.dispose();
+  }
+
+  void _onBuscaAlterada() {
+    final String novoTermo = _buscaController.text;
+    if (novoTermo == _termoBusca) {
+      return;
+    }
+
+    setState(() {
+      _termoBusca = novoTermo;
+    });
+  }
 
   String _mensagemErroFirestore(Object? error) {
     final String erro = (error ?? '').toString().toLowerCase();
@@ -38,10 +70,18 @@ class AReceberScreen extends StatelessWidget {
     );
   }
 
+  bool _filtrarPorNome(Conta conta) {
+    if (_termoBusca.trim().isEmpty) {
+      return true;
+    }
+
+    return conta.nome.toLowerCase().contains(_termoBusca.trim().toLowerCase());
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Conta>>(
-      stream: db.contasAReceber,
+      stream: widget.db.contasAReceber,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const ListSkeleton();
@@ -60,9 +100,12 @@ class AReceberScreen extends StatelessWidget {
         }
 
         final List<Conta> todasAsContas = snapshot.data ?? [];
-        final List<Conta> listaContas = somentePendentes
+        final List<Conta> listaContas = widget.somentePendentes
             ? todasAsContas.where((conta) => !conta.foiPago).toList()
             : todasAsContas;
+        final List<Conta> contasFiltradas = listaContas
+            .where(_filtrarPorNome)
+            .toList();
 
         double totalReceber = 0;
         double totalPendente = 0;
@@ -132,7 +175,7 @@ class AReceberScreen extends StatelessWidget {
                   '${(progresso * 100).toStringAsFixed(0)}% do valor recuperado',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
-                if (somentePendentes) ...[
+                if (widget.somentePendentes) ...[
                   const SizedBox(height: AppSpacing.s12),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -158,162 +201,189 @@ class AReceberScreen extends StatelessWidget {
           ),
         );
 
-        if (listaContas.isEmpty) {
-          return Column(
-            children: [
-              cardResumo,
-              Expanded(
-                child: AppEmptyStateCta(
-                  icon: Icons.inbox_rounded,
-                  title: 'Nenhuma conta pendente',
-                  description:
-                      'Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.',
-                  buttonLabel: 'Adicionar cobrança',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => NovoRecebivelScreen(db: db),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        }
-
         return Column(
           children: [
             cardResumo,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                0,
+                AppSpacing.s16,
+                AppSpacing.s12,
+              ),
+              child: TextField(
+                controller: _buscaController,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: 'Buscar por nome do devedor',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _termoBusca.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Limpar busca',
+                          onPressed: () {
+                            _buscaController.clear();
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
             Expanded(
-              child: ListView.builder(
-                itemCount: listaContas.length,
-                itemBuilder: (context, index) {
-                  final Conta conta = listaContas[index];
+              child: contasFiltradas.isEmpty
+                  ? AppEmptyStateCta(
+                      icon: Icons.search_off_outlined,
+                      title: _termoBusca.trim().isEmpty
+                          ? 'Nenhuma conta pendente'
+                          : 'Nenhum devedor encontrado',
+                      description: _termoBusca.trim().isEmpty
+                          ? 'Registre uma nova cobrança para acompanhar quem ainda precisa te pagar.'
+                          : 'Tente outro nome do devedor para encontrar a cobrança desejada.',
+                      buttonLabel: 'Adicionar cobrança',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => NovoRecebivelScreen(db: widget.db),
+                          ),
+                        );
+                      },
+                    )
+                  : ListView.builder(
+                      itemCount: contasFiltradas.length,
+                      itemBuilder: (context, index) {
+                        final Conta conta = contasFiltradas[index];
 
-                  return Dismissible(
-                    key: Key(conta.id),
-                    direction: DismissDirection.endToStart,
-                    confirmDismiss: (direction) async {
-                      return _confirmarExclusao(context, conta);
-                    },
-                    onDismissed: (direction) async {
-                      try {
-                        await db.deletarRecebivel(conta.id);
-                      } catch (e) {
-                        if (context.mounted) {
-                          AppFeedback.showError(context, 'Erro: $e');
-                        }
-                      }
-                    },
-                    background: Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s16,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade400,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                    child: Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s16,
-                        vertical: 6,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: conta.foiPago
-                              ? Colors.green[100]
-                              : Colors.red[100],
-                          child: Icon(
-                            conta.foiPago ? Icons.check : Icons.pending_actions,
-                            color: conta.foiPago ? Colors.green : Colors.red,
-                          ),
-                        ),
-                        title: Text(
-                          conta.nome,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            decoration: conta.foiPago
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                        ),
-                        subtitle: Text(
-                          conta.descricao.isEmpty
-                              ? 'Sem descrição'
-                              : conta.descricao,
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).textTheme.bodyMedium?.color,
-                          ),
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              AppFormatters.moeda(conta.valor),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                        return Dismissible(
+                          key: Key(conta.id),
+                          direction: DismissDirection.endToStart,
+                          confirmDismiss: (direction) async {
+                            return _confirmarExclusao(context, conta);
+                          },
+                          onDismissed: (direction) async {
+                            try {
+                              await widget.db.deletarRecebivel(conta.id);
+                            } catch (e) {
+                              if (context.mounted) {
+                                AppFeedback.showError(context, 'Erro: $e');
+                              }
+                            }
+                          },
+                          background: Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s16,
+                              vertical: 6,
                             ),
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: conta.foiPago
-                                    ? Colors.green.withValues(alpha: 0.1)
-                                    : Colors.red.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                conta.foiPago ? 'PAGO' : 'PENDENTE',
-                                style: TextStyle(
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade400,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                          ),
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s16,
+                              vertical: 6,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: conta.foiPago
+                                    ? Colors.green[100]
+                                    : Colors.red[100],
+                                child: Icon(
+                                  conta.foiPago
+                                      ? Icons.check
+                                      : Icons.pending_actions,
                                   color: conta.foiPago
                                       ? Colors.green
                                       : Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
                                 ),
                               ),
+                              title: Text(
+                                conta.nome,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  decoration: conta.foiPago
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                              subtitle: Text(
+                                conta.descricao.isEmpty
+                                    ? 'Sem descrição'
+                                    : conta.descricao,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium?.color,
+                                ),
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    AppFormatters.moeda(conta.valor),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: conta.foiPago
+                                          ? Colors.green.withValues(alpha: 0.1)
+                                          : Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      conta.foiPago ? 'PAGO' : 'PENDENTE',
+                                      style: TextStyle(
+                                        color: conta.foiPago
+                                            ? Colors.green
+                                            : Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              onTap: () async {
+                                try {
+                                  await widget.db.alternarStatusRecebivel(
+                                    conta.id,
+                                    conta.foiPago,
+                                  );
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    AppFeedback.showError(
+                                      context,
+                                      'Erro ao atualizar: $e',
+                                    );
+                                  }
+                                }
+                              },
                             ),
-                          ],
-                        ),
-                        onTap: () async {
-                          try {
-                            await db.alternarStatusRecebivel(
-                              conta.id,
-                              conta.foiPago,
-                            );
-                          } catch (e) {
-                            if (context.mounted) {
-                              AppFeedback.showError(
-                                context,
-                                'Erro ao atualizar: $e',
-                              );
-                            }
-                          }
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         );

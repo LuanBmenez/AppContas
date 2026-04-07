@@ -13,7 +13,8 @@ import '../../models/preferencias_novo_gasto_model.dart';
 import '../../theme/app_tokens.dart';
 import '../../utils/app_feedback.dart';
 import '../../utils/app_formatters.dart';
-import '../../utils/text_normalizer.dart';
+import 'components/novo_gasto_sections.dart';
+import 'controllers/novo_gasto_categoria_controller.dart';
 
 class NovoGastoScreen extends StatefulWidget {
   const NovoGastoScreen({super.key, required this.db});
@@ -76,20 +77,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     Icons.fastfood_outlined,
     Icons.store_outlined,
   ];
-
-  static const Map<String, CategoriaGasto> _sugestoesPadrao =
-      <String, CategoriaGasto>{
-        'uber': CategoriaGasto.transporte,
-        '99': CategoriaGasto.transporte,
-        'ifood': CategoriaGasto.comida,
-        'mercado': CategoriaGasto.comida,
-        'farmacia': CategoriaGasto.saude,
-        'drogaria': CategoriaGasto.saude,
-        'aluguel': CategoriaGasto.moradia,
-        'faculdade': CategoriaGasto.educacao,
-        'curso': CategoriaGasto.educacao,
-        'cinema': CategoriaGasto.entretenimento,
-      };
 
   @override
   void initState() {
@@ -164,11 +151,14 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   void _atualizarSugestaoPorTitulo({required bool aplicarAutomaticamente}) {
-    final String normalizado = TextNormalizer.normalizeForSearch(
-      _tituloController.text,
-    ).toLowerCase();
+    final CategoriaSugestaoResultado sugestao =
+        NovoGastoCategoriaController.sugerirPorTitulo(
+          titulo: _tituloController.text,
+          categoriasAtivas: _categoriasAtivas,
+        );
 
-    if (normalizado.isEmpty) {
+    if (sugestao.categoriaPadrao == null &&
+        sugestao.categoriaPersonalizadaId == null) {
       setState(() {
         _categoriaSugerida = null;
         _categoriaPersonalizadaSugeridaId = null;
@@ -176,41 +166,20 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       return;
     }
 
-    String? customId;
-    for (final CategoriaPersonalizada categoria in _categoriasAtivas) {
-      final String nome = TextNormalizer.normalizeForSearch(
-        categoria.nome,
-      ).toLowerCase();
-      if (nome.isNotEmpty && normalizado.contains(nome)) {
-        customId = categoria.id;
-        break;
-      }
-    }
-
-    CategoriaGasto? sugerida;
-    if (customId == null) {
-      for (final MapEntry<String, CategoriaGasto> entry
-          in _sugestoesPadrao.entries) {
-        if (normalizado.contains(entry.key)) {
-          sugerida = entry.value;
-          break;
-        }
-      }
-    }
-
     setState(() {
-      _categoriaSugerida = sugerida;
-      _categoriaPersonalizadaSugeridaId = customId;
+      _categoriaSugerida = sugestao.categoriaPadrao;
+      _categoriaPersonalizadaSugeridaId = sugestao.categoriaPersonalizadaId;
 
       if (!aplicarAutomaticamente) {
         return;
       }
 
-      if (customId != null) {
-        _categoriaPersonalizadaSelecionadaId = customId;
-      } else if (sugerida != null) {
+      if (sugestao.categoriaPersonalizadaId != null) {
+        _categoriaPersonalizadaSelecionadaId =
+            sugestao.categoriaPersonalizadaId;
+      } else if (sugestao.categoriaPadrao != null) {
         _categoriaPersonalizadaSelecionadaId = null;
-        _categoriaSelecionada = sugerida;
+        _categoriaSelecionada = sugestao.categoriaPadrao!;
       }
     });
   }
@@ -349,36 +318,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     return AppSectionCard(child: child);
   }
 
-  Widget _previewTile({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color accent,
-  }) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 180),
-      transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.08),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
-        );
-      },
-      child: _ResumoMiniItem(
-        key: ValueKey<String>('${label}_$value'),
-        icon: icon,
-        label: label,
-        value: value,
-        accent: accent,
-      ),
-    );
-  }
-
   void _selecionarCategoriaPadrao(CategoriaGasto categoria) {
     setState(() {
       _selecaoCategoriaManual = true;
@@ -395,75 +334,31 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   List<CategoriaGasto> _categoriasPadraoFiltradas() {
-    final String busca = TextNormalizer.normalizeForSearch(
+    return NovoGastoCategoriaController.filtrarCategoriasPadrao(
       _buscaCategoriaController.text,
-    ).toLowerCase();
-    if (busca.isEmpty) {
-      return CategoriaGasto.values;
-    }
-
-    return CategoriaGasto.values.where((categoria) {
-      final String nome = TextNormalizer.normalizeForSearch(
-        categoria.label,
-      ).toLowerCase();
-      return nome.contains(busca);
-    }).toList();
+    );
   }
 
   List<CategoriaPersonalizada> _categoriasPersonalizadasFiltradas() {
-    final String busca = TextNormalizer.normalizeForSearch(
+    return NovoGastoCategoriaController.filtrarCategoriasPersonalizadas(
       _buscaCategoriaController.text,
-    ).toLowerCase();
-    final List<CategoriaPersonalizada> base = _categoriasAtivas;
+      _categoriasAtivas,
+    );
+  }
 
-    if (busca.isEmpty) {
-      base.sort((a, b) {
-        if (a.favorita != b.favorita) {
-          return a.favorita ? -1 : 1;
-        }
-        return b.usoCount.compareTo(a.usoCount);
-      });
-      return base;
-    }
-
-    return base.where((categoria) {
-      final String nome = TextNormalizer.normalizeForSearch(
-        categoria.nome,
-      ).toLowerCase();
-      return nome.contains(busca);
-    }).toList();
+  CategoriaPersonalizada? _buscarCategoriaAtivaPorId(String id) {
+    return NovoGastoCategoriaController.buscarCategoriaAtivaPorId(
+      _categoriasAtivas,
+      id,
+    );
   }
 
   bool _nomeCategoriaDuplicado(String nome, {String? ignorarId}) {
-    final String normalizado = TextNormalizer.normalizeForSearch(
-      nome,
-    ).trim().toLowerCase();
-    if (normalizado.isEmpty) {
-      return false;
-    }
-
-    for (final CategoriaGasto item in CategoriaGasto.values) {
-      final String padrao = TextNormalizer.normalizeForSearch(
-        item.label,
-      ).toLowerCase();
-      if (padrao == normalizado) {
-        return true;
-      }
-    }
-
-    for (final CategoriaPersonalizada item in _categoriasAtivas) {
-      if (item.id == ignorarId) {
-        continue;
-      }
-      final String existente = TextNormalizer.normalizeForSearch(
-        item.nome,
-      ).toLowerCase();
-      if (existente == normalizado) {
-        return true;
-      }
-    }
-
-    return false;
+    return NovoGastoCategoriaController.nomeCategoriaDuplicado(
+      nome: nome,
+      categoriasAtivas: _categoriasAtivas,
+      ignorarId: ignorarId,
+    );
   }
 
   double _contrastRatio(Color a, Color b) {
@@ -640,6 +535,10 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 FilledButton(
                   onPressed: () async {
                     final String nome = nomeController.text.trim();
+                    final bool categoriaNova = categoria == null;
+                    final String categoriaId =
+                        categoria?.id ??
+                        DateTime.now().microsecondsSinceEpoch.toString();
                     if (nome.length < 3) {
                       AppFeedback.showError(
                         context,
@@ -666,7 +565,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     }
 
                     final CategoriaPersonalizada nova = CategoriaPersonalizada(
-                      id: categoria?.id ?? '',
+                      id: categoriaId,
                       nome: nome,
                       corValue: corValue,
                       iconeCodePoint: iconeCodePoint,
@@ -683,8 +582,18 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
                     setState(() {
                       _selecaoCategoriaManual = true;
-                      _categoriaPersonalizadaSelecionadaId =
-                          categoria?.id ?? _categoriaPersonalizadaSelecionadaId;
+                      _categoriaPersonalizadaSelecionadaId = categoriaId;
+
+                      if (categoriaNova) {
+                        _categoriasPersonalizadas = <CategoriaPersonalizada>[
+                          ..._categoriasPersonalizadas,
+                          nova,
+                        ];
+                      } else {
+                        _categoriasPersonalizadas = _categoriasPersonalizadas
+                            .map((item) => item.id == categoriaId ? nova : item)
+                            .toList();
+                      }
                     });
 
                     Navigator.pop(dialogContext, true);
@@ -728,6 +637,15 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 title: Text(categoria.favorita ? 'Desfavoritar' : 'Favoritar'),
                 onTap: () async {
                   Navigator.pop(sheetContext);
+                  setState(() {
+                    _categoriasPersonalizadas = _categoriasPersonalizadas
+                        .map(
+                          (item) => item.id == categoria.id
+                              ? item.copyWith(favorita: !categoria.favorita)
+                              : item,
+                        )
+                        .toList();
+                  });
                   await widget.db.alternarFavoritaCategoriaPersonalizada(
                     categoria.id,
                     !categoria.favorita,
@@ -743,12 +661,22 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 title: Text(categoria.arquivada ? 'Desarquivar' : 'Arquivar'),
                 onTap: () async {
                   Navigator.pop(sheetContext);
+                  final bool novoArquivada = !categoria.arquivada;
+                  setState(() {
+                    _categoriasPersonalizadas = _categoriasPersonalizadas
+                        .map(
+                          (item) => item.id == categoria.id
+                              ? item.copyWith(arquivada: novoArquivada)
+                              : item,
+                        )
+                        .toList();
+                  });
                   await widget.db.arquivarCategoriaPersonalizada(
                     categoria.id,
-                    !categoria.arquivada,
+                    novoArquivada,
                   );
                   if (_categoriaPersonalizadaSelecionadaId == categoria.id &&
-                      !categoria.arquivada) {
+                      novoArquivada) {
                     setState(() {
                       _categoriaPersonalizadaSelecionadaId = null;
                     });
@@ -768,6 +696,19 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                       context,
                       'Categoria em uso. Apenas arquivamento é permitido.',
                     );
+                    setState(() {
+                      _categoriasPersonalizadas = _categoriasPersonalizadas
+                          .map(
+                            (item) => item.id == categoria.id
+                                ? item.copyWith(arquivada: true)
+                                : item,
+                          )
+                          .toList();
+                      if (_categoriaPersonalizadaSelecionadaId ==
+                          categoria.id) {
+                        _categoriaPersonalizadaSelecionadaId = null;
+                      }
+                    });
                     await widget.db.arquivarCategoriaPersonalizada(
                       categoria.id,
                       true,
@@ -786,12 +727,15 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                   }
 
                   await widget.db.deletarCategoriaPersonalizada(categoria.id);
-                  if (_categoriaPersonalizadaSelecionadaId == categoria.id &&
-                      mounted) {
-                    setState(() {
+                  if (!mounted) return;
+                  setState(() {
+                    _categoriasPersonalizadas = _categoriasPersonalizadas
+                        .where((item) => item.id != categoria.id)
+                        .toList();
+                    if (_categoriaPersonalizadaSelecionadaId == categoria.id) {
                       _categoriaPersonalizadaSelecionadaId = null;
-                    });
-                  }
+                    }
+                  });
                 },
               ),
             ],
@@ -810,12 +754,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
     String label;
     if (customId != null) {
-      final CategoriaPersonalizada? custom = _categoriasAtivas
-          .where((c) {
-            return c.id == customId;
-          })
-          .cast<CategoriaPersonalizada?>()
-          .firstOrNull;
+      final CategoriaPersonalizada? custom = _buscarCategoriaAtivaPorId(
+        customId,
+      );
       label = custom?.nome ?? 'Categoria personalizada';
     } else {
       label = padrao!.label;
@@ -850,17 +791,12 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     final List<Widget> recentes = <Widget>[];
 
     for (final String id in _preferencias.recentesPersonalizadas) {
-      final CategoriaPersonalizada? item = _categoriasAtivas
-          .where((c) {
-            return c.id == id;
-          })
-          .cast<CategoriaPersonalizada?>()
-          .firstOrNull;
+      final CategoriaPersonalizada? item = _buscarCategoriaAtivaPorId(id);
       if (item == null) {
         continue;
       }
       recentes.add(
-        _CategoriaQuickChip(
+        NovoGastoCategoriaQuickChip(
           label: item.nome,
           color: item.cor,
           icon: item.icone,
@@ -875,7 +811,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     if (recentes.length < 5) {
       for (final CategoriaGasto item in _preferencias.recentesPadrao) {
         recentes.add(
-          _CategoriaQuickChip(
+          NovoGastoCategoriaQuickChip(
             label: item.label,
             color: item.color,
             icon: item.icon,
@@ -888,133 +824,19 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       }
     }
 
-    return _buildSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Categoria',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-              const Spacer(),
-              if (_categoriaPersonalizadaAtiva)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'Personalizada',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          TextField(
-            controller: _buscaCategoriaController,
-            decoration: const InputDecoration(
-              labelText: 'Buscar categoria',
-              hintText: 'Digite para filtrar',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.search),
-            ),
-          ),
-          if (recentes.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.s12),
-            Text(
-              'Recentes',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-            Wrap(
-              spacing: AppSpacing.s8,
-              runSpacing: AppSpacing.s8,
-              children: recentes,
-            ),
-          ],
-          const SizedBox(height: AppSpacing.s16),
-          Text(
-            'Sugeridas',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          GridView.count(
-            crossAxisCount: colunas,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: AppSpacing.s8,
-            crossAxisSpacing: AppSpacing.s8,
-            childAspectRatio: 2.3,
-            children: padrao.map((categoria) {
-              final bool selecionada =
-                  _categoriaPersonalizadaSelecionadaId == null &&
-                  categoria == _categoriaSelecionada;
-              return _CategoriaOptionTile(
-                label: categoria.label,
-                icon: categoria.icon,
-                color: categoria.color,
-                selecionada: selecionada,
-                isFavorita: false,
-                onTap: () => _selecionarCategoriaPadrao(categoria),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: AppSpacing.s16),
-          Text(
-            'Minhas categorias',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          GridView.count(
-            crossAxisCount: colunas,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: AppSpacing.s8,
-            crossAxisSpacing: AppSpacing.s8,
-            childAspectRatio: 2.3,
-            children: <Widget>[
-              _NovaCategoriaTile(onTap: _abrirModalCategoria),
-              ...personalizadas.map((categoria) {
-                final bool selecionada =
-                    categoria.id == _categoriaPersonalizadaSelecionadaId;
-                return _CategoriaOptionTile(
-                  label: categoria.nome,
-                  icon: categoria.icone,
-                  color: categoria.cor,
-                  selecionada: selecionada,
-                  isFavorita: categoria.favorita,
-                  onTap: () => _selecionarCategoriaPersonalizada(categoria.id),
-                  onLongPress: () =>
-                      _abrirAcoesCategoriaPersonalizada(categoria),
-                );
-              }),
-            ],
-          ),
-        ],
-      ),
+    return NovoGastoCategoriaSection(
+      categoriaPersonalizadaAtiva: _categoriaPersonalizadaAtiva,
+      buscaCategoriaController: _buscaCategoriaController,
+      recentes: recentes,
+      categoriasPadrao: padrao,
+      categoriasPersonalizadas: personalizadas,
+      categoriaPersonalizadaSelecionadaId: _categoriaPersonalizadaSelecionadaId,
+      categoriaSelecionada: _categoriaSelecionada,
+      onSelecionarCategoriaPadrao: _selecionarCategoriaPadrao,
+      onSelecionarCategoriaPersonalizada: _selecionarCategoriaPersonalizada,
+      onNovaCategoria: _abrirModalCategoria,
+      onAbrirAcoesCategoria: _abrirAcoesCategoriaPersonalizada,
+      colunas: colunas,
     );
   }
 
@@ -1043,218 +865,16 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 96),
                   children: [
-                    _buildSectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: previewAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.s8),
-                              Text(
-                                'Prévia rápida',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                'Atualiza em tempo real',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade500,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.s8),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.all(AppSpacing.s16),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  previewSurface,
-                                  previewAccent.withValues(alpha: 0.10),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: previewAccent.withValues(alpha: 0.16),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            _tituloController.text
-                                                    .trim()
-                                                    .isEmpty
-                                                ? 'Sem título'
-                                                : _tituloController.text.trim(),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w800,
-                                              height: 1.15,
-                                            ),
-                                          ),
-                                          const SizedBox(height: AppSpacing.s8),
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  _categoriaNomePreview,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: Colors.grey.shade700,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (_categoriaPersonalizadaAtiva) ...[
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: previewAccent
-                                                        .withValues(
-                                                          alpha: 0.15,
-                                                        ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          999,
-                                                        ),
-                                                  ),
-                                                  child: const Text(
-                                                    'Custom',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppSpacing.s12),
-                                    Container(
-                                      width: 52,
-                                      height: 52,
-                                      decoration: BoxDecoration(
-                                        color: previewAccent.withValues(
-                                          alpha: 0.16,
-                                        ),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        _categoriaIconePreview,
-                                        color: previewAccent,
-                                        size: 26,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: AppSpacing.s16),
-                                AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 180),
-                                  transitionBuilder: (child, animation) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: SlideTransition(
-                                        position: Tween<Offset>(
-                                          begin: const Offset(0, 0.08),
-                                          end: Offset.zero,
-                                        ).animate(animation),
-                                        child: child,
-                                      ),
-                                    );
-                                  },
-                                  child: Text(
-                                    valorPreview,
-                                    key: ValueKey<String>(valorPreview),
-                                    style: TextStyle(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w900,
-                                      color: previewAccent,
-                                      height: 1,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.s8),
-                                Text(
-                                  _tipoSelecionado == TipoGasto.fixo
-                                      ? 'Despesa fixa'
-                                      : 'Despesa variável',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.s16),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _previewTile(
-                                        icon: Icons.calendar_month_outlined,
-                                        label: 'Data',
-                                        value: _formatarData(_dataSelecionada),
-                                        accent: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppSpacing.s8),
-                                    Expanded(
-                                      child: _previewTile(
-                                        icon: _tipoSelecionado == TipoGasto.fixo
-                                            ? Icons.lock_outline
-                                            : Icons.auto_awesome_outlined,
-                                        label: 'Tipo',
-                                        value: _tipoSelecionado.label,
-                                        accent: Theme.of(
-                                          context,
-                                        ).colorScheme.secondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    NovoGastoPreviewCard(
+                      titulo: _tituloController.text.trim(),
+                      categoriaNome: _categoriaNomePreview,
+                      categoriaPersonalizadaAtiva: _categoriaPersonalizadaAtiva,
+                      categoriaIcone: _categoriaIconePreview,
+                      valorPreview: valorPreview,
+                      tipoSelecionado: _tipoSelecionado,
+                      dataFormatada: _formatarData(_dataSelecionada),
+                      previewAccent: previewAccent,
+                      previewSurface: previewSurface,
                     ),
                     const SizedBox(height: AppSpacing.s16),
                     _buildSectionCard(
@@ -1326,323 +946,23 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     const SizedBox(height: AppSpacing.s16),
                     _buildCategoriaSection(),
                     const SizedBox(height: AppSpacing.s16),
-                    _buildSectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Tipo',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s12),
-                          ToggleButtons(
-                            isSelected: <bool>[
-                              _tipoSelecionado == TipoGasto.fixo,
-                              _tipoSelecionado == TipoGasto.variavel,
-                            ],
-                            onPressed: (index) {
-                              setState(() {
-                                _tipoSelecionado = index == 0
-                                    ? TipoGasto.fixo
-                                    : TipoGasto.variavel;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(14),
-                            selectedColor: Colors.white,
-                            fillColor: Theme.of(context).colorScheme.primary,
-                            color: Colors.grey.shade700,
-                            constraints: const BoxConstraints(minHeight: 46),
-                            children: const [
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 18),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.lock_outline, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Fixo'),
-                                  ],
-                                ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 18),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.auto_awesome_outlined, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Variável'),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    NovoGastoTipoSection(
+                      tipoSelecionado: _tipoSelecionado,
+                      onChanged: (tipo) {
+                        setState(() {
+                          _tipoSelecionado = tipo;
+                        });
+                      },
                     ),
                     const SizedBox(height: AppSpacing.s16),
-                    _buildSectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Data',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s12),
-                          FilledButton.tonalIcon(
-                            onPressed: _selecionarData,
-                            icon: const Icon(Icons.calendar_month),
-                            label: Text(_formatarData(_dataSelecionada)),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s16,
-                                vertical: AppSpacing.s12,
-                              ),
-                              alignment: Alignment.centerLeft,
-                            ),
-                          ),
-                        ],
-                      ),
+                    NovoGastoDataSection(
+                      dataFormatada: _formatarData(_dataSelecionada),
+                      onSelecionarData: _selecionarData,
                     ),
                   ],
                 ),
               ),
             ),
     );
-  }
-}
-
-class _ResumoMiniItem extends StatelessWidget {
-  const _ResumoMiniItem({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accent.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 13, color: accent),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: accent,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoriaQuickChip extends StatelessWidget {
-  const _CategoriaQuickChip({
-    required this.label,
-    required this.color,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NovaCategoriaTile extends StatelessWidget {
-  const _NovaCategoriaTile({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: const Row(
-            children: [
-              CircleAvatar(radius: 14, child: Icon(Icons.add, size: 16)),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Nova categoria',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoriaOptionTile extends StatelessWidget {
-  const _CategoriaOptionTile({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.selecionada,
-    required this.isFavorita,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool selecionada;
-  final bool isFavorita;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selecionada ? color.withValues(alpha: 0.15) : Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selecionada ? color : Colors.grey.shade200,
-              width: selecionada ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 16, color: color),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: selecionada ? color : Colors.black87,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (isFavorita)
-                Icon(Icons.star, size: 14, color: color.withValues(alpha: 0.9)),
-              if (selecionada) Icon(Icons.check_circle, size: 14, color: color),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    if (isEmpty) {
-      return null;
-    }
-    return first;
   }
 }

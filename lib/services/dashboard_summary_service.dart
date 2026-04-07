@@ -1,8 +1,33 @@
+import 'package:flutter/material.dart';
+
 import '../domain/repositories/finance_repository.dart';
 import '../models/conta_model.dart';
 import '../models/gasto_model.dart';
+import '../utils/app_formatters.dart';
 
 enum DashboardPeriodoRapido { hoje, seteDias, mes, trimestre }
+
+class DashboardCategoriaResumo {
+  final String id;
+  final String label;
+  final Color color;
+  final IconData icon;
+  final double valor;
+  final bool custom;
+  final CategoriaGasto? categoriaPadrao;
+  final String? categoriaPersonalizadaId;
+
+  const DashboardCategoriaResumo({
+    required this.id,
+    required this.label,
+    required this.color,
+    required this.icon,
+    required this.valor,
+    required this.custom,
+    this.categoriaPadrao,
+    this.categoriaPersonalizadaId,
+  });
+}
 
 class DashboardResumoCalculado {
   final double totalGastosPeriodo;
@@ -11,9 +36,10 @@ class DashboardResumoCalculado {
   final bool saldoPositivo;
   final double variacaoSaldo;
   final double variacaoGastos;
-  final List<MapEntry<CategoriaGasto, double>> categoriasOrdenadas;
-  final MapEntry<CategoriaGasto, double>? categoriaMaisGasta;
-  final MapEntry<CategoriaGasto, double>? categoriaMenosGasta;
+  final String comparativoLabel;
+  final List<DashboardCategoriaResumo> categoriasOrdenadas;
+  final DashboardCategoriaResumo? categoriaMaisGasta;
+  final DashboardCategoriaResumo? categoriaMenosGasta;
 
   const DashboardResumoCalculado({
     required this.totalGastosPeriodo,
@@ -22,6 +48,7 @@ class DashboardResumoCalculado {
     required this.saldoPositivo,
     required this.variacaoSaldo,
     required this.variacaoGastos,
+    required this.comparativoLabel,
     required this.categoriasOrdenadas,
     required this.categoriaMaisGasta,
     required this.categoriaMenosGasta,
@@ -34,13 +61,18 @@ class DashboardSummaryService {
   DashboardResumoCalculado calcularResumo({
     required DashboardResumo resumo,
     required DashboardPeriodoRapido periodo,
+    CategoriaGasto? filtroCategoriaPadrao,
+    String? filtroCategoriaPersonalizadaId,
+    TipoGasto? filtroTipo,
+    DateTime? inicioOverride,
+    DateTime? fimExclusivoOverride,
     DateTime? agora,
   }) {
     final DateTime referencia = agora ?? DateTime.now();
-    final ({DateTime inicio, DateTime fimExclusivo}) faixaAtual = _faixaAtual(
-      periodo,
-      referencia,
-    );
+    final ({DateTime inicio, DateTime fimExclusivo}) faixaAtual =
+        inicioOverride != null && fimExclusivoOverride != null
+        ? (inicio: inicioOverride, fimExclusivo: fimExclusivoOverride)
+        : _faixaAtual(periodo, referencia);
     final ({DateTime inicio, DateTime fimExclusivo}) faixaAnterior =
         _faixaAnterior(faixaAtual.inicio, faixaAtual.fimExclusivo);
 
@@ -48,6 +80,15 @@ class DashboardSummaryService {
     double totalGastosPeriodoAnterior = 0;
 
     for (final Gasto gasto in resumo.gastos) {
+      if (!_passaFiltroGasto(
+        gasto,
+        filtroCategoriaPadrao: filtroCategoriaPadrao,
+        filtroCategoriaPersonalizadaId: filtroCategoriaPersonalizadaId,
+        filtroTipo: filtroTipo,
+      )) {
+        continue;
+      }
+
       if (_estaNaFaixa(
         gasto.data,
         faixaAtual.inicio,
@@ -95,22 +136,59 @@ class DashboardSummaryService {
       totalGastosPeriodoAnterior,
     );
 
-    final Map<CategoriaGasto, double> totaisPorCategoria =
-        <CategoriaGasto, double>{};
+    final Map<String, DashboardCategoriaResumo> totaisPorCategoria =
+        <String, DashboardCategoriaResumo>{};
     for (final Gasto gasto in resumo.gastos) {
+      if (!_passaFiltroGasto(
+        gasto,
+        filtroCategoriaPadrao: filtroCategoriaPadrao,
+        filtroCategoriaPersonalizadaId: filtroCategoriaPersonalizadaId,
+        filtroTipo: filtroTipo,
+      )) {
+        continue;
+      }
+
       if (_estaNaFaixa(
         gasto.data,
         faixaAtual.inicio,
         faixaAtual.fimExclusivo,
       )) {
-        totaisPorCategoria[gasto.categoria] =
-            (totaisPorCategoria[gasto.categoria] ?? 0) + gasto.valor;
+        final bool custom = gasto.usaCategoriaPersonalizada;
+        final String id = custom
+            ? 'custom:${gasto.categoriaPersonalizadaId ?? gasto.categoriaLabelExibicao}'
+            : 'std:${gasto.categoria.name}';
+        final DashboardCategoriaResumo atual =
+            totaisPorCategoria[id] ??
+            DashboardCategoriaResumo(
+              id: id,
+              label: gasto.categoriaLabelExibicao,
+              color: gasto.categoriaCorExibicao,
+              icon: gasto.categoriaIconeExibicao,
+              valor: 0,
+              custom: custom,
+              categoriaPadrao: custom ? null : gasto.categoria,
+              categoriaPersonalizadaId: custom
+                  ? gasto.categoriaPersonalizadaId
+                  : null,
+            );
+        totaisPorCategoria[id] = DashboardCategoriaResumo(
+          id: atual.id,
+          label: atual.label,
+          color: atual.color,
+          icon: atual.icon,
+          valor: atual.valor + gasto.valor,
+          custom: atual.custom,
+          categoriaPadrao: atual.categoriaPadrao,
+          categoriaPersonalizadaId: atual.categoriaPersonalizadaId,
+        );
       }
     }
 
-    final List<MapEntry<CategoriaGasto, double>> categoriasOrdenadas =
-        totaisPorCategoria.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
+    final List<DashboardCategoriaResumo> categoriasOrdenadas =
+        totaisPorCategoria.values.toList()
+          ..sort((a, b) => b.valor.compareTo(a.valor));
+
+    final String comparativoLabel = _labelComparativo(faixaAnterior.inicio);
 
     return DashboardResumoCalculado(
       totalGastosPeriodo: totalGastosPeriodo,
@@ -119,6 +197,7 @@ class DashboardSummaryService {
       saldoPositivo: saldo >= 0,
       variacaoSaldo: variacaoSaldo,
       variacaoGastos: variacaoGastos,
+      comparativoLabel: comparativoLabel,
       categoriasOrdenadas: categoriasOrdenadas,
       categoriaMaisGasta: categoriasOrdenadas.isEmpty
           ? null
@@ -184,5 +263,32 @@ class DashboardSummaryService {
       return atual == 0 ? 0 : 100;
     }
     return ((atual - anterior) / anterior.abs()) * 100;
+  }
+
+  bool _passaFiltroGasto(
+    Gasto gasto, {
+    CategoriaGasto? filtroCategoriaPadrao,
+    String? filtroCategoriaPersonalizadaId,
+    TipoGasto? filtroTipo,
+  }) {
+    if (filtroTipo != null && gasto.tipo != filtroTipo) {
+      return false;
+    }
+
+    if (filtroCategoriaPersonalizadaId != null &&
+        filtroCategoriaPersonalizadaId.isNotEmpty) {
+      return gasto.categoriaPersonalizadaId == filtroCategoriaPersonalizadaId;
+    }
+
+    if (filtroCategoriaPadrao != null) {
+      return !gasto.usaCategoriaPersonalizada &&
+          gasto.categoria == filtroCategoriaPadrao;
+    }
+
+    return true;
+  }
+
+  String _labelComparativo(DateTime referencia) {
+    return AppFormatters.nomeMes(referencia.month);
   }
 }
