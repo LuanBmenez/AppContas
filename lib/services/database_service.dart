@@ -2,12 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../domain/repositories/finance_repository.dart';
-import '../models/cartao_credito_model.dart';
-import '../models/categoria_personalizada_model.dart';
-import '../models/conta_model.dart';
-import '../models/gasto_model.dart';
-import '../models/preferencias_novo_gasto_model.dart';
-import '../models/regra_categoria_importacao_model.dart';
+import '../domain/models/cartao_credito.dart';
+import '../domain/models/categoria_personalizada.dart';
+import '../domain/models/conta.dart';
+import '../domain/models/gasto.dart';
+import '../domain/models/preferencias_novo_gasto.dart';
+import '../domain/models/regra_categoria_importacao.dart';
 import '../utils/text_normalizer.dart';
 
 class DatabaseService implements FinanceRepository {

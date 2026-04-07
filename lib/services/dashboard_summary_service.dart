@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../domain/repositories/finance_repository.dart';
-import '../models/conta_model.dart';
-import '../models/gasto_model.dart';
+import '../domain/models/conta.dart';
+import '../domain/models/gasto.dart';
 import '../utils/app_formatters.dart';
 
 enum DashboardPeriodoRapido { hoje, seteDias, mes, trimestre }

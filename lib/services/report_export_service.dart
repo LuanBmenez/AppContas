@@ -4,7 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../domain/repositories/finance_repository.dart';
-import '../models/gasto_model.dart';
+import '../domain/models/gasto.dart';
 import '../utils/app_formatters.dart';
 
 class RelatorioExportado {

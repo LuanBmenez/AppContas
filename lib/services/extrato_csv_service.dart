@@ -1,8 +1,8 @@
 import 'dart:math';
 
-import '../models/cartao_credito_model.dart';
-import '../models/gasto_model.dart';
-import '../models/regra_categoria_importacao_model.dart';
+import '../domain/models/cartao_credito.dart';
+import '../domain/models/gasto.dart';
+import '../domain/models/regra_categoria_importacao.dart';
 import '../utils/app_formatters.dart';
 import '../utils/text_normalizer.dart';
 
@@ -58,6 +58,28 @@ class SugestaoRegraCategoria {
   });
 }
 
+class _RegraPadraoNormalizada {
+  final String termoNormalizado;
+  final CategoriaGasto categoria;
+
+  const _RegraPadraoNormalizada({
+    required this.termoNormalizado,
+    required this.categoria,
+  });
+}
+
+class _RegraAprendidaNormalizada {
+  final CategoriaGasto categoria;
+  final String termoNormalizado;
+  final Set<String> tokens;
+
+  const _RegraAprendidaNormalizada({
+    required this.categoria,
+    required this.termoNormalizado,
+    required this.tokens,
+  });
+}
+
 class ExtratoCsvService {
   static const Map<String, CategoriaGasto> _regrasCategoria =
       <String, CategoriaGasto>{
@@ -89,6 +111,17 @@ class ExtratoCsvService {
         'Mundodoscolchoes': CategoriaGasto.moradia,
         'Galego': CategoriaGasto.moradia,
       };
+
+  static final List<_RegraPadraoNormalizada> _regrasPadraoNormalizadas =
+      _regrasCategoria.entries
+          .map(
+            (entry) => _RegraPadraoNormalizada(
+              termoNormalizado: TextNormalizer.normalizeForSearch(entry.key),
+              categoria: entry.value,
+            ),
+          )
+          .where((entry) => entry.termoNormalizado.isNotEmpty)
+          .toList(growable: false);
 
   ResultadoLeituraCsv lerCsv(String conteudo) {
     final List<String> linhasBrutas = conteudo
@@ -160,6 +193,20 @@ class ExtratoCsvService {
     final List<RegraCategoriaImportacao> regrasAprendidasOrdenadas =
         List<RegraCategoriaImportacao>.from(regrasAprendidas)
           ..sort((a, b) => b.termo.length.compareTo(a.termo.length));
+    final List<_RegraAprendidaNormalizada> regrasAprendidasNormalizadas =
+        regrasAprendidasOrdenadas
+            .map((regra) {
+              final String termoNormalizado = _normalizarTextoBusca(
+                regra.termo,
+              );
+              return _RegraAprendidaNormalizada(
+                categoria: regra.categoria,
+                termoNormalizado: termoNormalizado,
+                tokens: _tokensRelevantes(termoNormalizado),
+              );
+            })
+            .where((regra) => regra.termoNormalizado.isNotEmpty)
+            .toList(growable: false);
 
     void registrarPossivelErro(String mensagem) {
       if (!possiveisErros.contains(mensagem)) {
@@ -271,7 +318,7 @@ class ExtratoCsvService {
       final double valorNormalizado = ehEstorno ? -valor.abs() : valor;
       final CategoriaResolvida categoriaResolvida = _categorizar(
         descricao,
-        regrasAprendidasOrdenadas,
+        regrasAprendidasNormalizadas,
       );
       categoriasPorFonte[categoriaResolvida.fonte] =
           (categoriasPorFonte[categoriaResolvida.fonte] ?? 0) + 1;
@@ -578,14 +625,13 @@ class ExtratoCsvService {
 
   CategoriaResolvida _categorizar(
     String descricao,
-    List<RegraCategoriaImportacao> regrasAprendidas,
+    List<_RegraAprendidaNormalizada> regrasAprendidas,
   ) {
     final String d = _normalizarTextoBusca(descricao);
     final Set<String> tokensDescricao = _tokensRelevantes(d);
 
-    for (final RegraCategoriaImportacao regra in regrasAprendidas) {
-      final String chave = _normalizarTextoBusca(regra.termo);
-      if (chave.isNotEmpty && d.contains(chave)) {
+    for (final _RegraAprendidaNormalizada regra in regrasAprendidas) {
+      if (d.contains(regra.termoNormalizado)) {
         return CategoriaResolvida(
           categoria: regra.categoria,
           fonte: 'historico_exato',
@@ -595,10 +641,8 @@ class ExtratoCsvService {
 
     double melhorScore = 0;
     CategoriaGasto? melhorCategoria;
-    for (final RegraCategoriaImportacao regra in regrasAprendidas) {
-      final Set<String> tokensRegra = _tokensRelevantes(
-        _normalizarTextoBusca(regra.termo),
-      );
+    for (final _RegraAprendidaNormalizada regra in regrasAprendidas) {
+      final Set<String> tokensRegra = regra.tokens;
       if (tokensRegra.isEmpty || tokensDescricao.isEmpty) {
         continue;
       }
@@ -617,12 +661,10 @@ class ExtratoCsvService {
       );
     }
 
-    for (final MapEntry<String, CategoriaGasto> entry
-        in _regrasCategoria.entries) {
-      final String chave = _normalizarTextoBusca(entry.key);
-      if (chave.isNotEmpty && d.contains(chave)) {
+    for (final _RegraPadraoNormalizada entry in _regrasPadraoNormalizadas) {
+      if (d.contains(entry.termoNormalizado)) {
         return CategoriaResolvida(
-          categoria: entry.value,
+          categoria: entry.categoria,
           fonte: 'regra_padrao',
         );
       }

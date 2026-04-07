@@ -597,9 +597,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
           try {
             await widget.db.alternarStatusRecebivel(conta.id, conta.foiPago);
           } catch (e) {
-            if (context.mounted) {
-              AppFeedback.showError(context, 'Erro ao atualizar: $e');
-            }
+            if (!mounted) return;
+            AppFeedback.showError(context, 'Erro ao atualizar: $e');
           }
         },
         onLongPress: () {
@@ -683,9 +682,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
         try {
           await widget.db.deletarRecebivel(conta.id);
         } catch (e) {
-          if (context.mounted) {
-            AppFeedback.showError(context, 'Erro: $e');
-          }
+          if (!mounted) return;
+          AppFeedback.showError(context, 'Erro: $e');
         }
       },
       background: Container(

@@ -18,14 +18,12 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.db,
     this.onTapSaidas,
-    this.onTapReceber,
     this.onTapSaidasFiltradas,
   });
 
   final FinanceRepository db;
 
   final VoidCallback? onTapSaidas;
-  final VoidCallback? onTapReceber;
   final ValueChanged<DashboardDrillDownFilter>? onTapSaidasFiltradas;
 
   @override
@@ -157,8 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     final String chave = [
-      bruto.gastos.length,
-      bruto.contas.length,
+      _assinaturaResumo(bruto),
       faixa.inicio.millisecondsSinceEpoch,
       faixa.fimExclusivo.millisecondsSinceEpoch,
       _periodo.name,
@@ -179,6 +176,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _memoKey = chave;
     _memoResumo = resumo;
     return resumo;
+  }
+
+  String _assinaturaResumo(DashboardResumo resumo) {
+    int hash = 0x811C9DC5;
+    const int prime = 0x01000193;
+
+    void add(String value) {
+      for (final int byte in value.codeUnits) {
+        hash ^= byte;
+        hash = (hash * prime) & 0xFFFFFFFF;
+      }
+    }
+
+    for (final Gasto gasto in resumo.gastos) {
+      add(gasto.id);
+      add(gasto.data.millisecondsSinceEpoch.toString());
+      add(gasto.valor.toStringAsFixed(2));
+      add(gasto.categoria.name);
+      add(gasto.tipo.name);
+    }
+
+    for (final Conta conta in resumo.contas) {
+      add(conta.id);
+      add(conta.data.millisecondsSinceEpoch.toString());
+      add(conta.valor.toStringAsFixed(2));
+      add(conta.foiPago ? '1' : '0');
+    }
+
+    return hash.toRadixString(16);
   }
 
   void _abrirDrillDownCategoria(DashboardCategoriaResumo categoria) {
@@ -284,6 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'PDF gerado em ${arquivo.path}. Compartilhe manualmente se necessário.',
           );
         }
+        return;
       }
 
       if (mounted) {
@@ -364,326 +391,339 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.s16),
-          child: ListView(
-            children: [
-              const Text(
-                'Resumo Financeiro',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Text(
-                _tituloPeriodo(agora),
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Text(
-                _insightPrincipal(resumo),
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-              ),
-              const SizedBox(height: AppSpacing.s12),
-              Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
-                children: DashboardPeriodoRapido.values.map((periodo) {
-                  final bool selecionado = _periodo == periodo;
-                  return ChoiceChip(
-                    label: Text(_labelPeriodo(periodo)),
-                    selected: selecionado,
-                    onSelected: (_) {
-                      setState(() {
-                        _periodo = periodo;
-                        _mesEspecifico = null;
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bool telaCompacta = constraints.maxHeight < 700;
+              return ListView(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: _selecionarMesEspecifico,
-                    icon: const Icon(Icons.calendar_month_outlined),
-                    label: Text(
-                      _mesEspecifico == null
-                          ? 'Escolher mês'
-                          : AppFormatters.mesAno(_mesEspecifico!),
-                    ),
+                  const Text(
+                    'Resumo Financeiro',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
-                  if (_mesEspecifico != null)
-                    InputChip(
-                      label: const Text('Mês específico'),
-                      onDeleted: _limparMesEspecifico,
-                    ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              const SizedBox(height: AppSpacing.s12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _exportandoRelatorio
-                          ? null
-                          : _exportarRelatorioMensal,
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: Text(
-                        _exportandoRelatorio
-                            ? 'Gerando e compartilhando...'
-                            : 'Exportar PDF',
-                      ),
-                    ),
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    _tituloPeriodo(agora),
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s24),
-              _DashboardEntry(
-                delayMs: 0,
-                child: Card(
-                  elevation: 2,
-                  shadowColor: Colors.black.withValues(alpha: 0.06),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      widget.onTapSaidasFiltradas?.call(
-                        DashboardDrillDownFilter(
-                          mesReferencia: _mesEspecifico ?? DateTime.now(),
-                        ),
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    _insightPrincipal(resumo),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
+                  Wrap(
+                    spacing: AppSpacing.s8,
+                    runSpacing: AppSpacing.s8,
+                    children: DashboardPeriodoRapido.values.map((periodo) {
+                      final bool selecionado = _periodo == periodo;
+                      return ChoiceChip(
+                        label: Text(_labelPeriodo(periodo)),
+                        selected: selecionado,
+                        onSelected: (_) {
+                          setState(() {
+                            _periodo = periodo;
+                            _mesEspecifico = null;
+                          });
+                        },
                       );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.s24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: resumo.saldoPositivo
-                              ? [Colors.green.shade700, Colors.teal.shade700]
-                              : [
-                                  Colors.red.shade700,
-                                  Colors.deepOrange.shade700,
-                                ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Saldo Mensal (Recebido - Gastos)',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s8),
-                          Text(
-                            AppFormatters.moeda(resumo.saldo),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    }).toList(),
                   ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s12),
-              _DashboardEntry(
-                delayMs: 70,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _ComparativoChip(
-                        titulo: 'Saldo vs ${resumo.comparativoLabel}',
-                        percentual: resumo.variacaoSaldo,
-                        positivoEhBom: true,
+                  const SizedBox(height: AppSpacing.s8),
+                  Wrap(
+                    spacing: AppSpacing.s8,
+                    runSpacing: AppSpacing.s8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _selecionarMesEspecifico,
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        label: Text(
+                          _mesEspecifico == null
+                              ? 'Escolher mês'
+                              : AppFormatters.mesAno(_mesEspecifico!),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.s12),
-                    Expanded(
-                      child: _ComparativoChip(
-                        titulo: 'Gastos vs ${resumo.comparativoLabel}',
-                        percentual: resumo.variacaoGastos,
-                        positivoEhBom: false,
+                      if (_mesEspecifico != null)
+                        InputChip(
+                          label: const Text('Mês específico'),
+                          onDeleted: _limparMesEspecifico,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  const SizedBox(height: AppSpacing.s12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _exportandoRelatorio
+                              ? null
+                              : _exportarRelatorioMensal,
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
+                          label: Text(
+                            _exportandoRelatorio
+                                ? 'Gerando e compartilhando...'
+                                : 'Exportar PDF',
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s24),
-              _DashboardEntry(
-                delayMs: 130,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _MiniSummaryCard(
-                        titulo: 'Saídas',
-                        valor: resumo.totalGastosPeriodo,
-                        cor: Colors.red,
-                        icone: Icons.arrow_downward,
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s24),
+                  _DashboardEntry(
+                    delayMs: 0,
+                    child: Card(
+                      elevation: 2,
+                      shadowColor: Colors.black.withValues(alpha: 0.06),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
                         onTap: () {
                           widget.onTapSaidasFiltradas?.call(
                             DashboardDrillDownFilter(
                               mesReferencia: _mesEspecifico ?? DateTime.now(),
                             ),
                           );
-                          if (widget.onTapSaidasFiltradas == null) {
-                            widget.onTapSaidas?.call();
-                          }
                         },
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.s24),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: resumo.saldoPositivo
+                                  ? [
+                                      Colors.green.shade700,
+                                      Colors.teal.shade700,
+                                    ]
+                                  : [
+                                      Colors.red.shade700,
+                                      Colors.deepOrange.shade700,
+                                    ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Saldo Mensal (Recebido - Gastos)',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s8),
+                              Text(
+                                AppFormatters.moeda(resumo.saldo),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.s12),
-                    Expanded(
-                      child: _MiniSummaryCard(
-                        titulo: 'A Receber',
-                        valor: resumo.totalPendente,
-                        cor: Colors.orange,
-                        icone: Icons.pending_actions,
-                        onTap: widget.onTapReceber,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s24),
-              _DashboardEntry(
-                delayMs: 180,
-                child: Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: AppSpacing.s12),
+                  _DashboardEntry(
+                    delayMs: 70,
+                    child: Row(
                       children: [
-                        const Text(
-                          'Categorias de gastos',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: _ComparativoChip(
+                            titulo: 'Saldo vs ${resumo.comparativoLabel}',
+                            percentual: resumo.variacaoSaldo,
+                            positivoEhBom: true,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.s4),
-                        Text(
-                          'Distribuição dos gastos no mês',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          child: _ComparativoChip(
+                            titulo: 'Gastos vs ${resumo.comparativoLabel}',
+                            percentual: resumo.variacaoGastos,
+                            positivoEhBom: false,
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.s8),
-                        Text(
-                          'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.s16),
-                        if (resumo.categoriasOrdenadas.isEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s16,
-                              vertical: AppSpacing.s24,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest
-                                  .withValues(alpha: 0.55),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outlineVariant
-                                    .withValues(alpha: 0.7),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.pie_chart_outline,
-                                  size: 42,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.35),
-                                ),
-                                const SizedBox(height: AppSpacing.s12),
-                                const Text(
-                                  'Sem gastos no período para montar o gráfico.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: AppSpacing.s4),
-                                Text(
-                                  'Adicione gastos para ver a distribuição por categoria.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          _CategoriasBarrasCard(
-                            total: resumo.totalGastosPeriodo,
-                            periodo: _tituloPeriodo(agora),
-                            data: resumo.categoriasOrdenadas,
-                            onTapCategoria: _abrirDrillDownCategoria,
-                          ),
-                        const SizedBox(height: AppSpacing.s16),
-                        Wrap(
-                          spacing: AppSpacing.s12,
-                          runSpacing: AppSpacing.s12,
-                          children: [
-                            _InsightResumoCard(
-                              titulo: 'Categoria líder',
-                              categoria: resumo.categoriaMaisGasta,
-                              valor: resumo.categoriaMaisGasta?.valor ?? 0,
-                            ),
-                            _InsightResumoCard(
-                              titulo: 'Menor participação',
-                              categoria: resumo.categoriaMenosGasta,
-                              valor: resumo.categoriaMenosGasta?.valor ?? 0,
-                            ),
-                            _InsightResumoCard(
-                              titulo: 'Categorias ativas',
-                              valor: resumo.categoriasOrdenadas.length
-                                  .toDouble(),
-                              labelUnico: true,
-                            ),
-                          ],
                         ),
                       ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s24),
-              Center(
-                child: Icon(
-                  Icons.insights,
-                  size: 100,
-                  color: Colors.grey.shade300,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s24),
-            ],
+                  const SizedBox(height: AppSpacing.s24),
+                  _DashboardEntry(
+                    delayMs: 130,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _MiniSummaryCard(
+                            titulo: 'Saídas',
+                            valor: resumo.totalGastosPeriodo,
+                            cor: Colors.red,
+                            icone: Icons.arrow_downward,
+                            onTap: () {
+                              widget.onTapSaidasFiltradas?.call(
+                                DashboardDrillDownFilter(
+                                  mesReferencia:
+                                      _mesEspecifico ?? DateTime.now(),
+                                ),
+                              );
+                              if (widget.onTapSaidasFiltradas == null) {
+                                widget.onTapSaidas?.call();
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          child: _MiniSummaryCard(
+                            titulo: 'Pendências',
+                            valor: resumo.totalPendente,
+                            cor: Colors.orange,
+                            icone: Icons.pending_actions,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s24),
+                  _DashboardEntry(
+                    delayMs: 180,
+                    child: Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.s16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Categorias de gastos',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s4),
+                            Text(
+                              'Distribuição dos gastos no mês',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s8),
+                            Text(
+                              'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s16),
+                            if (resumo.categoriasOrdenadas.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s16,
+                                  vertical: AppSpacing.s24,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.55),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withValues(alpha: 0.7),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.pie_chart_outline,
+                                      size: 42,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s12),
+                                    const Text(
+                                      'Sem gastos no período para montar o gráfico.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s4),
+                                    Text(
+                                      'Adicione gastos para ver a distribuição por categoria.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              _CategoriasBarrasCard(
+                                total: resumo.totalGastosPeriodo,
+                                periodo: _tituloPeriodo(agora),
+                                data: resumo.categoriasOrdenadas,
+                                onTapCategoria: _abrirDrillDownCategoria,
+                              ),
+                            const SizedBox(height: AppSpacing.s16),
+                            Wrap(
+                              spacing: AppSpacing.s12,
+                              runSpacing: AppSpacing.s12,
+                              children: [
+                                _InsightResumoCard(
+                                  titulo: 'Categoria líder',
+                                  categoria: resumo.categoriaMaisGasta,
+                                  valor: resumo.categoriaMaisGasta?.valor ?? 0,
+                                ),
+                                _InsightResumoCard(
+                                  titulo: 'Menor participação',
+                                  categoria: resumo.categoriaMenosGasta,
+                                  valor: resumo.categoriaMenosGasta?.valor ?? 0,
+                                ),
+                                _InsightResumoCard(
+                                  titulo: 'Categorias ativas',
+                                  valor: resumo.categoriasOrdenadas.length
+                                      .toDouble(),
+                                  labelUnico: true,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!telaCompacta) ...[
+                    const SizedBox(height: AppSpacing.s24),
+                    Center(
+                      child: Icon(
+                        Icons.insights,
+                        size: 100,
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s24),
+                  ],
+                ],
+              );
+            },
           ),
         );
       },

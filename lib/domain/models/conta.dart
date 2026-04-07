@@ -81,8 +81,6 @@ class Conta {
     this.historico = const <ContaHistoricoEvento>[],
   });
 
-  // Converte um documento do Firebase (JSON) num objeto Conta do Flutter.
-  // Mantemos fallback para chaves antigas para facilitar migracao.
   factory Conta.fromMap(Map<String, dynamic> map, String id) {
     final dynamic valorRaw = map['valor'];
     final dynamic dataRaw = map['data'];
@@ -121,7 +119,6 @@ class Conta {
     );
   }
 
-  // Converte o nosso objeto Conta para um Map que o Firebase consegue guardar.
   Map<String, dynamic> toMap() {
     return {
       'nome': nome,

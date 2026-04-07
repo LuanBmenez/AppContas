@@ -1,6 +1,6 @@
-import '../../../models/categoria_personalizada_model.dart';
-import '../../../models/gasto_model.dart';
-import '../../../utils/text_normalizer.dart';
+import '../../../domain/models/categoria_personalizada.dart';
+import '../../../domain/models/gasto.dart';
+import '../../../core/utils/text_normalizer.dart';
 
 class CategoriaSugestaoResultado {
   const CategoriaSugestaoResultado({

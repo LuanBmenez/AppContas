@@ -24,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
     DashboardScreen(
       db: db,
       onTapSaidas: _abrirDespesasMesAtual,
-      onTapReceber: _abrirReceberPendentes,
       onTapSaidasFiltradas: _abrirDespesasComFiltro,
     ),
     MeusGastosScreen(
@@ -55,7 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
         context,
         MaterialPageRoute(builder: (_) => NovoRecebivelScreen(db: db)),
       );
-      return;
     }
   }
 
@@ -71,12 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _gastosKeyVersion++;
       _indiceAtual = 1;
       _dashboardDrillDownFilter = filter;
-    });
-  }
-
-  void _abrirReceberPendentes() {
-    setState(() {
-      _indiceAtual = 2;
     });
   }
 

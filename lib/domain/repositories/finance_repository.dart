@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../models/cartao_credito_model.dart';
-import '../../models/categoria_personalizada_model.dart';
-import '../../models/conta_model.dart';
-import '../../models/gasto_model.dart';
-import '../../models/preferencias_novo_gasto_model.dart';
-import '../../models/regra_categoria_importacao_model.dart';
+import '../models/cartao_credito.dart';
+import '../models/categoria_personalizada.dart';
+import '../models/conta.dart';
+import '../models/gasto.dart';
+import '../models/preferencias_novo_gasto.dart';
+import '../models/regra_categoria_importacao.dart';
 
 class DashboardResumo {
   final List<Gasto> gastos;

@@ -1,6 +1,6 @@
 export 'cartao_credito.dart';
-export '../../models/categoria_personalizada_model.dart';
-export '../../models/conta_model.dart';
+export 'categoria_personalizada.dart';
+export 'conta.dart';
 export 'dashboard_drilldown_filter.dart';
 export 'gasto.dart';
 export 'preferencias_novo_gasto.dart';
