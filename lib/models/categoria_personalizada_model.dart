@@ -32,7 +32,7 @@ class CategoriaPersonalizada {
     return CategoriaPersonalizada(
       id: id,
       nome: (map['nome'] ?? '').toString().trim(),
-      corValue: (map['corValue'] as num?)?.toInt() ?? Colors.blue.value,
+      corValue: (map['corValue'] as num?)?.toInt() ?? Colors.blue.toARGB32(),
       iconeCodePoint:
           (map['iconeCodePoint'] as num?)?.toInt() ?? Icons.label.codePoint,
       favorita: map['favorita'] == true,

@@ -1,15 +1,1 @@
-import 'gasto_model.dart';
-
-class DashboardDrillDownFilter {
-  final DateTime? mesReferencia;
-  final CategoriaGasto? categoriaPadrao;
-  final String? categoriaPersonalizadaId;
-  final TipoGasto? tipo;
-
-  const DashboardDrillDownFilter({
-    this.mesReferencia,
-    this.categoriaPadrao,
-    this.categoriaPersonalizadaId,
-    this.tipo,
-  });
-}
+export '../domain/models/dashboard_drilldown_filter.dart';
