@@ -1,172 +1,97 @@
-# Paga o que me deve
+# AppContas
 
-Aplicativo Flutter para controle financeiro pessoal com foco em previsibilidade de caixa e tomada de decisão.
+Aplicativo de finanças pessoais desenvolvido em **Flutter** com **Firebase**, focado no controle de **gastos**, **valores a receber**, **dashboard financeiro**, **importação de extratos** e **organização dos dados por usuário**.
 
-## Visao do produto
+## Sobre o projeto
 
-Problema:
+O **AppContas** foi criado para facilitar o acompanhamento financeiro do dia a dia de forma simples, prática e visual.
 
-- pequenas entradas e saidas acabam espalhadas, sem contexto mensal claro
+O app permite registrar despesas, acompanhar cobranças, importar lançamentos de extratos e visualizar um painel com resumos e comparativos financeiros.
 
-Solucao:
+Além disso, o projeto já evolui com foco em:
+- experiência visual mais refinada
+- separação de dados por usuário
+- dashboard com insights
+- base preparada para novas automações financeiras
 
-- centralizar gastos, recebiveis e insights em um dashboard unico
-- apoiar rotina com filtros, busca, lote e relatorio em PDF
+---
 
-## Funcionalidades principais
+## Funcionalidades atuais
 
-- Dashboard com comparativos de periodo, distribuicao por categoria e drill-down
-- Gestao de gastos por categoria/tipo
-- Gestao de contas a receber com status e fluxo em lote
-- Exportacao de relatorio mensal em PDF
-- Navegacao por rotas nomeadas com parametros de consulta
+### Gestão de gastos
+- Cadastro manual de gastos
+- Organização por categorias
+- Filtros por período, categoria e tipo
+- Edição individual de categoria
+- Exclusão por gesto
+- Seleção em lote para ações em massa
+- Regras automáticas de categorização
+- Importação com prévia e deduplicação
 
-## Stack tecnica
+### Importação de extratos
+- Importação de extratos em CSV
+- Pré-visualização antes de salvar
+- Deduplicação por hash de importação
+- Tentativa de categorização automática com base no histórico
+- Regras de categoria para futuras importações
 
-- Flutter 3 / Dart 3
-- Firebase Core + Cloud Firestore
-- Go Router
-- PDF + Printing + Share Plus
+### Dashboard financeiro
+- Resumo financeiro do período
+- Saldo do período
+- Comparativo com períodos anteriores
+- Total de saídas
+- Total a receber
+- Distribuição de gastos por categoria
+- Drill-down por categoria
+- Exportação de relatório em PDF
+- Cards de insights e comparativos visuais
 
-## Arquitetura
+### Contas a receber
+- Cadastro de cobranças
+- Controle de pendências e valores recebidos
+- Busca por nome do devedor
+- Alteração de status
+- Seleção em lote
+- Exclusão de cobranças
 
-Estrutura principal:
+### Conta e autenticação
+- Login com Firebase Authentication
+- Separação de dados por usuário
+- Perfil com informações da conta
+- Logout
 
-- lib/app: bootstrap da aplicacao e roteamento
-- lib/domain: modelos e contratos
-- lib/services: infraestrutura e regras de aplicacao
-- lib/features: fluxos por contexto funcional
-- lib/ui e lib/core: design system, utilitarios e componentes reaproveitaveis
+---
 
-Decisoes de implementacao:
+## Tecnologias utilizadas
 
-- separacao por camadas para reduzir acoplamento
-- contratos de repositorio no dominio para facilitar evolucao
-- cache de resumo no dashboard com TTL, LRU e limpeza explicita
-- telemetria com contrato de eventos e sanitizacao de parametros
+- **Flutter**
+- **Dart**
+- **Firebase Core**
+- **Firebase Authentication**
+- **Cloud Firestore**
+- **Intl**
+- **RxDart**
+- **File Picker**
+- **PDF / Printing**
+- **Share Plus**
+- **Path Provider**
 
-## Firebase: seguranca e governanca
+---
 
-### Regras de seguranca
-
-Este repositorio inclui regras versionadas:
-
-- firestore.rules
-- storage.rules
-
-Publicar regras:
-
-```bash
-firebase deploy --only firestore:rules,storage
-```
-
-### App Check (producao)
-
-O app ativa App Check no bootstrap com:
-
-- Android: Play Integrity
-- Apple: App Attest
-- Web: ReCaptchaV3Provider
-
-Para Web, passe a chave por dart-define:
-
-```bash
-flutter run -d chrome --dart-define=FIREBASE_RECAPTCHA_SITE_KEY=YOUR_SITE_KEY
-```
-
-### Ambientes (dev/stage/prod)
-
-Recomendado usar um projeto Firebase por ambiente:
-
-- app-contas-dev
-- app-contas-stage
-- app-contas-prod
-
-Gerar opcoes por ambiente:
+## Estrutura do projeto
 
 ```bash
-flutterfire configure --project=app-contas-dev
-flutterfire configure --project=app-contas-stage
-flutterfire configure --project=app-contas-prod
-```
-
-Boas praticas:
-
-- manter regras equivalentes entre ambientes
-- revisar permissao de leitura/escrita periodicamente
-- habilitar App Check em todos os ambientes
-
-## Observabilidade
-
-Telemetria estruturada em:
-
-- lib/services/app_telemetry_service.dart
-
-Padroes aplicados:
-
-- contrato de eventos
-- allowlist de parametros por evento
-- sanitizacao de campos sensiveis
-- log local em modo nao release
-
-## Como rodar
-
-```bash
-flutter pub get
-flutter run
-```
-
-## Qualidade e testes
-
-Analise estatica:
-
-```bash
-flutter analyze
-```
-
-Testes:
-
-```bash
-flutter test
-```
-
-Cobertura:
-
-```bash
-flutter test --coverage
-```
-
-Suites atuais:
-
-- test/widget_test.dart
-- test/services/extrato_csv_service_test.dart
-- test/services/dashboard_summary_service_test.dart
-- test/services/app_telemetry_service_test.dart
-- test/features/inicio/dashboard_screen_test.dart
-
-## CI automatizado
-
-Pipeline GitHub Actions:
-
-- analyze + test
-- coleta de cobertura
-
-Arquivos de workflow:
-
-- .github/workflows/flutter-ci.yml
-
-## Roadmap
-
-- ampliar cobertura de testes para fluxos de lote em receber e despesas
-- publicar badge de cobertura no README
-- adicionar artefatos de build no CI para distribuicao interna
-- evoluir observabilidade com provider externo (analytics/monitoring)
-
-## Apresentacao para LinkedIn
-
-Ao publicar, destaque:
-
-- foco em arquitetura limpa e evolutiva
-- qualidade com testes e pipeline automatizada
-- seguranca e governanca no Firebase
-- UX orientada a produtividade financeira
+lib/
+├── core/
+│   ├── theme/
+│   └── utils/
+├── data/
+│   └── services/
+├── domain/
+│   ├── models/
+│   └── repositories/
+├── features/
+├── screens/
+├── services/
+├── ui/
+└── widgets/
