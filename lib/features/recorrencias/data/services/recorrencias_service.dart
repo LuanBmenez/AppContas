@@ -1,8 +1,6 @@
 import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart'
-    show SugestaoRecorrenciaDespesa;
 import 'package:paga_o_que_me_deve/domain/services/recorrencia_despesa_service.dart';
 import 'package:paga_o_que_me_deve/features/recorrencias/domain/models/recorrencia_ativa.dart';
 

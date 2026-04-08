@@ -46,7 +46,10 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
       if (!mounted) {
         return;
       }
-      AppFeedback.showError(context, 'Não foi possível remover recorrência: $e');
+      AppFeedback.showError(
+        context,
+        'Não foi possível remover recorrência: $e',
+      );
     }
   }
 
@@ -113,7 +116,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
           return ListView.separated(
             padding: const EdgeInsets.all(AppSpacing.s16),
             itemCount: recorrencias.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s10),
+            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.s10),
             itemBuilder: (context, index) {
               final RecorrenciaAtiva item = recorrencias[index];
               return Card(
@@ -138,7 +141,9 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.1,
+                              ),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
