@@ -50,6 +50,11 @@ class HomeShellScreen extends StatelessWidget {
         actions: currentTab == HomeTab.gastos
             ? <Widget>[
                 IconButton(
+                  tooltip: 'Orçamentos',
+                  onPressed: () => context.push(AppRoutes.orcamentosPath),
+                  icon: const Icon(Icons.savings_outlined),
+                ),
+                IconButton(
                   tooltip: 'Cartoes',
                   onPressed: () => context.push(AppRoutes.cartoesPath),
                   icon: const Icon(Icons.credit_card_outlined),
@@ -67,6 +72,7 @@ class HomeShellScreen extends StatelessWidget {
           currentTab == HomeTab.inicio || currentTab == HomeTab.perfil
           ? null
           : FloatingActionButton(
+              heroTag: 'home_shell_add_fab',
               onPressed: () => _onAdicionar(context),
               child: const Icon(Icons.add),
             ),

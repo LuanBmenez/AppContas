@@ -20,6 +20,7 @@ class CartoesScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'cartoes_add_fab',
         onPressed: () => _abrirNovoCartaoDialog(context),
         icon: const Icon(Icons.add_card_outlined),
         label: const Text('Novo cartão'),

@@ -6,12 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
+import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_data_service.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_summary_service.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/report_export_service.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/presentation/widgets/dashboard_loading_view.dart';
+import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -37,6 +39,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late final DashboardDataService _dashboardDataService;
+  late final OrcamentosService _orcamentosService;
+  late final Stream<List<OrcamentoCategoriaResumo>> _orcamentosMesStream;
   final DashboardSummaryService _summaryService = DashboardSummaryService();
   final ReportExportService _reportExportService = const ReportExportService();
 
@@ -52,6 +56,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _dashboardDataService = DashboardDataService(widget.db);
+    _orcamentosService = OrcamentosService(repository: widget.db);
+    _orcamentosMesStream = _orcamentosService.calcularResumoPorCategoria(
+      DateTime.now(),
+      limite: 5,
+    );
+  }
+
+  Widget _buildOrcamentosMesCard(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Orçamentos do mês',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.push(AppRoutes.orcamentosPath),
+                  child: const Text('Gerenciar'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s6),
+            Text(
+              'Acompanhe limites por categoria no mês atual.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            StreamBuilder<List<OrcamentoCategoriaResumo>>(
+              stream: _orcamentosMesStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Column(
+                    children: [
+                      AppSkeletonBox(height: 84, radius: 14),
+                      SizedBox(height: AppSpacing.s10),
+                      AppSkeletonBox(height: 84, radius: 14),
+                    ],
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Text(
+                    'Não foi possível carregar orçamentos: ${snapshot.error}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  );
+                }
+
+                final List<OrcamentoCategoriaResumo> resumos =
+                    snapshot.data ?? <OrcamentoCategoriaResumo>[];
+
+                if (resumos.isEmpty) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.s14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Você ainda não definiu orçamentos por categoria.',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              context.push(AppRoutes.orcamentosPath),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Criar orçamento'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    for (int i = 0; i < resumos.length; i++) ...[
+                      OrcamentoCategoriaProgressItem(
+                        resumo: resumos[i],
+                        compacto: true,
+                        onTap: () => context.push(AppRoutes.orcamentosPath),
+                      ),
+                      if (i != resumos.length - 1)
+                        const SizedBox(height: AppSpacing.s10),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _tituloPeriodo(DateTime agora) {
@@ -798,6 +920,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _DashboardEntry(
                           delayMs: 130,
                           child: _buildExportCard(theme),
+                        ),
+                        const SizedBox(height: 16),
+                        _DashboardEntry(
+                          delayMs: 150,
+                          child: _buildOrcamentosMesCard(theme),
                         ),
                         const SizedBox(height: 20),
                         _DashboardEntry(

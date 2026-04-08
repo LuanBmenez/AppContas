@@ -14,6 +14,7 @@ import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/dashboard.dart';
 import 'package:paga_o_que_me_deve/features/gastos/gastos.dart';
 import 'package:paga_o_que_me_deve/features/importacao/importacao.dart';
+import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
 import 'package:paga_o_que_me_deve/features/perfil/perfil.dart';
 
 class AppRouter {
@@ -114,6 +115,13 @@ class AppRouter {
         name: AppRoutes.novoGastoName,
         builder: (BuildContext context, GoRouterState state) {
           return NovoGastoScreen(db: _db);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.orcamentosPath,
+        name: AppRoutes.orcamentosName,
+        builder: (BuildContext context, GoRouterState state) {
+          return OrcamentosScreen(db: _db);
         },
       ),
       GoRoute(
