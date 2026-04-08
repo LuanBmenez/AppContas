@@ -8,7 +8,6 @@ import 'package:paga_o_que_me_deve/app/session/presentation/screens/home_shell_s
 import 'package:paga_o_que_me_deve/data/services/services.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/features/a_receber/a_receber.dart';
 import 'package:paga_o_que_me_deve/features/auth/auth.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/dashboard.dart';
@@ -16,6 +15,7 @@ import 'package:paga_o_que_me_deve/features/gastos/gastos.dart';
 import 'package:paga_o_que_me_deve/features/importacao/importacao.dart';
 import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
 import 'package:paga_o_que_me_deve/features/perfil/perfil.dart';
+import 'package:paga_o_que_me_deve/features/recebimentos/ui/recebimentos_page.dart';
 import 'package:paga_o_que_me_deve/features/recorrencias/recorrencias.dart';
 
 class AppRouter {
@@ -67,10 +67,12 @@ class AppRouter {
         builder: (BuildContext context, GoRouterState state) {
           final DashboardDrillDownFilter? filtroViaQuery =
               AppRoutes.gastosFilterFromQuery(state.uri.queryParameters);
+
           final DashboardDrillDownFilter? filtroViaExtra =
               state.extra is DashboardDrillDownFilter
               ? state.extra as DashboardDrillDownFilter
               : null;
+
           final DashboardDrillDownFilter? filtro =
               filtroViaQuery ?? filtroViaExtra;
 
@@ -81,7 +83,11 @@ class AppRouter {
               key: ValueKey<String>(
                 filtro == null
                     ? 'gastos_sem_filtro'
-                    : 'gastos_${filtro.mesReferencia?.millisecondsSinceEpoch ?? 0}_${filtro.categoriaPadrao?.name ?? ''}_${filtro.categoriaPersonalizadaId ?? ''}_${filtro.tipo?.name ?? ''}',
+                    : 'gastos_'
+                          '${filtro.mesReferencia?.millisecondsSinceEpoch ?? 0}_'
+                          '${filtro.categoriaPadrao?.name ?? ''}_'
+                          '${filtro.categoriaPersonalizadaId ?? ''}_'
+                          '${filtro.tipo?.name ?? ''}',
               ),
               db: _db,
               initialFilter: filtro,
@@ -96,7 +102,7 @@ class AppRouter {
           return HomeShellScreen(
             db: _db,
             currentTab: HomeTab.receber,
-            child: AReceberScreen(db: _db),
+            child: const RecebimentosPage(),
           );
         },
       ),
@@ -146,13 +152,7 @@ class AppRouter {
           return ImportacaoScreen(db: _db);
         },
       ),
-      GoRoute(
-        path: AppRoutes.novoRecebivelPath,
-        name: AppRoutes.novoRecebivelName,
-        builder: (BuildContext context, GoRouterState state) {
-          return NovoRecebivelScreen(db: _db);
-        },
-      ),
+      // Rota NovoRecebivelScreen removida: feature substituída pelo novo fluxo de recebimentos.
     ],
   );
 }

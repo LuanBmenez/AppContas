@@ -48,11 +48,30 @@ class _RecebimentosPageState extends State<RecebimentosPage> {
       return competencia;
     }
 
-    return DateFormat.yMMM('pt_BR').format(DateTime(ano, mes, 1));
+    try {
+      return DateFormat.yMMM('pt_BR').format(DateTime(ano, mes, 1));
+    } catch (_) {
+      return '${mes.toString().padLeft(2, '0')}/$ano';
+    }
   }
 
   String _formatarMoeda(double valor) {
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(valor);
+    try {
+      return NumberFormat.currency(
+        locale: 'pt_BR',
+        symbol: 'R\$',
+      ).format(valor);
+    } catch (_) {
+      return 'R\$ ${valor.toStringAsFixed(2)}';
+    }
+  }
+
+  String _formatarData(DateTime data) {
+    try {
+      return DateFormat('dd/MM/yyyy', 'pt_BR').format(data);
+    } catch (_) {
+      return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+    }
   }
 
   @override
@@ -141,11 +160,11 @@ class _RecebimentosPageState extends State<RecebimentosPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Previsto: ${DateFormat('dd/MM/yyyy').format(r.dataPrevista)}',
+                                  'Previsto: ${_formatarData(r.dataPrevista)}',
                                 ),
                                 if (r.dataRecebido != null)
                                   Text(
-                                    'Recebido: ${DateFormat('dd/MM/yyyy').format(r.dataRecebido!)}',
+                                    'Recebido: ${_formatarData(r.dataRecebido!)}',
                                   ),
                               ],
                             ),

@@ -159,9 +159,7 @@ Widget _buildTestApp({
   Future<void> Function(DateTime referencia)? exportadorRelatorio,
 }) {
   return MaterialApp(
-    home: Scaffold(
-      body: DashboardScreen(db: db, exportadorRelatorio: exportadorRelatorio),
-    ),
+    home: Scaffold(body: DashboardScreen(db: db)),
   );
 }
 
