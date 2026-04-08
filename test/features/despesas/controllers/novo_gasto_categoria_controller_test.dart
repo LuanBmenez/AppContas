@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:paga_o_que_me_deve/domain/models/categoria_personalizada.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
-import 'package:paga_o_que_me_deve/features/categorias/presentation/controllers/novo_gasto_categoria_controller.dart';
+import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo_gasto_categoria_controller.dart';
 
 void main() {
   group('NovoGastoCategoriaController', () {

@@ -8,7 +8,7 @@ import '../../data/services/services.dart';
 import '../../domain/models/models.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../features/a_receber/presentation/screens/a_receber_screen.dart';
-import '../../features/a_receber/presentation/screens/nova_conta_screen.dart';
+import '../../features/a_receber/presentation/screens/novo_recebivel_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/cartoes/presentation/screens/cartoes_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';

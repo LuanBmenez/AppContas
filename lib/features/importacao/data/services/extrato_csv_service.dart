@@ -1,10 +1,10 @@
 import 'dart:math';
 
+import 'package:paga_o_que_me_deve/core/utils/app_formatters.dart';
+import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
-import 'package:paga_o_que_me_deve/utils/app_formatters.dart';
-import 'package:paga_o_que_me_deve/utils/text_normalizer.dart';
 
 enum CampoExtrato { dataLancamento, dataCompra, descricao, valor, parcela }
 

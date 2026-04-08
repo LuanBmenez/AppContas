@@ -7,7 +7,7 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/features/categorias/presentation/controllers/novo_gasto_categoria_controller.dart';
+import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo_gasto_categoria_controller.dart';
 
 import '../widgets/novo_gasto_sections.dart';
 

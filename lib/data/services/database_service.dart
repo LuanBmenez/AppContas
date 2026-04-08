@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:rxdart/rxdart.dart';
-
+import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
 import 'package:paga_o_que_me_deve/domain/models/categoria_personalizada.dart';
 import 'package:paga_o_que_me_deve/domain/models/conta.dart';
@@ -10,7 +9,7 @@ import 'package:paga_o_que_me_deve/domain/models/preferencias_novo_gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/recorrencia_despesa_service.dart';
-import 'package:paga_o_que_me_deve/utils/text_normalizer.dart';
+import 'package:rxdart/rxdart.dart';
 
 class DatabaseService implements FinanceRepository {
   final RecorrenciaDespesaService _recorrenciaDespesaService =

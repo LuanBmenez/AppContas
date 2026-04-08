@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:paga_o_que_me_deve/core/utils/app_formatters.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/utils/app_formatters.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 

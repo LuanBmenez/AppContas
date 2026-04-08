@@ -5,7 +5,7 @@ import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
-import 'nova_conta_screen.dart';
+import 'novo_recebivel_screen.dart';
 
 class AReceberScreen extends StatefulWidget {
   const AReceberScreen({

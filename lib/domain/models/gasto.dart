@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../utils/text_normalizer.dart';
+import '../../core/utils/text_normalizer.dart';
 
 enum CategoriaGasto {
   moradia,

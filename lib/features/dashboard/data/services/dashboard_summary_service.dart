@@ -1,10 +1,10 @@
 import 'dart:collection';
 
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/utils/app_formatters.dart';
 import 'package:paga_o_que_me_deve/domain/models/conta.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/utils/app_formatters.dart';
 
 enum DashboardPeriodoRapido { hoje, seteDias, mes, trimestre }
 
