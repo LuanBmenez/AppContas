@@ -45,7 +45,6 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   final Map<String, AcaoRecebimentoImportacao> _acoesRecebimentos =
       <String, AcaoRecebimentoImportacao>{};
   final Map<String, String?> _vinculosRecebimentos = <String, String?>{};
-
   final Map<CampoExtrato, String?> _mapeamento = <CampoExtrato, String?>{};
   final Map<TransacaoCanceladaDetectada, bool> _acoesCancelamento =
       <TransacaoCanceladaDetectada, bool>{};
@@ -71,6 +70,22 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     _acoesCancelamento.clear();
     _chaveDuplicadosCache = null;
     _duplicadosCache = null;
+  }
+
+  CartaoCredito _resolverCartaoSelecionado(List<CartaoCredito> cartoes) {
+    final String? cartaoSelecionadoId = _cartaoSelecionado?.id;
+
+    if (cartaoSelecionadoId == null) {
+      return cartoes.first;
+    }
+
+    for (final CartaoCredito cartao in cartoes) {
+      if (cartao.id == cartaoSelecionadoId) {
+        return cartao;
+      }
+    }
+
+    return cartoes.first;
   }
 
   List<Gasto> _filtrarGastosPorCancelamento(
@@ -114,14 +129,14 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       final PlatformFile file = result.files.single;
       final Uint8List? bytes = file.bytes;
       if (bytes == null) {
-        throw Exception('Nao foi possivel ler o arquivo selecionado.');
+        throw Exception('Não foi possível ler o arquivo selecionado.');
       }
 
       final String conteudo = _decodificarTexto(bytes);
       final ResultadoLeituraCsv csv = _extratoService.lerCsv(conteudo);
 
       if (csv.cabecalhos.isEmpty) {
-        throw Exception('CSV sem cabecalho valido.');
+        throw Exception('CSV sem cabeçalho válido.');
       }
 
       _limparEstadosDerivadosImportacao();
@@ -169,7 +184,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     required List<Conta> contasPendentes,
   }) async {
     if (gastos.isEmpty && recebimentos.isEmpty) {
-      AppFeedback.showError(context, 'Nenhum item valido para importar.');
+      AppFeedback.showError(context, 'Nenhum item válido para importar.');
       return;
     }
 
@@ -250,7 +265,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
       AppFeedback.showSuccess(
         context,
-        'Importacao concluida: '
+        'Importação concluída: '
         '$importados gastos novos, '
         '$duplicados duplicados ignorados, '
         '$vinculados recebimentos vinculados, '
@@ -261,7 +276,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, 'Falha ao salvar importacao: $e');
+      AppFeedback.showError(context, 'Falha ao salvar importação: $e');
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -290,12 +305,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
             return _buildSemCartoes();
           }
 
-          final String? cartaoSelecionadoId = _cartaoSelecionado?.id;
-          final CartaoCredito cartaoSelecionadoAtual = cartoes.firstWhere(
-            (c) => c.id == cartaoSelecionadoId,
-            orElse: () => cartoes.first,
-          );
-          _cartaoSelecionado = cartaoSelecionadoAtual;
+          final CartaoCredito cartaoSelecionadoAtual =
+              _resolverCartaoSelecionado(cartoes);
 
           return StreamBuilder<List<RegraCategoriaImportacao>>(
             stream: _importacaoService.regrasCategoriaImportacao,
@@ -305,6 +316,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
               final ResultadoMapeamentoExtrato preview = _gerarPreview(
                 regrasAprendidas,
+                cartaoSelecionadoAtual,
               );
 
               final List<TransacaoCanceladaDetectada> cancelamentosDetectados =
@@ -343,7 +355,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                     children: [
                       CartaoStepSection(
                         cartoes: cartoes,
-                        cartaoSelecionado: _cartaoSelecionado,
+                        cartaoSelecionado: cartaoSelecionadoAtual,
                         onCartaoChanged: (value) {
                           if (value != null) {
                             setState(() {
@@ -372,11 +384,11 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                         const SizedBox(height: AppSpacing.s12),
                         MapeamentoColunasSection(
                           campoDataLancamento: _buildCampoMapeamento(
-                            label: 'Data de lancamento*',
+                            label: 'Data de lançamento*',
                             campo: CampoExtrato.dataLancamento,
                           ),
                           campoDescricao: _buildCampoMapeamento(
-                            label: 'Descricao*',
+                            label: 'Descrição*',
                             campo: CampoExtrato.descricao,
                           ),
                           campoValor: _buildCampoMapeamento(
@@ -457,11 +469,11 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
   ResultadoMapeamentoExtrato _gerarPreview(
     List<RegraCategoriaImportacao> regrasAprendidas,
+    CartaoCredito cartao,
   ) {
     final ResultadoLeituraCsv? csv = _csv;
-    final CartaoCredito? cartao = _cartaoSelecionado;
 
-    if (csv == null || cartao == null || !_mapeamentoObrigatorioOk) {
+    if (csv == null || !_mapeamentoObrigatorioOk) {
       return const ResultadoMapeamentoExtrato(
         gastos: <Gasto>[],
         ignorados: 0,
@@ -485,6 +497,10 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
             .toSet()
             .toList()
           ..sort();
+
+    if (hashes.isEmpty) {
+      return Future<int>.value(0);
+    }
 
     final String chave = hashes.join('|');
     if (_duplicadosCache != null && _chaveDuplicadosCache == chave) {
@@ -514,11 +530,11 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
       AppFeedback.showSuccess(
         context,
-        '${sugestoes.length} sugestoes aplicadas e aprendidas.',
+        '${sugestoes.length} sugestões aplicadas e aprendidas.',
       );
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, 'Falha ao salvar sugestoes: $e');
+      AppFeedback.showError(context, 'Falha ao salvar sugestões: $e');
     } finally {
       if (mounted) {
         setState(() => _salvandoSugestoes = false);
@@ -534,12 +550,12 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '4) Sugestoes de categorizacao',
+              '4) Sugestões de categorização',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.s8),
             const Text(
-              'Revise e aceite em lote para treinar regras das proximas importacoes.',
+              'Revise e aceite em lote para treinar regras das próximas importações.',
             ),
             const SizedBox(height: AppSpacing.s12),
             ...sugestoes
@@ -553,7 +569,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                   ),
                 ),
             if (sugestoes.length > 8)
-              Text('... e mais ${sugestoes.length - 8} sugestoes'),
+              Text('... e mais ${sugestoes.length - 8} sugestões'),
             const SizedBox(height: AppSpacing.s12),
             SizedBox(
               width: double.infinity,
@@ -573,8 +589,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                     : const Icon(Icons.auto_fix_high),
                 label: Text(
                   _salvandoSugestoes
-                      ? 'Aplicando sugestoes...'
-                      : 'Aceitar ${sugestoes.length} sugestoes',
+                      ? 'Aplicando sugestões...'
+                      : 'Aceitar ${sugestoes.length} sugestões',
                 ),
               ),
             ),
@@ -630,9 +646,20 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         _acoesRecebimentos[recebimento.id] ??
         _acaoPadraoRecebimento(recebimento, sugestoes);
 
-    final String? contaSelecionadaId =
-        _vinculosRecebimentos[recebimento.id] ??
-        (sugestoes.isEmpty ? null : sugestoes.first.conta.id);
+    final String? sugestaoPadraoId = sugestoes.isEmpty
+        ? null
+        : sugestoes.first.conta.id;
+
+    final String? contaSelecionadaIdAtual =
+        _vinculosRecebimentos[recebimento.id] ?? sugestaoPadraoId;
+
+    final bool contaSelecionadaExiste = contaSelecionadaIdAtual == null
+        ? false
+        : sugestoes.any((s) => s.conta.id == contaSelecionadaIdAtual);
+
+    final String? contaSelecionadaId = contaSelecionadaExiste
+        ? contaSelecionadaIdAtual
+        : sugestaoPadraoId;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s12),
@@ -658,7 +685,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
               const SizedBox(height: AppSpacing.s4),
               Text('Tipo: ${recebimento.tipo.label}'),
               if ((recebimento.nomeExtraido ?? '').isNotEmpty)
-                Text('Nome extraido: ${recebimento.nomeExtraido}'),
+                Text('Nome extraído: ${recebimento.nomeExtraido}'),
               if (recebimento.valorSuspeito)
                 Text(
                   'Valor muito baixo/suspeito. Recomenda-se ignorar.',
@@ -669,7 +696,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 ),
               const SizedBox(height: AppSpacing.s8),
               DropdownButtonFormField<AcaoRecebimentoImportacao>(
-                initialValue: acaoSelecionada,
+                value: acaoSelecionada,
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Ação',
@@ -684,7 +711,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                   DropdownMenuItem(
                     value: AcaoRecebimentoImportacao.vincular,
                     child: Text(
-                      'Vincular a cobrança',
+                      'Vincular à cobrança',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -710,6 +737,9 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                   if (value == null) return;
                   setState(() {
                     _acoesRecebimentos[recebimento.id] = value;
+                    if (value != AcaoRecebimentoImportacao.vincular) {
+                      _vinculosRecebimentos.remove(recebimento.id);
+                    }
                   });
                 },
               ),
@@ -717,14 +747,14 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 const SizedBox(height: AppSpacing.s8),
                 if (sugestoes.isEmpty)
                   const Text(
-                    'Nenhuma cobranca pendente compativel encontrada. Escolha criar ou ignorar.',
+                    'Nenhuma cobrança pendente compatível encontrada. Escolha criar ou ignorar.',
                   )
                 else
                   DropdownButtonFormField<String>(
-                    initialValue: contaSelecionadaId,
+                    value: contaSelecionadaId,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Cobranca sugerida',
+                      labelText: 'Cobrança sugerida',
                       border: OutlineInputBorder(),
                     ),
                     items: sugestoes.map((sugestao) {
@@ -732,7 +762,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                         sugestao.conta.valor,
                       );
                       final String statusValor = sugestao.valorCompativel
-                          ? 'valor compativel'
+                          ? 'valor compatível'
                           : 'dif. ${AppFormatters.moeda(sugestao.diferencaValorAbsoluta)}';
 
                       return DropdownMenuItem<String>(
@@ -800,7 +830,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
             const Icon(Icons.credit_card_off_outlined, size: 72),
             const SizedBox(height: AppSpacing.s12),
             const Text(
-              'Cadastre pelo menos um cartao para importar extrato.',
+              'Cadastre pelo menos um cartão para importar extrato.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.s16),
@@ -814,7 +844,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 );
               },
               icon: const Icon(Icons.add_card),
-              label: const Text('Cadastrar cartao'),
+              label: const Text('Cadastrar cartão'),
             ),
           ],
         ),
@@ -832,7 +862,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     }
 
     return DropdownButtonFormField<String?>(
-      initialValue: _mapeamento[campo],
+      value: _mapeamento[campo],
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
@@ -842,7 +872,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         const DropdownMenuItem<String?>(
           value: null,
           child: Text(
-            'Nao usar esta coluna',
+            'Não usar esta coluna',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

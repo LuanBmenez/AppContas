@@ -44,20 +44,24 @@ class ImportacaoService {
     required DateTime dataRecebimento,
     required double valorRecebido,
   }) async {
-    if (!conta.foiPago) {
-      await _repository.alternarStatusRecebivel(conta.id, conta.foiPago);
-    }
-
     final String detalhe =
         'Recebimento via importacao CSV em ${AppFormatters.dataCurta(dataRecebimento)} (${AppFormatters.moeda(valorRecebido)}).';
+
     final String descricaoAtualizada = _anexarDetalhesNaDescricao(
       conta.descricao,
       detalhe,
       referencia,
     );
 
+    // CORREÇÃO: Fazemos uma única atualização no banco garantindo que o status
+    // de pagamento e a data de recebimento corretos sejam salvos,
+    // evitando sobrescrever o status acidentalmente.
     await _repository.atualizarRecebivel(
-      conta.copyWith(descricao: descricaoAtualizada),
+      conta.copyWith(
+        descricao: descricaoAtualizada,
+        foiPago: true,
+        recebidaEm: dataRecebimento,
+      ),
     );
   }
 
@@ -88,6 +92,7 @@ class ImportacaoService {
     final String referenciaLimpa = referencia.trim();
     final String descricaoBase = descricaoAtual.trim();
     final String marcador = '[Importacao CSV]';
+
     if (descricaoBase.contains(marcador)) {
       return descricaoBase;
     }
@@ -95,8 +100,10 @@ class ImportacaoService {
     final String referenciaCurta = referenciaLimpa.length > 120
         ? '${referenciaLimpa.substring(0, 120)}...'
         : referenciaLimpa;
+
     final String bloco =
         '$marcador $detalhe${referenciaCurta.isEmpty ? '' : ' Ref: $referenciaCurta'}';
+
     if (descricaoBase.isEmpty) {
       return bloco;
     }

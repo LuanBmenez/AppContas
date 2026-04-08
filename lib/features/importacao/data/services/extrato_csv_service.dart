@@ -364,6 +364,17 @@ class ExtratoCsvService {
           valor: valor,
         );
 
+        // CORREÇÃO: Evita duplicar o mesmo recebimento caso venha repetido no CSV
+        if (!hashesNoArquivo.add(hashRecebimento)) {
+          contarIgnorado(
+            'Recebimento duplicado no arquivo',
+            linhaCsv: linhaCsv,
+            descricao: descricao,
+            valor: valorRaw,
+          );
+          continue;
+        }
+
         recebimentosDetectados.add(
           RecebimentoDetectado(
             id: hashRecebimento,
@@ -423,7 +434,7 @@ class ExtratoCsvService {
 
       if (!hashesNoArquivo.add(hash)) {
         contarIgnorado(
-          'Duplicado no arquivo',
+          'Gasto duplicado no arquivo',
           linhaCsv: linhaCsv,
           descricao: descricao,
           valor: valorRaw,
@@ -509,8 +520,11 @@ class ExtratoCsvService {
                 _tokensRelevantes(descricaoConta),
               ),
             );
-      final double diferenca = (conta.valor - recebimento.valor).abs();
-      final double toleranciaValor = max(5, recebimento.valor * 0.15);
+
+      // Forçando conversão de ambos para positivo a fim de evitar bugs no cálculo de diferença
+      final double diferenca = (conta.valor.abs() - recebimento.valor.abs())
+          .abs();
+      final double toleranciaValor = max(5, recebimento.valor.abs() * 0.15);
       final bool valorCompativel = diferenca <= toleranciaValor;
       final double valorScore =
           (1 - (diferenca / max(recebimento.valor.abs(), 1))).clamp(0, 1);
@@ -675,7 +689,7 @@ class ExtratoCsvService {
     }
 
     final String bruto = limpo
-        .replaceAll('R\$', '')
+        .replaceAll(RegExp(r'R\$'), '')
         .replaceAll(' ', '')
         .replaceAll(RegExp(r'[^0-9,.-]'), '');
 
@@ -686,7 +700,6 @@ class ExtratoCsvService {
     final int ultimoPonto = bruto.lastIndexOf('.');
     final int ultimaVirgula = bruto.lastIndexOf(',');
 
-    // Regra: o ultimo separador encontrado vira decimal; os demais sao milhares.
     String normalizado;
     if (ultimoPonto >= 0 && ultimaVirgula >= 0) {
       if (ultimoPonto > ultimaVirgula) {
@@ -765,7 +778,9 @@ class ExtratoCsvService {
   }
 
   TipoRecebimentoDetectado _classificarRecebimento(String descricao) {
-    final String d = _normalizarTextoBusca(descricao);
+    // CORREÇÃO: Força o toUpperCase() para o match exato das palavras-chave,
+    // independente do comportamento interno do TextNormalizer.
+    final String d = _normalizarTextoBusca(descricao).toUpperCase();
 
     if (d.contains('REEMBOLSO')) {
       return TipoRecebimentoDetectado.reembolso;
@@ -795,7 +810,8 @@ class ExtratoCsvService {
       return true;
     }
 
-    final String d = _normalizarTextoBusca(descricao);
+    // CORREÇÃO: Força o toUpperCase() para proteção do comportamento do Normalizer.
+    final String d = _normalizarTextoBusca(descricao).toUpperCase();
     return d.contains('RECEBIDO') ||
         d.contains('RECEBIMENTO') ||
         d.contains('CREDITO RECEBIDO') ||

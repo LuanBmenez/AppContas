@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -20,15 +21,33 @@ class OrcamentosScreen extends StatefulWidget {
 
 class _OrcamentosScreenState extends State<OrcamentosScreen> {
   late final OrcamentosService _orcamentosService;
-  late final Stream<List<OrcamentoCategoriaResumo>> _resumosOrcamentoStream;
+  late Stream<List<OrcamentoCategoriaResumo>> _resumosOrcamentoStream;
+
+  // Estado para controlar o mês atual na tela
+  DateTime _mesSelecionado = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _orcamentosService = OrcamentosService(repository: widget.db);
+    _carregarStreamDoMes();
+  }
+
+  // Atualiza a Stream baseada no mês selecionado
+  void _carregarStreamDoMes() {
     _resumosOrcamentoStream = _orcamentosService.calcularResumoPorCategoria(
-      DateTime.now(),
+      _mesSelecionado,
     );
+  }
+
+  void _mudarMes(int incremento) {
+    setState(() {
+      _mesSelecionado = DateTime(
+        _mesSelecionado.year,
+        _mesSelecionado.month + incremento,
+      );
+      _carregarStreamDoMes();
+    });
   }
 
   Future<void> _abrirFormularioOrcamento({
@@ -85,7 +104,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
                         MoedaInputFormatter(),
                       ],
                       decoration: const InputDecoration(
-                        labelText: 'Limite mensal',
+                        labelText: 'Limite mensal base',
                         hintText: 'Ex: 500,00',
                         border: OutlineInputBorder(),
                       ),
@@ -109,13 +128,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
       },
     );
 
-    if (confirmar != true) {
-      return;
-    }
-
-    if (!screenContext.mounted) {
-      return;
-    }
+    if (confirmar != true) return;
+    if (!screenContext.mounted) return;
 
     final String limiteRaw = limiteController.text.trim();
     final double limite;
@@ -159,14 +173,10 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
         );
       }
 
-      if (!screenContext.mounted) {
-        return;
-      }
+      if (!screenContext.mounted) return;
       AppFeedback.showSuccess(screenContext, 'Orçamento salvo com sucesso.');
     } catch (e) {
-      if (!screenContext.mounted) {
-        return;
-      }
+      if (!screenContext.mounted) return;
       AppFeedback.showError(screenContext, 'Falha ao salvar orçamento: $e');
     }
   }
@@ -180,89 +190,124 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
           'Deseja excluir o orçamento de ${orcamento.categoriaPadrao.label}?',
     );
 
-    if (!confirmar) {
-      return;
-    }
-
-    if (!screenContext.mounted) {
-      return;
-    }
+    if (!confirmar) return;
+    if (!screenContext.mounted) return;
 
     try {
       await _orcamentosService.deletarOrcamento(orcamento.id);
-      if (!screenContext.mounted) {
-        return;
-      }
+      if (!screenContext.mounted) return;
       AppFeedback.showSuccess(screenContext, 'Orçamento removido.');
     } catch (e) {
-      if (!screenContext.mounted) {
-        return;
-      }
+      if (!screenContext.mounted) return;
       AppFeedback.showError(screenContext, 'Falha ao excluir orçamento: $e');
     }
+  }
+
+  // Widget para navegar entre os meses
+  Widget _buildSeletorMes() {
+    final String mesFormatado = DateFormat(
+      'MMMM yyyy',
+      'pt_BR',
+    ).format(_mesSelecionado).toUpperCase();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () => _mudarMes(-1),
+          ),
+          Text(
+            mesFormatado,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: () => _mudarMes(1),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Orçamentos por categoria')),
+      appBar: AppBar(title: const Text('Orçamentos Globais')),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'orcamentos_add_fab',
         onPressed: () => _abrirFormularioOrcamento(resumos: const []),
         icon: const Icon(Icons.add),
         label: const Text('Adicionar'),
       ),
-      body: StreamBuilder<List<OrcamentoCategoriaResumo>>(
-        stream: _resumosOrcamentoStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const ListSkeleton();
-          }
+      body: Column(
+        children: [
+          _buildSeletorMes(),
+          Expanded(
+            child: StreamBuilder<List<OrcamentoCategoriaResumo>>(
+              stream: _resumosOrcamentoStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const ListSkeleton();
+                }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.s16),
-                child: Text(
-                  'Falha ao carregar orçamentos: ${snapshot.error}',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.s16),
+                      child: Text(
+                        'Falha ao carregar orçamentos: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
 
-          final List<OrcamentoCategoriaResumo> resumos =
-              snapshot.data ?? <OrcamentoCategoriaResumo>[];
+                final List<OrcamentoCategoriaResumo> resumos =
+                    snapshot.data ?? <OrcamentoCategoriaResumo>[];
 
-          if (resumos.isEmpty) {
-            return AppEmptyStateCta(
-              icon: Icons.savings_outlined,
-              title: 'Nenhum orçamento definido',
-              description:
-                  'Crie um limite mensal por categoria para acompanhar seus gastos.',
-              buttonLabel: 'Criar primeiro orçamento',
-              onPressed: () => _abrirFormularioOrcamento(resumos: resumos),
-            );
-          }
+                if (resumos.isEmpty) {
+                  return AppEmptyStateCta(
+                    icon: Icons.savings_outlined,
+                    title: 'Nenhum orçamento',
+                    description:
+                        'Crie um limite mensal global por categoria para acompanhar seus gastos.',
+                    buttonLabel: 'Criar primeiro orçamento',
+                    onPressed: () =>
+                        _abrirFormularioOrcamento(resumos: resumos),
+                  );
+                }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            itemCount: resumos.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.s12),
-            itemBuilder: (context, index) {
-              final OrcamentoCategoriaResumo resumo = resumos[index];
+                return ListView.separated(
+                  padding: const EdgeInsets.only(
+                    left: AppSpacing.s16,
+                    right: AppSpacing.s16,
+                    bottom: 80, // Espaço para o FAB
+                  ),
+                  itemCount: resumos.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.s12),
+                  itemBuilder: (context, index) {
+                    final OrcamentoCategoriaResumo resumo = resumos[index];
 
-              return OrcamentoCategoriaProgressItem(
-                resumo: resumo,
-                onTap: () => _abrirFormularioOrcamento(
-                  existente: resumo.orcamento,
-                  resumos: resumos,
-                ),
-                onDelete: () => _excluirOrcamento(resumo.orcamento),
-              );
-            },
-          );
-        },
+                    return OrcamentoCategoriaProgressItem(
+                      resumo: resumo,
+                      onTap: () => _abrirFormularioOrcamento(
+                        existente: resumo.orcamento,
+                        resumos: resumos,
+                      ),
+                      onDelete: () => _excluirOrcamento(resumo.orcamento),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

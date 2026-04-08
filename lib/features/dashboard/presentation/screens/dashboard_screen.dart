@@ -63,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _dashboardDataService = DashboardDataService(widget.db);
+
     final Stream<List<OrcamentoCategoriaResumo>>? streamOverride =
         widget.orcamentosMesStreamOverride;
     if (streamOverride != null) {
@@ -503,6 +504,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildHeader(ThemeData theme, DateTime agora) {
+    final String insight = _memoResumo == null
+        ? ''
+        : _insightPrincipal(_memoResumo!);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -520,14 +525,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          _memoResumo == null ? '' : _insightPrincipal(_memoResumo!),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.3,
+        if (insight.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            insight,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.3,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
