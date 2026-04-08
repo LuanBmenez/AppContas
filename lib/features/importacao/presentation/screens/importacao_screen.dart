@@ -8,10 +8,14 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
+import 'package:paga_o_que_me_deve/features/importacao/data/services/cancelamento_csv_service.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/importacao_service.dart';
 
+import '../widgets/cancelamento_section.dart';
 import '../widgets/importacao_sections.dart';
+
+enum AcaoRecebimentoImportacao { vincular, criar, ignorar }
 
 class ImportacaoScreen extends StatefulWidget {
   const ImportacaoScreen({super.key, required this.db});
@@ -24,28 +28,73 @@ class ImportacaoScreen extends StatefulWidget {
 
 class _ImportacaoScreenState extends State<ImportacaoScreen> {
   final ExtratoCsvService _extratoService = ExtratoCsvService();
+  final CancelamentoCsvService _cancelamentoService = CancelamentoCsvService();
   late final ImportacaoService _importacaoService;
 
   bool _carregandoArquivo = false;
   bool _salvando = false;
   bool _salvandoSugestoes = false;
+
   String? _nomeArquivo;
   ResultadoLeituraCsv? _csv;
   CartaoCredito? _cartaoSelecionado;
+
   String? _chaveDuplicadosCache;
   Future<int>? _duplicadosCache;
 
+  final Map<String, AcaoRecebimentoImportacao> _acoesRecebimentos =
+      <String, AcaoRecebimentoImportacao>{};
+  final Map<String, String?> _vinculosRecebimentos = <String, String?>{};
+
   final Map<CampoExtrato, String?> _mapeamento = <CampoExtrato, String?>{};
+  final Map<TransacaoCanceladaDetectada, bool> _acoesCancelamento =
+      <TransacaoCanceladaDetectada, bool>{};
 
   @override
   void initState() {
     super.initState();
     _importacaoService = ImportacaoService(widget.db);
+    _resetarMapeamento();
+  }
+
+  void _resetarMapeamento() {
     _mapeamento[CampoExtrato.dataLancamento] = null;
     _mapeamento[CampoExtrato.dataCompra] = null;
     _mapeamento[CampoExtrato.descricao] = null;
     _mapeamento[CampoExtrato.valor] = null;
     _mapeamento[CampoExtrato.parcela] = null;
+  }
+
+  void _limparEstadosDerivadosImportacao() {
+    _acoesRecebimentos.clear();
+    _vinculosRecebimentos.clear();
+    _acoesCancelamento.clear();
+    _chaveDuplicadosCache = null;
+    _duplicadosCache = null;
+  }
+
+  List<Gasto> _filtrarGastosPorCancelamento(
+    List<Gasto> gastos,
+    List<TransacaoCanceladaDetectada> cancelados,
+  ) {
+    final Set<String> idsIgnorar = cancelados
+        .where((c) => _acoesCancelamento[c] == true)
+        .map((c) => c.gasto.id)
+        .toSet();
+
+    return gastos.where((g) => !idsIgnorar.contains(g.id)).toList();
+  }
+
+  List<RecebimentoDetectado> _filtrarRecebimentosPorCancelamento(
+    List<RecebimentoDetectado> recebimentos,
+    List<TransacaoCanceladaDetectada> cancelados,
+  ) {
+    final Set<String> idsIgnorar = cancelados
+        .where((c) => _acoesCancelamento[c] == true)
+        .map((c) => c.recebimento.id)
+        .toSet();
+
+    return recebimentos.where((r) => !idsIgnorar.contains(r.id)).toList();
   }
 
   Future<void> _selecionarArquivoCsv() async {
@@ -75,9 +124,12 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         throw Exception('CSV sem cabecalho valido.');
       }
 
+      _limparEstadosDerivadosImportacao();
+
       setState(() {
         _nomeArquivo = file.name;
         _csv = csv;
+
         _mapeamento[CampoExtrato.dataLancamento] = _sugerirCabecalho(
           csv.cabecalhos,
           <String>['data_lancamento', 'lancamento', 'data'],
@@ -110,34 +162,105 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     }
   }
 
-  Future<void> _importar(List<Gasto> gastos) async {
-    if (gastos.isEmpty) {
-      AppFeedback.showError(context, 'Nenhum gasto valido para importar.');
+  Future<void> _importar({
+    required List<Gasto> gastos,
+    required List<RecebimentoDetectado> recebimentos,
+    required Map<String, List<SugestaoVinculoRecebimento>> sugestoesVinculo,
+    required List<Conta> contasPendentes,
+  }) async {
+    if (gastos.isEmpty && recebimentos.isEmpty) {
+      AppFeedback.showError(context, 'Nenhum item valido para importar.');
       return;
     }
 
     setState(() => _salvando = true);
 
     try {
-      final resultado = await _importacaoService.importarGastosComDeduplicacao(
-        gastos,
-      );
-
-      if (!mounted) {
-        return;
+      ResultadoImportacaoGastos? resultado;
+      if (gastos.isNotEmpty) {
+        resultado = await _importacaoService.importarGastosComDeduplicacao(
+          gastos,
+        );
       }
+
+      int vinculados = 0;
+      int criados = 0;
+      int ignorados = 0;
+
+      final Map<String, Conta> contasPorId = <String, Conta>{
+        for (final Conta conta in contasPendentes) conta.id: conta,
+      };
+
+      for (final RecebimentoDetectado recebimento in recebimentos) {
+        final List<SugestaoVinculoRecebimento> sugestoes =
+            sugestoesVinculo[recebimento.id] ??
+            const <SugestaoVinculoRecebimento>[];
+
+        final AcaoRecebimentoImportacao acao =
+            _acoesRecebimentos[recebimento.id] ??
+            _acaoPadraoRecebimento(recebimento, sugestoes);
+
+        if (acao == AcaoRecebimentoImportacao.ignorar) {
+          ignorados++;
+          continue;
+        }
+
+        if (acao == AcaoRecebimentoImportacao.vincular) {
+          final String? contaIdEscolhida =
+              _vinculosRecebimentos[recebimento.id] ??
+              (sugestoes.isEmpty ? null : sugestoes.first.conta.id);
+
+          if (contaIdEscolhida == null) {
+            ignorados++;
+            continue;
+          }
+
+          final Conta? contaSelecionada =
+              contasPorId[contaIdEscolhida] ??
+              _buscarContaNasSugestoes(contaIdEscolhida, sugestoes);
+
+          if (contaSelecionada == null) {
+            ignorados++;
+            continue;
+          }
+
+          await _importacaoService.vincularRecebimentoImportado(
+            conta: contaSelecionada,
+            referencia: recebimento.descricaoOriginal,
+            dataRecebimento: recebimento.data,
+            valorRecebido: recebimento.valor,
+          );
+          vinculados++;
+          continue;
+        }
+
+        await _importacaoService.criarRecebimentoAvulso(
+          nome: recebimento.nomeExtraido ?? 'Recebimento importado',
+          descricao: 'Importado via CSV: ${recebimento.descricaoOriginal}',
+          data: recebimento.data,
+          valor: recebimento.valor,
+        );
+        criados++;
+      }
+
+      if (!mounted) return;
+
+      final int importados = resultado?.importados ?? 0;
+      final int duplicados = resultado?.duplicados ?? 0;
 
       AppFeedback.showSuccess(
         context,
-        'Importacao concluida: ${resultado.importados} novos, ${resultado.duplicados} duplicados ignorados.',
+        'Importacao concluida: '
+        '$importados gastos novos, '
+        '$duplicados duplicados ignorados, '
+        '$vinculados recebimentos vinculados, '
+        '$criados recebimentos avulsos, '
+        '$ignorados recebimentos ignorados.',
       );
 
       Navigator.pop(context);
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       AppFeedback.showError(context, 'Falha ao salvar importacao: $e');
     } finally {
       if (mounted) {
@@ -162,6 +285,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
           final List<CartaoCredito> cartoes =
               snapshot.data ?? <CartaoCredito>[];
+
           if (cartoes.isEmpty) {
             return _buildSemCartoes();
           }
@@ -178,86 +302,145 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
             builder: (context, regrasSnapshot) {
               final List<RegraCategoriaImportacao> regrasAprendidas =
                   regrasSnapshot.data ?? <RegraCategoriaImportacao>[];
+
               final ResultadoMapeamentoExtrato preview = _gerarPreview(
                 regrasAprendidas,
               );
+
+              final List<TransacaoCanceladaDetectada> cancelamentosDetectados =
+                  _cancelamentoService.detectarCancelamentos(
+                    gastos: preview.gastos,
+                    recebimentos: preview.recebimentosDetectados,
+                  );
+
               final List<SugestaoRegraCategoria> sugestoesRegras =
                   _extratoService.sugerirRegrasParaGastos(
                     gastos: preview.gastos,
                     regrasExistentes: regrasAprendidas,
                   );
+
               final Future<int> duplicadosFuture = _obterDuplicadosFuture(
                 preview.gastos,
               );
 
-              return ListView(
-                padding: const EdgeInsets.all(AppSpacing.s16),
-                children: [
-                  CartaoStepSection(
-                    cartoes: cartoes,
-                    cartaoSelecionado: _cartaoSelecionado,
-                    onCartaoChanged: (value) {
-                      if (value != null) {
-                        setState(() => _cartaoSelecionado = value);
-                      }
-                    },
-                    onGerenciarCartoes: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CartoesCreditoScreen(db: widget.db),
-                        ),
+              return StreamBuilder<List<Conta>>(
+                stream: _importacaoService.contasAReceber,
+                builder: (context, contasSnapshot) {
+                  final List<Conta> contasPendentes =
+                      (contasSnapshot.data ?? <Conta>[])
+                          .where((conta) => !conta.foiPago)
+                          .toList();
+
+                  final Map<String, List<SugestaoVinculoRecebimento>>
+                  sugestoesVinculo = _extratoService
+                      .sugerirVinculosRecebimentos(
+                        recebimentos: preview.recebimentosDetectados,
+                        contasPendentes: contasPendentes,
                       );
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  ArquivoCsvStepSection(
-                    carregandoArquivo: _carregandoArquivo,
-                    nomeArquivo: _nomeArquivo,
-                    onSelecionarArquivo: _selecionarArquivoCsv,
-                  ),
-                  if (_csv != null) ...[
-                    const SizedBox(height: AppSpacing.s12),
-                    MapeamentoColunasSection(
-                      campoDataLancamento: _buildCampoMapeamento(
-                        label: 'Data de lancamento*',
-                        campo: CampoExtrato.dataLancamento,
+
+                  return ListView(
+                    padding: const EdgeInsets.all(AppSpacing.s16),
+                    children: [
+                      CartaoStepSection(
+                        cartoes: cartoes,
+                        cartaoSelecionado: _cartaoSelecionado,
+                        onCartaoChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _cartaoSelecionado = value;
+                              _limparEstadosDerivadosImportacao();
+                            });
+                          }
+                        },
+                        onGerenciarCartoes: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  CartoesCreditoScreen(db: widget.db),
+                            ),
+                          );
+                        },
                       ),
-                      campoDescricao: _buildCampoMapeamento(
-                        label: 'Descricao*',
-                        campo: CampoExtrato.descricao,
-                      ),
-                      campoValor: _buildCampoMapeamento(
-                        label: 'Valor*',
-                        campo: CampoExtrato.valor,
-                      ),
-                      campoDataCompra: _buildCampoMapeamento(
-                        label: 'Data da compra (opcional)',
-                        campo: CampoExtrato.dataCompra,
-                      ),
-                      campoParcela: _buildCampoMapeamento(
-                        label: 'Parcela (opcional)',
-                        campo: CampoExtrato.parcela,
-                      ),
-                    ),
-                    if (sugestoesRegras.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.s12),
-                      _buildSugestoesRegrasCard(sugestoesRegras),
+                      ArquivoCsvStepSection(
+                        carregandoArquivo: _carregandoArquivo,
+                        nomeArquivo: _nomeArquivo,
+                        onSelecionarArquivo: _selecionarArquivoCsv,
+                      ),
+                      if (_csv != null) ...[
+                        const SizedBox(height: AppSpacing.s12),
+                        MapeamentoColunasSection(
+                          campoDataLancamento: _buildCampoMapeamento(
+                            label: 'Data de lancamento*',
+                            campo: CampoExtrato.dataLancamento,
+                          ),
+                          campoDescricao: _buildCampoMapeamento(
+                            label: 'Descricao*',
+                            campo: CampoExtrato.descricao,
+                          ),
+                          campoValor: _buildCampoMapeamento(
+                            label: 'Valor*',
+                            campo: CampoExtrato.valor,
+                          ),
+                          campoDataCompra: _buildCampoMapeamento(
+                            label: 'Data da compra (opcional)',
+                            campo: CampoExtrato.dataCompra,
+                          ),
+                          campoParcela: _buildCampoMapeamento(
+                            label: 'Parcela (opcional)',
+                            campo: CampoExtrato.parcela,
+                          ),
+                        ),
+                        if (sugestoesRegras.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.s12),
+                          _buildSugestoesRegrasCard(sugestoesRegras),
+                        ],
+                        if (cancelamentosDetectados.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.s12),
+                          CancelamentoSection(
+                            cancelamentos: cancelamentosDetectados,
+                            onAcao: (par, ignorar) {
+                              setState(() {
+                                _acoesCancelamento[par] = ignorar;
+                              });
+                            },
+                          ),
+                        ],
+                        if (preview.recebimentosDetectados.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.s12),
+                          _buildRecebimentosDetectadosCard(
+                            recebimentos: preview.recebimentosDetectados,
+                            sugestoesVinculo: sugestoesVinculo,
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.s12),
+                        PreviewImportacaoSection(
+                          preview: preview,
+                          duplicadosFuture: duplicadosFuture,
+                          salvando: _salvando,
+                          podeImportar: _mapeamentoObrigatorioOk && !_salvando,
+                          onImportar: () => _importar(
+                            gastos: _filtrarGastosPorCancelamento(
+                              preview.gastos,
+                              cancelamentosDetectados,
+                            ),
+                            recebimentos: _filtrarRecebimentosPorCancelamento(
+                              preview.recebimentosDetectados,
+                              cancelamentosDetectados,
+                            ),
+                            sugestoesVinculo: sugestoesVinculo,
+                            contasPendentes: contasPendentes,
+                          ),
+                          itensPreview: preview.gastos
+                              .take(8)
+                              .map((gasto) => _buildItemPreview(gasto))
+                              .toList(),
+                        ),
+                      ],
                     ],
-                    const SizedBox(height: AppSpacing.s12),
-                    PreviewImportacaoSection(
-                      preview: preview,
-                      duplicadosFuture: duplicadosFuture,
-                      salvando: _salvando,
-                      podeImportar: _mapeamentoObrigatorioOk && !_salvando,
-                      onImportar: () => _importar(preview.gastos),
-                      itensPreview: preview.gastos
-                          .take(8)
-                          .map((gasto) => _buildItemPreview(gasto))
-                          .toList(),
-                    ),
-                  ],
-                ],
+                  );
+                },
               );
             },
           );
@@ -316,9 +499,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   Future<void> _aceitarSugestoesRegras(
     List<SugestaoRegraCategoria> sugestoes,
   ) async {
-    if (sugestoes.isEmpty) {
-      return;
-    }
+    if (sugestoes.isEmpty) return;
 
     setState(() => _salvandoSugestoes = true);
     try {
@@ -329,17 +510,14 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         );
       }
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
+
       AppFeedback.showSuccess(
         context,
         '${sugestoes.length} sugestoes aplicadas e aprendidas.',
       );
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppFeedback.showError(context, 'Falha ao salvar sugestoes: $e');
     } finally {
       if (mounted) {
@@ -406,6 +584,212 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     );
   }
 
+  Widget _buildRecebimentosDetectadosCard({
+    required List<RecebimentoDetectado> recebimentos,
+    required Map<String, List<SugestaoVinculoRecebimento>> sugestoesVinculo,
+  }) {
+    final double total = recebimentos.fold<double>(
+      0,
+      (sum, item) => sum + item.valor,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '5) Recebimentos detectados',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              '${recebimentos.length} entradas positivas detectadas (${AppFormatters.moeda(total)})',
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            ...recebimentos.map(
+              (recebimento) => _buildRecebimentoItem(
+                recebimento: recebimento,
+                sugestoes:
+                    sugestoesVinculo[recebimento.id] ??
+                    const <SugestaoVinculoRecebimento>[],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecebimentoItem({
+    required RecebimentoDetectado recebimento,
+    required List<SugestaoVinculoRecebimento> sugestoes,
+  }) {
+    final AcaoRecebimentoImportacao acaoSelecionada =
+        _acoesRecebimentos[recebimento.id] ??
+        _acaoPadraoRecebimento(recebimento, sugestoes);
+
+    final String? contaSelecionadaId =
+        _vinculosRecebimentos[recebimento.id] ??
+        (sugestoes.isEmpty ? null : sugestoes.first.conta.id);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+      child: SizedBox(
+        width: double.infinity,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${AppFormatters.dataCurta(recebimento.data)} • ${AppFormatters.moeda(recebimento.valor)}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: AppSpacing.s4),
+              Text(recebimento.descricaoOriginal),
+              const SizedBox(height: AppSpacing.s4),
+              Text('Tipo: ${recebimento.tipo.label}'),
+              if ((recebimento.nomeExtraido ?? '').isNotEmpty)
+                Text('Nome extraido: ${recebimento.nomeExtraido}'),
+              if (recebimento.valorSuspeito)
+                Text(
+                  'Valor muito baixo/suspeito. Recomenda-se ignorar.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.s8),
+              DropdownButtonFormField<AcaoRecebimentoImportacao>(
+                initialValue: acaoSelecionada,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Ação',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(),
+                ),
+                items: const <DropdownMenuItem<AcaoRecebimentoImportacao>>[
+                  DropdownMenuItem(
+                    value: AcaoRecebimentoImportacao.vincular,
+                    child: Text(
+                      'Vincular a cobrança',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: AcaoRecebimentoImportacao.criar,
+                    child: Text(
+                      'Criar recebimento',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: AcaoRecebimentoImportacao.ignorar,
+                    child: Text(
+                      'Ignorar',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _acoesRecebimentos[recebimento.id] = value;
+                  });
+                },
+              ),
+              if (acaoSelecionada == AcaoRecebimentoImportacao.vincular) ...[
+                const SizedBox(height: AppSpacing.s8),
+                if (sugestoes.isEmpty)
+                  const Text(
+                    'Nenhuma cobranca pendente compativel encontrada. Escolha criar ou ignorar.',
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue: contaSelecionadaId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Cobranca sugerida',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: sugestoes.map((sugestao) {
+                      final String valorConta = AppFormatters.moeda(
+                        sugestao.conta.valor,
+                      );
+                      final String statusValor = sugestao.valorCompativel
+                          ? 'valor compativel'
+                          : 'dif. ${AppFormatters.moeda(sugestao.diferencaValorAbsoluta)}';
+
+                      return DropdownMenuItem<String>(
+                        value: sugestao.conta.id,
+                        child: Text(
+                          '${sugestao.conta.nome} • $valorConta • $statusValor',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _vinculosRecebimentos[recebimento.id] = value;
+                      });
+                    },
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  AcaoRecebimentoImportacao _acaoPadraoRecebimento(
+    RecebimentoDetectado recebimento,
+    List<SugestaoVinculoRecebimento> sugestoes,
+  ) {
+    if (recebimento.valorSuspeito ||
+        recebimento.tipo == TipoRecebimentoDetectado.reembolso ||
+        recebimento.tipo == TipoRecebimentoDetectado.estorno) {
+      return AcaoRecebimentoImportacao.ignorar;
+    }
+
+    if (sugestoes.isNotEmpty) {
+      final SugestaoVinculoRecebimento melhor = sugestoes.first;
+      if (melhor.valorCompativel && melhor.score >= 0.8) {
+        return AcaoRecebimentoImportacao.vincular;
+      }
+    }
+
+    return AcaoRecebimentoImportacao.criar;
+  }
+
+  Conta? _buscarContaNasSugestoes(
+    String contaId,
+    List<SugestaoVinculoRecebimento> sugestoes,
+  ) {
+    for (final SugestaoVinculoRecebimento sugestao in sugestoes) {
+      if (sugestao.conta.id == contaId) {
+        return sugestao.conta;
+      }
+    }
+    return null;
+  }
+
   Widget _buildSemCartoes() {
     return Center(
       child: Padding(
@@ -449,6 +833,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
     return DropdownButtonFormField<String?>(
       initialValue: _mapeamento[campo],
+      isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -456,15 +841,24 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       items: <DropdownMenuItem<String?>>[
         const DropdownMenuItem<String?>(
           value: null,
-          child: Text('Nao usar esta coluna'),
+          child: Text(
+            'Nao usar esta coluna',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         ...csv.cabecalhos.map(
-          (header) =>
-              DropdownMenuItem<String?>(value: header, child: Text(header)),
+          (header) => DropdownMenuItem<String?>(
+            value: header,
+            child: Text(header, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
         ),
       ],
       onChanged: (value) {
-        setState(() => _mapeamento[campo] = value);
+        setState(() {
+          _mapeamento[campo] = value;
+          _limparEstadosDerivadosImportacao();
+        });
       },
     );
   }

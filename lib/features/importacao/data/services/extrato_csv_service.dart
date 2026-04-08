@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:paga_o_que_me_deve/core/utils/app_formatters.dart';
 import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
+import 'package:paga_o_que_me_deve/domain/models/conta.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
 
@@ -23,6 +24,7 @@ class ResultadoLeituraCsv {
 
 class ResultadoMapeamentoExtrato {
   final List<Gasto> gastos;
+  final List<RecebimentoDetectado> recebimentosDetectados;
   final int ignorados;
   final Map<String, int> ignoradosPorMotivo;
   final Map<String, int> categoriasPorFonte;
@@ -31,11 +33,75 @@ class ResultadoMapeamentoExtrato {
 
   const ResultadoMapeamentoExtrato({
     required this.gastos,
+    this.recebimentosDetectados = const <RecebimentoDetectado>[],
     required this.ignorados,
     this.ignoradosPorMotivo = const <String, int>{},
     this.categoriasPorFonte = const <String, int>{},
     this.possiveisErros = const <String>[],
     this.amostraLinhasIgnoradas = const <String>[],
+  });
+}
+
+enum TipoRecebimentoDetectado {
+  pixRecebido,
+  transferenciaRecebida,
+  reembolso,
+  estorno,
+  outro,
+}
+
+extension TipoRecebimentoDetectadoLabel on TipoRecebimentoDetectado {
+  String get label {
+    switch (this) {
+      case TipoRecebimentoDetectado.pixRecebido:
+        return 'Pix recebido';
+      case TipoRecebimentoDetectado.transferenciaRecebida:
+        return 'Transferencia recebida';
+      case TipoRecebimentoDetectado.reembolso:
+        return 'Reembolso';
+      case TipoRecebimentoDetectado.estorno:
+        return 'Estorno/Ajuste';
+      case TipoRecebimentoDetectado.outro:
+        return 'Outro recebimento';
+    }
+  }
+}
+
+class RecebimentoDetectado {
+  final String id;
+  final DateTime data;
+  final double valor;
+  final String descricaoOriginal;
+  final String? nomeExtraido;
+  final TipoRecebimentoDetectado tipo;
+  final bool valorSuspeito;
+  final String referenciaImportacao;
+
+  const RecebimentoDetectado({
+    required this.id,
+    required this.data,
+    required this.valor,
+    required this.descricaoOriginal,
+    required this.nomeExtraido,
+    required this.tipo,
+    required this.valorSuspeito,
+    required this.referenciaImportacao,
+  });
+}
+
+class SugestaoVinculoRecebimento {
+  final Conta conta;
+  final double score;
+  final bool nomeCompativel;
+  final bool valorCompativel;
+  final double diferencaValorAbsoluta;
+
+  const SugestaoVinculoRecebimento({
+    required this.conta,
+    required this.score,
+    required this.nomeCompativel,
+    required this.valorCompativel,
+    required this.diferencaValorAbsoluta,
   });
 }
 
@@ -185,6 +251,8 @@ class ExtratoCsvService {
 
     int ignorados = 0;
     final List<Gasto> gastos = <Gasto>[];
+    final List<RecebimentoDetectado> recebimentosDetectados =
+        <RecebimentoDetectado>[];
     final Map<String, int> ignoradosPorMotivo = <String, int>{};
     final Map<String, int> categoriasPorFonte = <String, int>{};
     final List<String> possiveisErros = <String>[];
@@ -283,12 +351,30 @@ class ExtratoCsvService {
         continue;
       }
 
-      if (_ehPagamentoRecebido(descricao)) {
-        contarIgnorado(
-          'Pagamento recebido',
-          linhaCsv: linhaCsv,
+      if (valor > 0 && _ehPossivelRecebimento(descricao)) {
+        final DateTime dataBase = dataLancamento;
+        final TipoRecebimentoDetectado tipo = _classificarRecebimento(
+          descricao,
+        );
+        final String? nomeExtraido = _extrairNomeContraparte(descricao);
+        final String hashRecebimento = _hashImportacao(
+          cartaoId: cartao.id,
+          data: dataBase,
           descricao: descricao,
-          valor: valorRaw,
+          valor: valor,
+        );
+
+        recebimentosDetectados.add(
+          RecebimentoDetectado(
+            id: hashRecebimento,
+            data: dataBase,
+            valor: valor,
+            descricaoOriginal: descricao,
+            nomeExtraido: nomeExtraido,
+            tipo: tipo,
+            valorSuspeito: valor <= 0.01,
+            referenciaImportacao: hashRecebimento,
+          ),
         );
         continue;
       }
@@ -367,12 +453,86 @@ class ExtratoCsvService {
 
     return ResultadoMapeamentoExtrato(
       gastos: gastos,
+      recebimentosDetectados: recebimentosDetectados,
       ignorados: ignorados,
       ignoradosPorMotivo: ignoradosPorMotivo,
       categoriasPorFonte: categoriasPorFonte,
       possiveisErros: possiveisErros,
       amostraLinhasIgnoradas: amostraLinhasIgnoradas,
     );
+  }
+
+  Map<String, List<SugestaoVinculoRecebimento>> sugerirVinculosRecebimentos({
+    required List<RecebimentoDetectado> recebimentos,
+    required List<Conta> contasPendentes,
+  }) {
+    final Map<String, List<SugestaoVinculoRecebimento>> resultado =
+        <String, List<SugestaoVinculoRecebimento>>{};
+
+    for (final RecebimentoDetectado recebimento in recebimentos) {
+      resultado[recebimento.id] = sugerirVinculosParaRecebimento(
+        recebimento: recebimento,
+        contasPendentes: contasPendentes,
+      );
+    }
+
+    return resultado;
+  }
+
+  List<SugestaoVinculoRecebimento> sugerirVinculosParaRecebimento({
+    required RecebimentoDetectado recebimento,
+    required List<Conta> contasPendentes,
+    int limite = 3,
+  }) {
+    final List<SugestaoVinculoRecebimento> sugestoes =
+        <SugestaoVinculoRecebimento>[];
+    final String nomeDetectado = _normalizarTextoBusca(
+      recebimento.nomeExtraido ?? '',
+    );
+
+    for (final Conta conta in contasPendentes) {
+      if (conta.foiPago) {
+        continue;
+      }
+
+      final String nomeConta = _normalizarTextoBusca(conta.nome);
+      final String descricaoConta = _normalizarTextoBusca(conta.descricao);
+      final double nomeScore = nomeDetectado.isEmpty
+          ? 0
+          : max(
+              _jaccard(
+                _tokensRelevantes(nomeDetectado),
+                _tokensRelevantes(nomeConta),
+              ),
+              _jaccard(
+                _tokensRelevantes(nomeDetectado),
+                _tokensRelevantes(descricaoConta),
+              ),
+            );
+      final double diferenca = (conta.valor - recebimento.valor).abs();
+      final double toleranciaValor = max(5, recebimento.valor * 0.15);
+      final bool valorCompativel = diferenca <= toleranciaValor;
+      final double valorScore =
+          (1 - (diferenca / max(recebimento.valor.abs(), 1))).clamp(0, 1);
+      final double score = nomeDetectado.isEmpty
+          ? valorScore * 0.6
+          : (nomeScore * 0.65) + (valorScore * 0.35);
+
+      if (nomeScore >= 0.45 || valorCompativel) {
+        sugestoes.add(
+          SugestaoVinculoRecebimento(
+            conta: conta,
+            score: score,
+            nomeCompativel: nomeScore >= 0.45,
+            valorCompativel: valorCompativel,
+            diferencaValorAbsoluta: diferenca,
+          ),
+        );
+      }
+    }
+
+    sugestoes.sort((a, b) => b.score.compareTo(a.score));
+    return sugestoes.take(limite).toList();
   }
 
   List<SugestaoRegraCategoria> sugerirRegrasParaGastos({
@@ -604,32 +764,64 @@ class ExtratoCsvService {
     return DateTime(anoCompetencia, mesCompetencia, diaCompetencia);
   }
 
-  bool _ehPagamentoRecebido(String descricao) {
+  TipoRecebimentoDetectado _classificarRecebimento(String descricao) {
     final String d = _normalizarTextoBusca(descricao);
-    if (d.isEmpty) {
-      return false;
+
+    if (d.contains('REEMBOLSO')) {
+      return TipoRecebimentoDetectado.reembolso;
     }
 
-    const List<String> padroesDiretos = <String>[
-      'PAGAMENTO RECEBIDO',
-      'PAGTO RECEBIDO',
-      'PGTO RECEBIDO',
-      'RECEBIMENTO DE PAGAMENTO',
-      'PAGAMENTO FATURA RECEBIDO',
-    ];
-
-    for (final String padrao in padroesDiretos) {
-      if (d.contains(padrao)) {
-        return true;
-      }
+    if (d.contains('ESTORNO') ||
+        d.contains('CHARGEBACK') ||
+        d.contains('REVERSAO') ||
+        d.contains('AJUSTE')) {
+      return TipoRecebimentoDetectado.estorno;
     }
 
-    final bool temPagamento =
-        d.contains('PAGAMENTO') || d.contains('PAGTO') || d.contains('PGTO');
-    final bool temRecebimento =
-        d.contains('RECEBIDO') || d.contains('RECEBIMENTO');
+    if (d.contains('PIX')) {
+      return TipoRecebimentoDetectado.pixRecebido;
+    }
 
-    return temPagamento && temRecebimento;
+    if (d.contains('TRANSFERENCIA') || d.contains('TED') || d.contains('DOC')) {
+      return TipoRecebimentoDetectado.transferenciaRecebida;
+    }
+
+    return TipoRecebimentoDetectado.outro;
+  }
+
+  bool _ehPossivelRecebimento(String descricao) {
+    final TipoRecebimentoDetectado tipo = _classificarRecebimento(descricao);
+    if (tipo != TipoRecebimentoDetectado.outro) {
+      return true;
+    }
+
+    final String d = _normalizarTextoBusca(descricao);
+    return d.contains('RECEBIDO') ||
+        d.contains('RECEBIMENTO') ||
+        d.contains('CREDITO RECEBIDO') ||
+        d.contains('DEPOSITO RECEBIDO');
+  }
+
+  String? _extrairNomeContraparte(String descricao) {
+    final List<String> partes = descricao.split('-');
+    if (partes.length < 2) {
+      return null;
+    }
+
+    final String candidata = partes.sublist(1).join(' ').trim();
+    if (candidata.isEmpty) {
+      return null;
+    }
+
+    final Match? match = RegExp(
+      r'([A-Za-zÀ-ÿ]{2,}(?:\s+[A-Za-zÀ-ÿ]{2,}){0,5})',
+    ).firstMatch(candidata);
+    if (match == null) {
+      return null;
+    }
+
+    final String nome = _normalizarTextoBusca(match.group(1) ?? '');
+    return nome.isEmpty ? null : nome;
   }
 
   String _normalizarTextoBusca(String texto) =>
