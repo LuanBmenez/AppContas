@@ -49,7 +49,11 @@ void main() {
 
       await tester.pumpWidget(_buildTestApp(db: repo));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -900));
+      await tester.dragUntilVisible(
+        find.text('Sem gastos no período para montar o gráfico.'),
+        find.byType(ListView),
+        const Offset(0, -280),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -87,7 +91,11 @@ void main() {
 
       await tester.pumpWidget(_buildTestApp(db: repo));
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -900));
+      await tester.dragUntilVisible(
+        find.text('Categorias de gastos'),
+        find.byType(ListView),
+        const Offset(0, -280),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Categorias de gastos'), findsOneWidget);

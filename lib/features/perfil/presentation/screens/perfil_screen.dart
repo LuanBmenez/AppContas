@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -183,6 +185,16 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
             );
           },
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.repeat_rounded),
+            title: const Text('Compras recorrentes'),
+            subtitle: const Text('Veja e gerencie suas recorrências'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => context.push(AppRoutes.recorrenciasPath),
+          ),
         ),
         const SizedBox(height: AppSpacing.s12),
         Card(

@@ -16,6 +16,7 @@ import 'package:paga_o_que_me_deve/features/gastos/gastos.dart';
 import 'package:paga_o_que_me_deve/features/importacao/importacao.dart';
 import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
 import 'package:paga_o_que_me_deve/features/perfil/perfil.dart';
+import 'package:paga_o_que_me_deve/features/recorrencias/recorrencias.dart';
 
 class AppRouter {
   AppRouter._();
@@ -108,6 +109,13 @@ class AppRouter {
             currentTab: HomeTab.perfil,
             child: const PerfilScreen(),
           );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.recorrenciasPath,
+        name: AppRoutes.recorrenciasName,
+        builder: (BuildContext context, GoRouterState state) {
+          return ComprasRecorrentesScreen(db: _db);
         },
       ),
       GoRoute(

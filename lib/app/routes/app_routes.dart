@@ -12,6 +12,7 @@ class AppRoutes {
   static const String orcamentosPath = '/despesas/orcamentos';
   static const String cartoesPath = '/despesas/cartoes';
   static const String importarPath = '/despesas/importar';
+  static const String recorrenciasPath = '/perfil/recorrencias';
   static const String novoRecebivelPath = '/receber/nova';
 
   @Deprecated('Use gastosPath')
@@ -27,6 +28,7 @@ class AppRoutes {
   static const String orcamentosName = 'gastos-orcamentos';
   static const String cartoesName = 'despesas-cartoes';
   static const String importarName = 'despesas-importar';
+  static const String recorrenciasName = 'perfil-recorrencias';
   static const String novoRecebivelName = 'receber-nova';
 
   @Deprecated('Use gastosName')
