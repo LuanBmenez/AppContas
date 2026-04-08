@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_summary_service.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/domain/models/previsao_fechamento_mes.dart';
 import 'package:paga_o_que_me_deve/features/insights/data/services/insights_service.dart';
 import 'package:paga_o_que_me_deve/features/insights/domain/models/insight_item.dart';
 import 'package:paga_o_que_me_deve/features/orcamentos/domain/models/orcamento_categoria.dart';
-import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 
 void main() {
   group('InsightsService', () {
@@ -81,18 +81,12 @@ void main() {
         insights.any((i) => i.mensagem.contains('ultrapassou o orçamento')),
         isTrue,
       );
-      expect(
-        insights.any((i) => i.mensagem.contains('já consumiu')),
-        isTrue,
-      );
+      expect(insights.any((i) => i.mensagem.contains('já consumiu')), isTrue);
       expect(
         insights.any((i) => i.mensagem.contains('despesas recorrentes')),
         isTrue,
       );
-      expect(
-        insights.any((i) => i.mensagem.contains('mês passado')),
-        isTrue,
-      );
+      expect(insights.any((i) => i.mensagem.contains('mês passado')), isTrue);
     });
 
     test('limita quantidade maxima de insights', () {

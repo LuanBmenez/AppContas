@@ -65,5 +65,113 @@ void main() {
       expect(resultado.gastos.first.categoria, CategoriaGasto.comida);
       expect(resultado.categoriasPorFonte['historico_exato'], 1);
     });
+
+    test('deve manter no mesmo mes quando compra for antes do fechamento', () {
+      final ExtratoCsvService service = ExtratoCsvService();
+      final ResultadoLeituraCsv csv = service.lerCsv(
+        'data;descricao;valor\n'
+        '09/03/2026;Farmacia;25,00\n',
+      );
+
+      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+        csv: csv,
+        mapeamento: <CampoExtrato, String?>{
+          CampoExtrato.dataLancamento: 'data',
+          CampoExtrato.descricao: 'descricao',
+          CampoExtrato.valor: 'valor',
+        },
+        cartao: cartao,
+      );
+
+      expect(resultado.gastos, hasLength(1));
+      expect(resultado.gastos.first.data, DateTime(2026, 3, 9));
+    });
+
+    test('deve manter no mesmo mes quando compra for no dia do fechamento', () {
+      final ExtratoCsvService service = ExtratoCsvService();
+      final ResultadoLeituraCsv csv = service.lerCsv(
+        'data;descricao;valor\n'
+        '10/03/2026;Supermercado;100,00\n',
+      );
+
+      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+        csv: csv,
+        mapeamento: <CampoExtrato, String?>{
+          CampoExtrato.dataLancamento: 'data',
+          CampoExtrato.descricao: 'descricao',
+          CampoExtrato.valor: 'valor',
+        },
+        cartao: cartao,
+      );
+
+      expect(resultado.gastos, hasLength(1));
+      expect(resultado.gastos.first.data, DateTime(2026, 3, 10));
+    });
+
+    test('deve ir para o mes seguinte quando compra for apos fechamento', () {
+      final ExtratoCsvService service = ExtratoCsvService();
+      final ResultadoLeituraCsv csv = service.lerCsv(
+        'data;descricao;valor\n'
+        '11/03/2026;Assinatura;39,90\n',
+      );
+
+      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+        csv: csv,
+        mapeamento: <CampoExtrato, String?>{
+          CampoExtrato.dataLancamento: 'data',
+          CampoExtrato.descricao: 'descricao',
+          CampoExtrato.valor: 'valor',
+        },
+        cartao: cartao,
+      );
+
+      expect(resultado.gastos, hasLength(1));
+      expect(resultado.gastos.first.data, DateTime(2026, 4, 11));
+    });
+
+    test(
+      'deve ajustar para o ultimo dia quando o proximo mes nao tiver o mesmo dia',
+      () {
+        final ExtratoCsvService service = ExtratoCsvService();
+        final ResultadoLeituraCsv csv = service.lerCsv(
+          'data;descricao;valor\n'
+          '31/03/2026;Compra pontual;50,00\n',
+        );
+
+        final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+          csv: csv,
+          mapeamento: <CampoExtrato, String?>{
+            CampoExtrato.dataLancamento: 'data',
+            CampoExtrato.descricao: 'descricao',
+            CampoExtrato.valor: 'valor',
+          },
+          cartao: cartao,
+        );
+
+        expect(resultado.gastos, hasLength(1));
+        expect(resultado.gastos.first.data, DateTime(2026, 4, 30));
+      },
+    );
+
+    test('deve virar dezembro para janeiro mantendo o dia quando valido', () {
+      final ExtratoCsvService service = ExtratoCsvService();
+      final ResultadoLeituraCsv csv = service.lerCsv(
+        'data;descricao;valor\n'
+        '15/12/2026;Eletronicos;250,00\n',
+      );
+
+      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+        csv: csv,
+        mapeamento: <CampoExtrato, String?>{
+          CampoExtrato.dataLancamento: 'data',
+          CampoExtrato.descricao: 'descricao',
+          CampoExtrato.valor: 'valor',
+        },
+        cartao: cartao,
+      );
+
+      expect(resultado.gastos, hasLength(1));
+      expect(resultado.gastos.first.data, DateTime(2027, 1, 15));
+    });
   });
 }

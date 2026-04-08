@@ -582,14 +582,26 @@ class ExtratoCsvService {
 
   DateTime _calcularDataCompetenciaFatura(DateTime data, int diaFechamento) {
     if (data.day <= diaFechamento) {
-      return DateTime(data.year, data.month, 1);
+      return DateTime(data.year, data.month, data.day);
     }
 
-    if (data.month == DateTime.december) {
-      return DateTime(data.year + 1, DateTime.january, 1);
+    int anoCompetencia = data.year;
+    int mesCompetencia = data.month + 1;
+    if (mesCompetencia > DateTime.december) {
+      mesCompetencia = DateTime.january;
+      anoCompetencia++;
     }
 
-    return DateTime(data.year, data.month + 1, 1);
+    final int ultimoDiaMesCompetencia = DateTime(
+      anoCompetencia,
+      mesCompetencia + 1,
+      0,
+    ).day;
+    final int diaCompetencia = data.day <= ultimoDiaMesCompetencia
+        ? data.day
+        : ultimoDiaMesCompetencia;
+
+    return DateTime(anoCompetencia, mesCompetencia, diaCompetencia);
   }
 
   bool _ehPagamentoRecebido(String descricao) {

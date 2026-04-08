@@ -19,10 +19,9 @@ class InsightsService {
     final List<InsightItem> itens = <InsightItem>[];
 
     final List<OrcamentoCategoriaResumo> orcamentosOrdenados =
-        List<OrcamentoCategoriaResumo>.from(orcamentos)
-          ..sort(
-            (a, b) => b.percentualUtilizado.compareTo(a.percentualUtilizado),
-          );
+        List<OrcamentoCategoriaResumo>.from(orcamentos)..sort(
+          (a, b) => b.percentualUtilizado.compareTo(a.percentualUtilizado),
+        );
 
     for (final OrcamentoCategoriaResumo item in orcamentosOrdenados) {
       final double percentual = item.percentualUtilizado * 100;
@@ -114,8 +113,9 @@ class InsightsService {
       return false;
     }
 
-    final double razao =
-        previsao.projecaoTotal <= 0 ? 0 : previsao.projecaoTotal / previsao.gastoAtual;
+    final double razao = previsao.projecaoTotal <= 0
+        ? 0
+        : previsao.projecaoTotal / previsao.gastoAtual;
 
     return razao >= 1.7;
   }
