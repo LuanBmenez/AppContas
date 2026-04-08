@@ -4,6 +4,8 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
+import 'package:paga_o_que_me_deve/features/gastos/data/services/categorias_service.dart';
+import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.dart';
 
 import 'novo_gasto_screen.dart';
 
@@ -18,6 +20,8 @@ class GastosScreen extends StatefulWidget {
 }
 
 class _GastosScreenState extends State<GastosScreen> {
+  late final GastosService _gastosService;
+  late final CategoriasService _categoriasService;
   final ScrollController _listController = ScrollController();
   Stream<List<Gasto>>? _gastosStream;
   DateTime _mesSelecionado = DateTime(
@@ -50,6 +54,8 @@ class _GastosScreenState extends State<GastosScreen> {
   @override
   void initState() {
     super.initState();
+    _gastosService = GastosService(widget.db);
+    _categoriasService = CategoriasService(widget.db);
     final DashboardDrillDownFilter? filtro = widget.initialFilter;
     if (filtro != null) {
       _filtroCategoriaPadrao = filtro.categoriaPadrao;
@@ -90,14 +96,14 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   void _recarregarGastosStream() {
-    _gastosStream = widget.db.streamGastosPorPeriodo(
+    _gastosStream = _gastosService.streamGastosPorPeriodo(
       inicio: _inicioMes,
       fimExclusivo: _fimMesExclusivo,
     );
   }
 
   Stream<List<Gasto>> _obterGastosStream() {
-    return _gastosStream ??= widget.db.streamGastosPorPeriodo(
+    return _gastosStream ??= _gastosService.streamGastosPorPeriodo(
       inicio: _inicioMes,
       fimExclusivo: _fimMesExclusivo,
     );
@@ -420,10 +426,10 @@ class _GastosScreenState extends State<GastosScreen> {
       final Gasto gastoAtualizado = gasto.copyWith(
         categoria: categoriaSelecionada,
       );
-      await widget.db.atualizarGasto(gastoAtualizado);
+      await _gastosService.atualizarGasto(gastoAtualizado);
 
       if (aprenderRegra) {
-        await widget.db.salvarRegraCategoriaImportacao(
+        await _categoriasService.salvarRegraCategoriaImportacao(
           termo: gasto.titulo,
           categoria: categoriaSelecionada,
         );
@@ -500,7 +506,7 @@ class _GastosScreenState extends State<GastosScreen> {
     setState(() => _processandoLote = true);
     try {
       for (final Gasto gasto in selecionados) {
-        await widget.db.deletarGasto(gasto.id);
+        await _gastosService.deletarGasto(gasto.id);
       }
       if (!mounted) {
         return;
@@ -578,7 +584,7 @@ class _GastosScreenState extends State<GastosScreen> {
     setState(() => _processandoLote = true);
     try {
       for (final Gasto gasto in selecionados) {
-        await widget.db.atualizarGasto(
+        await _gastosService.atualizarGasto(
           gasto.copyWith(categoria: categoriaSelecionada),
         );
       }
@@ -658,7 +664,9 @@ class _GastosScreenState extends State<GastosScreen> {
     setState(() => _processandoLote = true);
     try {
       for (final Gasto gasto in selecionados) {
-        await widget.db.atualizarGasto(gasto.copyWith(tipo: tipoSelecionado));
+        await _gastosService.atualizarGasto(
+          gasto.copyWith(tipo: tipoSelecionado),
+        );
       }
       if (!mounted) {
         return;
@@ -874,7 +882,7 @@ class _GastosScreenState extends State<GastosScreen> {
                                 return;
                               }
                               try {
-                                await widget.db.deletarGasto(gasto.id);
+                                await _gastosService.deletarGasto(gasto.id);
                               } catch (e) {
                                 if (context.mounted) {
                                   AppFeedback.showError(

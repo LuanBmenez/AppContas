@@ -1,28 +1,38 @@
-import '../../domain/models/dashboard_drilldown_filter.dart';
-import '../../domain/models/gasto.dart';
+import 'package:paga_o_que_me_deve/domain/models/dashboard_drilldown_filter.dart';
+import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 
 class AppRoutes {
   AppRoutes._();
 
   static const String inicioPath = '/inicio';
-  static const String despesasPath = '/despesas';
+  static const String gastosPath = '/despesas';
   static const String receberPath = '/receber';
   static const String perfilPath = '/perfil';
-  static const String novaDespesaPath = '/despesas/novo';
+  static const String novoGastoPath = '/despesas/novo';
   static const String cartoesPath = '/despesas/cartoes';
   static const String importarPath = '/despesas/importar';
   static const String novoRecebivelPath = '/receber/nova';
 
+  @Deprecated('Use gastosPath')
+  static const String despesasPath = gastosPath;
+  @Deprecated('Use novoGastoPath')
+  static const String novaDespesaPath = novoGastoPath;
+
   static const String inicioName = 'inicio';
-  static const String despesasName = 'despesas';
+  static const String gastosName = 'gastos';
   static const String receberName = 'receber';
   static const String perfilName = 'perfil';
-  static const String novaDespesaName = 'despesas-novo';
+  static const String novoGastoName = 'gastos-novo';
   static const String cartoesName = 'despesas-cartoes';
   static const String importarName = 'despesas-importar';
   static const String novoRecebivelName = 'receber-nova';
 
-  static Map<String, String> despesasQueryFromFilter(
+  @Deprecated('Use gastosName')
+  static const String despesasName = gastosName;
+  @Deprecated('Use novoGastoName')
+  static const String novaDespesaName = novoGastoName;
+
+  static Map<String, String> gastosQueryFromFilter(
     DashboardDrillDownFilter filter,
   ) {
     final Map<String, String> query = <String, String>{};
@@ -48,7 +58,7 @@ class AppRoutes {
     return query;
   }
 
-  static DashboardDrillDownFilter? despesasFilterFromQuery(
+  static DashboardDrillDownFilter? gastosFilterFromQuery(
     Map<String, String> query,
   ) {
     final DateTime? mesReferencia = _parseMes(query['mes']);
@@ -71,6 +81,20 @@ class AppRoutes {
       categoriaPersonalizadaId: categoriaCustomId,
       tipo: tipo,
     );
+  }
+
+  @Deprecated('Use gastosQueryFromFilter')
+  static Map<String, String> despesasQueryFromFilter(
+    DashboardDrillDownFilter filter,
+  ) {
+    return gastosQueryFromFilter(filter);
+  }
+
+  @Deprecated('Use gastosFilterFromQuery')
+  static DashboardDrillDownFilter? despesasFilterFromQuery(
+    Map<String, String> query,
+  ) {
+    return gastosFilterFromQuery(query);
   }
 
   static DateTime? _parseMes(String? value) {

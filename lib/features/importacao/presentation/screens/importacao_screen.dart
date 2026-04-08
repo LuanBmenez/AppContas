@@ -7,8 +7,9 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/features/cartoes/presentation/screens/cartoes_screen.dart';
+import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
+import 'package:paga_o_que_me_deve/features/importacao/data/services/importacao_service.dart';
 
 import '../widgets/importacao_sections.dart';
 
@@ -23,6 +24,7 @@ class ImportacaoScreen extends StatefulWidget {
 
 class _ImportacaoScreenState extends State<ImportacaoScreen> {
   final ExtratoCsvService _extratoService = ExtratoCsvService();
+  late final ImportacaoService _importacaoService;
 
   bool _carregandoArquivo = false;
   bool _salvando = false;
@@ -38,6 +40,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   @override
   void initState() {
     super.initState();
+    _importacaoService = ImportacaoService(widget.db);
     _mapeamento[CampoExtrato.dataLancamento] = null;
     _mapeamento[CampoExtrato.dataCompra] = null;
     _mapeamento[CampoExtrato.descricao] = null;
@@ -116,7 +119,9 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     setState(() => _salvando = true);
 
     try {
-      final resultado = await widget.db.importarGastosComDeduplicacao(gastos);
+      final resultado = await _importacaoService.importarGastosComDeduplicacao(
+        gastos,
+      );
 
       if (!mounted) {
         return;
@@ -149,7 +154,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: StreamBuilder<List<CartaoCredito>>(
-        stream: widget.db.cartoesCredito,
+        stream: _importacaoService.cartoesCredito,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -169,7 +174,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
           _cartaoSelecionado = cartaoSelecionadoAtual;
 
           return StreamBuilder<List<RegraCategoriaImportacao>>(
-            stream: widget.db.regrasCategoriaImportacao,
+            stream: _importacaoService.regrasCategoriaImportacao,
             builder: (context, regrasSnapshot) {
               final List<RegraCategoriaImportacao> regrasAprendidas =
                   regrasSnapshot.data ?? <RegraCategoriaImportacao>[];
@@ -304,7 +309,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     }
 
     _chaveDuplicadosCache = chave;
-    _duplicadosCache = widget.db.contarDuplicadosPorHash(hashes);
+    _duplicadosCache = _importacaoService.contarDuplicadosPorHash(hashes);
     return _duplicadosCache!;
   }
 
@@ -318,7 +323,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     setState(() => _salvandoSugestoes = true);
     try {
       for (final SugestaoRegraCategoria sugestao in sugestoes) {
-        await widget.db.salvarRegraCategoriaImportacao(
+        await _importacaoService.salvarRegraCategoriaImportacao(
           termo: sugestao.termo,
           categoria: sugestao.categoria,
         );

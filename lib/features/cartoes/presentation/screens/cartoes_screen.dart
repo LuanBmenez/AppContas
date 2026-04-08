@@ -3,11 +3,14 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
+import 'package:paga_o_que_me_deve/features/cartoes/data/services/cartoes_service.dart';
 
 class CartoesScreen extends StatelessWidget {
   const CartoesScreen({super.key, required this.db});
 
   final FinanceRepository db;
+
+  CartoesService get _cartoesService => CartoesService(db);
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +25,7 @@ class CartoesScreen extends StatelessWidget {
         label: const Text('Novo cartão'),
       ),
       body: StreamBuilder<List<CartaoCredito>>(
-        stream: db.cartoesCredito,
+        stream: _cartoesService.cartoesCredito,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -92,7 +95,7 @@ class CartoesScreen extends StatelessWidget {
       return;
     }
 
-    await db.deletarCartaoCredito(cartao.id);
+    await _cartoesService.deletarCartaoCredito(cartao.id);
   }
 
   Future<void> _abrirNovoCartaoDialog(BuildContext context) async {
@@ -192,7 +195,7 @@ class CartoesScreen extends StatelessWidget {
       diaVencimento: int.parse(vencimentoController.text),
     );
 
-    await db.adicionarCartaoCredito(novo);
+    await _cartoesService.adicionarCartaoCredito(novo);
   }
 
   String? _validarDia(String? value) {

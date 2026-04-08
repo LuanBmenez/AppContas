@@ -4,6 +4,7 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
+import 'package:paga_o_que_me_deve/features/a_receber/data/services/recebiveis_service.dart';
 
 import 'novo_recebivel_screen.dart';
 
@@ -22,6 +23,7 @@ class AReceberScreen extends StatefulWidget {
 }
 
 class _AReceberScreenState extends State<AReceberScreen> {
+  late final RecebiveisService _recebiveisService;
   final ScrollController _listController = ScrollController();
   Stream<List<Conta>>? _contasStream;
   final TextEditingController _buscaController = TextEditingController();
@@ -43,7 +45,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
   @override
   void initState() {
     super.initState();
-    _contasStream = widget.db.contasAReceber;
+    _recebiveisService = RecebiveisService(widget.db);
+    _contasStream = _recebiveisService.contasAReceber;
     _buscaController.addListener(_onBuscaAlterada);
   }
 
@@ -56,7 +59,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   Stream<List<Conta>> _obterContasStream() {
-    return _contasStream ??= widget.db.contasAReceber;
+    return _contasStream ??= _recebiveisService.contasAReceber;
   }
 
   AppSemanticColors _semanticColors(ThemeData theme) {
@@ -170,7 +173,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
     setState(() => _processandoLote = true);
     try {
       for (final Conta conta in selecionados) {
-        await widget.db.deletarRecebivel(conta.id);
+        await _recebiveisService.deletarRecebivel(conta.id);
       }
       if (!mounted) return;
 
@@ -201,7 +204,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
     try {
       for (final Conta conta in selecionados) {
         if (conta.foiPago != pago) {
-          await widget.db.alternarStatusRecebivel(conta.id, conta.foiPago);
+          await _recebiveisService.alternarStatusRecebivel(
+            conta.id,
+            conta.foiPago,
+          );
         }
       }
       if (!mounted) return;
@@ -669,7 +675,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
           }
 
           try {
-            await widget.db.alternarStatusRecebivel(conta.id, conta.foiPago);
+            await _recebiveisService.alternarStatusRecebivel(
+              conta.id,
+              conta.foiPago,
+            );
           } catch (e) {
             if (!mounted) return;
             AppFeedback.showError(context, 'Erro ao atualizar: $e');
@@ -754,7 +763,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
           return;
         }
         try {
-          await widget.db.deletarRecebivel(conta.id);
+          await _recebiveisService.deletarRecebivel(conta.id);
         } catch (e) {
           if (!mounted) return;
           AppFeedback.showError(context, 'Erro: $e');

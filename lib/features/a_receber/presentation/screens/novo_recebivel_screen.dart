@@ -5,6 +5,7 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
+import 'package:paga_o_que_me_deve/features/a_receber/data/services/recebiveis_service.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
   const NovoRecebivelScreen({super.key, required this.db});
@@ -16,6 +17,7 @@ class NovoRecebivelScreen extends StatefulWidget {
 }
 
 class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
+  late final RecebiveisService _recebiveisService;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _descricaoController = TextEditingController();
@@ -34,6 +36,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   @override
   void initState() {
     super.initState();
+    _recebiveisService = RecebiveisService(widget.db);
     _nomeController.addListener(_onCamposAlterados);
     _descricaoController.addListener(_onCamposAlterados);
     _valorController.addListener(_onCamposAlterados);
@@ -115,7 +118,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
           data: DateTime.now(),
         );
 
-        await widget.db.adicionarRecebivel(novaConta);
+        await _recebiveisService.adicionarRecebivel(novaConta);
 
         if (mounted) {
           Navigator.pop(context);

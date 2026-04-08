@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
-enum HomeTab { inicio, despesas, receber, perfil }
+enum HomeTab { inicio, gastos, receber, perfil }
 
 class HomeShellScreen extends StatelessWidget {
   const HomeShellScreen({
@@ -18,26 +19,26 @@ class HomeShellScreen extends StatelessWidget {
 
   String get _titulo {
     if (currentTab == HomeTab.inicio) return 'Visão Geral';
-    if (currentTab == HomeTab.despesas) return 'Meus Gastos';
+    if (currentTab == HomeTab.gastos) return 'Meus Gastos';
     if (currentTab == HomeTab.receber) return 'A Receber';
     return 'Perfil';
   }
 
   int get _indiceAtual => switch (currentTab) {
     HomeTab.inicio => 0,
-    HomeTab.despesas => 1,
+    HomeTab.gastos => 1,
     HomeTab.receber => 2,
     HomeTab.perfil => 3,
   };
 
   Future<void> _onAdicionar(BuildContext context) async {
-    if (currentTab == HomeTab.despesas) {
-      context.push('/despesas/novo');
+    if (currentTab == HomeTab.gastos) {
+      context.push(AppRoutes.novoGastoPath);
       return;
     }
 
     if (currentTab == HomeTab.receber) {
-      context.push('/receber/nova');
+      context.push(AppRoutes.novoRecebivelPath);
     }
   }
 
@@ -46,16 +47,16 @@ class HomeShellScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titulo),
-        actions: currentTab == HomeTab.despesas
+        actions: currentTab == HomeTab.gastos
             ? <Widget>[
                 IconButton(
                   tooltip: 'Cartoes',
-                  onPressed: () => context.push('/despesas/cartoes'),
+                  onPressed: () => context.push(AppRoutes.cartoesPath),
                   icon: const Icon(Icons.credit_card_outlined),
                 ),
                 IconButton(
                   tooltip: 'Importar extrato CSV',
-                  onPressed: () => context.push('/despesas/importar'),
+                  onPressed: () => context.push(AppRoutes.importarPath),
                   icon: const Icon(Icons.upload_file_outlined),
                 ),
               ]
@@ -86,18 +87,18 @@ class HomeShellScreen extends StatelessWidget {
           selectedIndex: _indiceAtual,
           onDestinationSelected: (index) {
             if (index == 0) {
-              context.go('/inicio');
+              context.go(AppRoutes.inicioPath);
               return;
             }
             if (index == 1) {
-              context.go('/despesas');
+              context.go(AppRoutes.gastosPath);
               return;
             }
             if (index == 2) {
-              context.go('/receber');
+              context.go(AppRoutes.receberPath);
               return;
             }
-            context.go('/perfil');
+            context.go(AppRoutes.perfilPath);
           },
           destinations: const [
             NavigationDestination(
@@ -108,7 +109,7 @@ class HomeShellScreen extends StatelessWidget {
             NavigationDestination(
               icon: Icon(Icons.account_balance_wallet_outlined),
               selectedIcon: Icon(Icons.account_balance_wallet),
-              label: 'Despesas',
+              label: 'Gastos',
             ),
             NavigationDestination(
               icon: Icon(Icons.handshake_outlined),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -911,7 +912,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                     return;
                                                   }
                                                   context.push(
-                                                    '/despesas/novo',
+                                                    AppRoutes.novoGastoPath,
                                                   );
                                                 },
                                                 icon: const Icon(
@@ -923,7 +924,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               ),
                                               OutlinedButton.icon(
                                                 onPressed: () => context.push(
-                                                  '/despesas/importar',
+                                                  AppRoutes.importarPath,
                                                 ),
                                                 icon: const Icon(
                                                   Icons.upload_file_outlined,

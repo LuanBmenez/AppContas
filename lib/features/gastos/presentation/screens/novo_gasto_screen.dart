@@ -7,6 +7,8 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
+import 'package:paga_o_que_me_deve/features/gastos/data/services/categorias_service.dart';
+import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.dart';
 import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo_gasto_categoria_controller.dart';
 
 import '../widgets/novo_gasto_sections.dart';
@@ -21,6 +23,8 @@ class NovoGastoScreen extends StatefulWidget {
 }
 
 class _NovoGastoScreenState extends State<NovoGastoScreen> {
+  late final GastosService _gastosService;
+  late final CategoriasService _categoriasService;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _valorController = TextEditingController();
@@ -88,6 +92,8 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   @override
   void initState() {
     super.initState();
+    _gastosService = GastosService(widget.db);
+    _categoriasService = CategoriasService(widget.db);
     _tituloController.addListener(_onCamposAlterados);
     _tituloController.addListener(_onTituloAlteradoParaSugestao);
     _valorController.addListener(_onCamposAlterados);
@@ -113,7 +119,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Future<void> _inicializarCategorias() async {
-    final PreferenciasNovoGasto preferencias = await widget.db
+    final PreferenciasNovoGasto preferencias = await _categoriasService
         .carregarPreferenciasNovoGasto();
 
     if (!mounted) {
@@ -130,7 +136,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       _carregandoPreferencias = false;
     });
 
-    _categoriasSub = widget.db.categoriasPersonalizadas.listen((categorias) {
+    _categoriasSub = _categoriasService.categoriasPersonalizadas.listen((
+      categorias,
+    ) {
       if (!mounted) {
         return;
       }
@@ -148,7 +156,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       _atualizarSugestaoPorTitulo(aplicarAutomaticamente: true);
     });
 
-    _regrasSub = widget.db.regrasCategoriaImportacao.listen((regras) {
+    _regrasSub = _categoriasService.regrasCategoriaImportacao.listen((regras) {
       if (!mounted) {
         return;
       }
@@ -223,7 +231,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
     setState(() => _carregandoDuplicados = true);
 
-    final List<Gasto> gastos = await widget.db.meusGastos.first;
+    final List<Gasto> gastos = await _gastosService.meusGastos.first;
     final String tituloNormalizado = TextNormalizer.normalizeForSearch(titulo);
     final DateTime dataBase = DateTime(
       _dataSelecionada.year,
@@ -281,7 +289,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
     setState(() => _carregandoSugestaoRecorrencia = true);
 
-    final SugestaoRecorrenciaDespesa? sugestao = await widget.db
+    final SugestaoRecorrenciaDespesa? sugestao = await _gastosService
         .sugerirRecorrenciaPorTitulo(titulo);
 
     if (!mounted) {
@@ -453,7 +461,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         tipo: _tipoSelecionado,
       );
 
-      await widget.db.adicionarGasto(novoGasto);
+      await _gastosService.adicionarGasto(novoGasto);
 
       if (_recorrenciaAtiva) {
         final List<Gasto> futuros = _gerarRecorrenciasFuturas(
@@ -461,11 +469,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
           mesesFuturos: _recorrenciaMesesFuturos,
         );
         for (final Gasto gasto in futuros) {
-          await widget.db.adicionarGasto(gasto);
+          await _gastosService.adicionarGasto(gasto);
         }
       }
 
-      await widget.db.registrarUsoNovoGasto(
+      await _gastosService.registrarUsoNovoGasto(
         categoriaPadrao: custom == null ? _categoriaSelecionada : null,
         categoriaPersonalizadaId: custom?.id,
         tipo: _tipoSelecionado,
@@ -830,7 +838,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                       criadaEm: categoria?.criadaEm,
                     );
 
-                    await widget.db.salvarCategoriaPersonalizada(nova);
+                    await _categoriasService.salvarCategoriaPersonalizada(nova);
                     if (!mounted) {
                       return;
                     }
@@ -904,10 +912,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                         )
                         .toList();
                   });
-                  await widget.db.alternarFavoritaCategoriaPersonalizada(
-                    categoria.id,
-                    !categoria.favorita,
-                  );
+                  await _categoriasService
+                      .alternarFavoritaCategoriaPersonalizada(
+                        categoria.id,
+                        !categoria.favorita,
+                      );
                 },
               ),
               ListTile(
@@ -929,7 +938,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                         )
                         .toList();
                   });
-                  await widget.db.arquivarCategoriaPersonalizada(
+                  await _categoriasService.arquivarCategoriaPersonalizada(
                     categoria.id,
                     novoArquivada,
                   );
@@ -946,7 +955,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                 title: const Text('Excluir'),
                 onTap: () async {
                   Navigator.pop(sheetContext);
-                  final bool emUso = await widget.db
+                  final bool emUso = await _categoriasService
                       .categoriaPersonalizadaEmUso(categoria.id);
                   if (emUso) {
                     if (!mounted) return;
@@ -967,7 +976,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                         _categoriaPersonalizadaSelecionadaId = null;
                       }
                     });
-                    await widget.db.arquivarCategoriaPersonalizada(
+                    await _categoriasService.arquivarCategoriaPersonalizada(
                       categoria.id,
                       true,
                     );
@@ -984,7 +993,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     return;
                   }
 
-                  await widget.db.deletarCategoriaPersonalizada(categoria.id);
+                  await _categoriasService.deletarCategoriaPersonalizada(
+                    categoria.id,
+                  );
                   if (!mounted) return;
                   setState(() {
                     _categoriasPersonalizadas = _categoriasPersonalizadas
