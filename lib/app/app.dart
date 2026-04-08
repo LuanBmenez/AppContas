@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/theme.dart';
-import 'router/app_router.dart';
+import 'routes/app_router.dart';
 
 class PagaOQueMeDeveApp extends StatelessWidget {
   const PagaOQueMeDeveApp({super.key, this.home});

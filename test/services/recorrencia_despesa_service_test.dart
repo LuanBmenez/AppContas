@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
-import 'package:paga_o_que_me_deve/services/recorrencia_despesa_service.dart';
+import 'package:paga_o_que_me_deve/features/gastos/data/services/recorrencia_despesa_service.dart';
 
 void main() {
   group('RecorrenciaDespesaService', () {

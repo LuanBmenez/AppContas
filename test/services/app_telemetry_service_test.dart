@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:paga_o_que_me_deve/services/app_telemetry_service.dart';
+import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_telemetry_service.dart';
 
 void main() {
   group('AppTelemetryService', () {

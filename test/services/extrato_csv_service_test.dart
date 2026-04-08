@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
-import 'package:paga_o_que_me_deve/services/extrato_csv_service.dart';
+import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
 
 void main() {
   group('ExtratoCsvService', () {
