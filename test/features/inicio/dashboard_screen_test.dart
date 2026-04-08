@@ -91,12 +91,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Categorias de gastos'), findsOneWidget);
-      expect(find.text('Comida'), findsWidgets);
-
-      await tester.tap(find.text('Comida').first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ver gastos desta categoria'), findsOneWidget);
+      final Finder categoriasCard = find.ancestor(
+        of: find.text('Categorias de gastos'),
+        matching: find.byType(Card),
+      );
+      final Finder comidaNoCard = find.descendant(
+        of: categoriasCard,
+        matching: find.text('Comida'),
+      );
+      expect(comidaNoCard, findsWidgets);
+      expect(find.text('R\$ 250,00'), findsWidgets);
     });
 
     testWidgets('desabilita exportacao durante processamento', (tester) async {
@@ -118,18 +122,20 @@ void main() {
         _buildTestApp(db: repo, exportadorRelatorio: exportador),
       );
       await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -700));
+      await tester.pumpAndSettle();
 
-      expect(
-        find.widgetWithText(OutlinedButton, 'Exportar PDF'),
-        findsOneWidget,
-      );
+      expect(find.widgetWithText(FilledButton, 'Exportar'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Exportar PDF'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Exportar'));
       await tester.pump();
 
-      expect(find.text('Gerando e compartilhando...'), findsOneWidget);
-      final OutlinedButton botao = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Gerando e compartilhando...'),
+      expect(
+        find.text('Gerando e compartilhando relatório...'),
+        findsOneWidget,
+      );
+      final FilledButton botao = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Gerando...'),
       );
       expect(botao.onPressed, isNull);
       expect(chamadas, 1);
