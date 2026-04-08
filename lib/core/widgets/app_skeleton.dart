@@ -38,33 +38,6 @@ class AppSkeletonBox extends StatelessWidget {
   }
 }
 
-class DashboardSkeleton extends StatelessWidget {
-  const DashboardSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          AppSkeletonBox(height: 28, width: 220),
-          SizedBox(height: AppSpacing.s8),
-          AppSkeletonBox(height: 18, width: 150),
-          SizedBox(height: AppSpacing.s12),
-          AppSkeletonBox(height: 32),
-          SizedBox(height: AppSpacing.s24),
-          AppSkeletonBox(height: 156, radius: 20),
-          SizedBox(height: AppSpacing.s12),
-          AppSkeletonBox(height: 44, radius: 12),
-          SizedBox(height: AppSpacing.s12),
-          AppSkeletonBox(height: 44, radius: 12),
-        ],
-      ),
-    );
-  }
-}
-
 class ListSkeleton extends StatelessWidget {
   const ListSkeleton({super.key, this.withHeader = true});
 

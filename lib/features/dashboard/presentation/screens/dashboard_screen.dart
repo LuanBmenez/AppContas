@@ -6,11 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
-import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
+import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_data_service.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_summary_service.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/report_export_service.dart';
+import 'package:paga_o_que_me_deve/features/dashboard/presentation/widgets/dashboard_loading_view.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -35,6 +36,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  late final DashboardDataService _dashboardDataService;
   final DashboardSummaryService _summaryService = DashboardSummaryService();
   final ReportExportService _reportExportService = const ReportExportService();
 
@@ -45,6 +47,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _memoKey = '';
   DashboardResumoCalculado? _memoResumo;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardDataService = DashboardDataService(widget.db);
+  }
 
   String _tituloPeriodo(DateTime agora) {
     if (_mesEspecifico != null) {
@@ -623,26 +631,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return StreamBuilder<DashboardResumo>(
       key: ValueKey<int>(_retryTick),
-      stream: widget.db.dashboardResumo,
+      stream: _dashboardDataService.dashboardResumo,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Padding(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: const [
-                AppSkeletonBox(height: 28, width: 220),
-                SizedBox(height: AppSpacing.s8),
-                AppSkeletonBox(height: 18, width: 180),
-                SizedBox(height: AppSpacing.s20),
-                AppSkeletonBox(height: 210, radius: 30),
-                SizedBox(height: AppSpacing.s16),
-                AppSkeletonBox(height: 44, radius: 999),
-                SizedBox(height: AppSpacing.s16),
-                AppSkeletonBox(height: 64, radius: 22),
-              ],
-            ),
-          );
+          return const DashboardLoadingView();
         }
 
         if (snapshot.hasError) {

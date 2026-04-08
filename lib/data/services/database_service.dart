@@ -8,7 +8,7 @@ import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/preferencias_novo_gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/features/gastos/data/services/recorrencia_despesa_service.dart';
+import 'package:paga_o_que_me_deve/domain/services/recorrencia_despesa_service.dart';
 import 'package:rxdart/rxdart.dart';
 
 class DatabaseService implements FinanceRepository {
