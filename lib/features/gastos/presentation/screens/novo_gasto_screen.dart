@@ -74,6 +74,29 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     Color(0xFF4D7C0F),
   ];
 
+  IconData _mapearIconeCategoria(int? codePoint) {
+    switch (codePoint) {
+      case 0xe88a:
+        return Icons.home_rounded;
+      case 0xe56c:
+        return Icons.restaurant_rounded;
+      case 0xe531:
+        return Icons.directions_car_rounded;
+      case 0xe57d:
+        return Icons.shopping_bag_rounded;
+      case 0xe227:
+        return Icons.attach_money_rounded;
+      case 0xe263:
+        return Icons.favorite_rounded;
+      case 0xe87d:
+        return Icons.person_rounded;
+      case 0xe8cc:
+        return Icons.credit_card_rounded;
+      default:
+        return Icons.category_rounded;
+    }
+  }
+
   static const List<IconData> _iconesCategoria = <IconData>[
     Icons.shopping_cart_outlined,
     Icons.restaurant_outlined,
@@ -653,10 +676,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final Color corAtual = Color(corValue);
-            final IconData iconeAtual = IconData(
-              iconeCodePoint,
-              fontFamily: 'MaterialIcons',
-            );
+            final IconData iconeAtual = _mapearIconeCategoria(iconeCodePoint);
             final Color texto = _contrastRatio(corAtual, Colors.white) >= 4.5
                 ? Colors.white
                 : Colors.black;

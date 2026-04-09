@@ -364,7 +364,6 @@ class ExtratoCsvService {
           valor: valor,
         );
 
-        // CORREÇÃO: Evita duplicar o mesmo recebimento caso venha repetido no CSV
         if (!hashesNoArquivo.add(hashRecebimento)) {
           contarIgnorado(
             'Recebimento duplicado no arquivo',
@@ -412,7 +411,11 @@ class ExtratoCsvService {
       final ({int atual, int total})? parcela = _extrairParcela(textoParcela);
 
       final bool ehEstorno = _ehEstornoOuAjuste(descricao);
-      final double valorNormalizado = ehEstorno ? -valor.abs() : valor;
+
+      // Gasto normal entra sempre positivo.
+      // Estorno / ajuste permanece negativo.
+      final double valorNormalizado = ehEstorno ? -valor.abs() : valor.abs();
+
       final CategoriaResolvida categoriaResolvida = _categorizar(
         descricao,
         regrasAprendidasNormalizadas,
@@ -521,7 +524,6 @@ class ExtratoCsvService {
               ),
             );
 
-      // Forçando conversão de ambos para positivo a fim de evitar bugs no cálculo de diferença
       final double diferenca = (conta.valor.abs() - recebimento.valor.abs())
           .abs();
       final double toleranciaValor = max(5, recebimento.valor.abs() * 0.15);
@@ -778,8 +780,6 @@ class ExtratoCsvService {
   }
 
   TipoRecebimentoDetectado _classificarRecebimento(String descricao) {
-    // CORREÇÃO: Força o toUpperCase() para o match exato das palavras-chave,
-    // independente do comportamento interno do TextNormalizer.
     final String d = _normalizarTextoBusca(descricao).toUpperCase();
 
     if (d.contains('REEMBOLSO')) {
@@ -810,7 +810,6 @@ class ExtratoCsvService {
       return true;
     }
 
-    // CORREÇÃO: Força o toUpperCase() para proteção do comportamento do Normalizer.
     final String d = _normalizarTextoBusca(descricao).toUpperCase();
     return d.contains('RECEBIDO') ||
         d.contains('RECEBIMENTO') ||

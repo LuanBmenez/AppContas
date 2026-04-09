@@ -116,6 +116,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
           descricao: _descricaoController.text.trim(),
           valor: valor,
           data: DateTime.now(),
+          foiPago: false,
         );
 
         await _recebiveisService.adicionarRecebivel(novaConta);

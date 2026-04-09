@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="paga_o_que_me_deve"
+        android:label="Paga o que me deve"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
