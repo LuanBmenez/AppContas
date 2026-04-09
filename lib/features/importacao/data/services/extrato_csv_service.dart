@@ -351,7 +351,7 @@ class ExtratoCsvService {
         continue;
       }
 
-      if (valor > 0 && _ehPossivelRecebimento(descricao)) {
+      if (valor > 0) {
         final DateTime dataBase = dataLancamento;
         final TipoRecebimentoDetectado tipo = _classificarRecebimento(
           descricao,
@@ -411,9 +411,6 @@ class ExtratoCsvService {
       final ({int atual, int total})? parcela = _extrairParcela(textoParcela);
 
       final bool ehEstorno = _ehEstornoOuAjuste(descricao);
-
-      // Gasto normal entra sempre positivo.
-      // Estorno / ajuste permanece negativo.
       final double valorNormalizado = ehEstorno ? -valor.abs() : valor.abs();
 
       final CategoriaResolvida categoriaResolvida = _categorizar(
@@ -804,18 +801,18 @@ class ExtratoCsvService {
     return TipoRecebimentoDetectado.outro;
   }
 
-  bool _ehPossivelRecebimento(String descricao) {
-    final TipoRecebimentoDetectado tipo = _classificarRecebimento(descricao);
-    if (tipo != TipoRecebimentoDetectado.outro) {
-      return true;
-    }
+  // bool _ehPossivelRecebimento(String descricao) {
+  //   final TipoRecebimentoDetectado tipo = _classificarRecebimento(descricao);
+  //   if (tipo != TipoRecebimentoDetectado.outro) {
+  //     return true;
+  //   }
 
-    final String d = _normalizarTextoBusca(descricao).toUpperCase();
-    return d.contains('RECEBIDO') ||
-        d.contains('RECEBIMENTO') ||
-        d.contains('CREDITO RECEBIDO') ||
-        d.contains('DEPOSITO RECEBIDO');
-  }
+  //   final String d = _normalizarTextoBusca(descricao).toUpperCase();
+  //   return d.contains('RECEBIDO') ||
+  //       d.contains('RECEBIMENTO') ||
+  //       d.contains('CREDITO RECEBIDO') ||
+  //       d.contains('DEPOSITO RECEBIDO');
+  // }
 
   String? _extrairNomeContraparte(String descricao) {
     final List<String> partes = descricao.split('-');
