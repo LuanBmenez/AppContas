@@ -13,6 +13,7 @@ import 'package:paga_o_que_me_deve/features/auth/auth.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/dashboard.dart';
 import 'package:paga_o_que_me_deve/features/gastos/gastos.dart';
+import 'package:paga_o_que_me_deve/features/guardado/guardado.dart';
 import 'package:paga_o_que_me_deve/features/importacao/importacao.dart';
 import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
 import 'package:paga_o_que_me_deve/features/perfil/perfil.dart';
@@ -97,6 +98,17 @@ class AppRouter {
             db: _db,
             currentTab: HomeTab.receber,
             child: AReceberScreen(db: _db),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.guardadoPath,
+        name: AppRoutes.guardadoName,
+        builder: (BuildContext context, GoRouterState state) {
+          return HomeShellScreen(
+            db: _db,
+            currentTab: HomeTab.guardado,
+            child: GuardadoScreen(db: _db),
           );
         },
       ),

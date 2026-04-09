@@ -5,6 +5,7 @@ import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
 import 'package:paga_o_que_me_deve/domain/models/categoria_personalizada.dart';
 import 'package:paga_o_que_me_deve/domain/models/conta.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
+import 'package:paga_o_que_me_deve/domain/models/guardado.dart';
 import 'package:paga_o_que_me_deve/domain/models/preferencias_novo_gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
@@ -33,6 +34,9 @@ class DatabaseService implements FinanceRepository {
 
   CollectionReference<Map<String, dynamic>> get _gastosCollection =>
       _workspaceDoc.collection('gastos');
+
+  CollectionReference<Map<String, dynamic>> get _guardadosCollection =>
+      _workspaceDoc.collection('guardados');
 
   CollectionReference<Map<String, dynamic>> get _cartoesCollection =>
       _workspaceDoc.collection('cartoes');
@@ -85,6 +89,17 @@ class DatabaseService implements FinanceRepository {
       (snapshot) {
         return snapshot.docs
             .map((doc) => Conta.fromMap(doc.data(), doc.id))
+            .toList();
+      },
+    );
+  }
+
+  @override
+  Stream<List<Guardado>> get guardados {
+    return _guardadosCollection.orderBy('data', descending: true).snapshots().map(
+      (snapshot) {
+        return snapshot.docs
+            .map((doc) => Guardado.fromMap(doc.data(), doc.id))
             .toList();
       },
     );
@@ -208,6 +223,35 @@ class DatabaseService implements FinanceRepository {
               .toMap(),
           SetOptions(merge: false),
         );
+  }
+
+  @override
+  Future<void> salvarGuardado(Guardado guardado) async {
+    final DocumentReference<Map<String, dynamic>> docRef =
+        guardado.id.isEmpty
+            ? _guardadosCollection.doc()
+            : _guardadosCollection.doc(guardado.id);
+
+    final Guardado guardadoComId = guardado.copyWith(
+      id: docRef.id,
+      competencia: Guardado.competenciaFromDate(guardado.data),
+    );
+
+    await docRef.set(guardadoComId.toMap());
+  }
+
+  @override
+  Future<void> atualizarGuardado(Guardado guardado) async {
+    final Guardado atualizado = guardado.copyWith(
+      competencia: Guardado.competenciaFromDate(guardado.data),
+    );
+
+    await _guardadosCollection.doc(atualizado.id).set(atualizado.toMap());
+  }
+
+  @override
+  Future<void> deletarGuardado(String id) async {
+    await _guardadosCollection.doc(id).delete();
   }
 
   @override

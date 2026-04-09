@@ -765,6 +765,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+
+  Widget _buildSobraGuardadoCard(
+    ThemeData theme,
+    DashboardResumoCalculado resumo,
+  ) {
+    final bool temSobra = resumo.saldo > 0;
+    final double valorGuardavel = temSobra ? resumo.saldo : 0;
+
+    return _DashboardEntry(
+      delayMs: 20,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => context.go(AppRoutes.guardadoPath),
+          child: Ink(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.s18),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.08),
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: theme.colorScheme.shadow.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F9D7A).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.savings_outlined,
+                    color: Color(0xFF0F9D7A),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Sobra para guardar',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s6),
+                      Text(
+                        AppFormatters.moeda(valorGuardavel),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        temSobra
+                            ? 'Toque para escolher o destino: caixinha, investimentos ou saldo livre.'
+                            : 'Sem sobra neste período. Abra Guardado para organizar valores já separados.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildExportCard(ThemeData theme) {
     return Container(
       width: double.infinity,
@@ -1142,6 +1233,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(height: 18),
                         _buildHeroSaldoCard(theme, resumo),
+                        const SizedBox(height: 12),
+                        _buildSobraGuardadoCard(theme, resumo),
                         const SizedBox(height: 16),
                         _DashboardEntry(
                           delayMs: 30,

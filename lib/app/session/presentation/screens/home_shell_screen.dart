@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
-enum HomeTab { inicio, gastos, receber, perfil }
+enum HomeTab { inicio, gastos, receber, guardado, perfil }
 
 class HomeShellScreen extends StatelessWidget {
   const HomeShellScreen({
@@ -21,6 +21,7 @@ class HomeShellScreen extends StatelessWidget {
     if (currentTab == HomeTab.inicio) return 'Visão Geral';
     if (currentTab == HomeTab.gastos) return 'Meus Gastos';
     if (currentTab == HomeTab.receber) return 'A Receber';
+    if (currentTab == HomeTab.guardado) return 'Guardado';
     return 'Perfil';
   }
 
@@ -28,7 +29,8 @@ class HomeShellScreen extends StatelessWidget {
     HomeTab.inicio => 0,
     HomeTab.gastos => 1,
     HomeTab.receber => 2,
-    HomeTab.perfil => 3,
+    HomeTab.guardado => 3,
+    HomeTab.perfil => 4,
   };
 
   Future<void> _onAdicionar(BuildContext context) async {
@@ -69,13 +71,15 @@ class HomeShellScreen extends StatelessWidget {
       ),
       body: child,
       floatingActionButton:
-          currentTab == HomeTab.inicio || currentTab == HomeTab.perfil
-          ? null
-          : FloatingActionButton(
-              heroTag: 'home_shell_add_fab',
-              onPressed: () => _onAdicionar(context),
-              child: const Icon(Icons.add),
-            ),
+          currentTab == HomeTab.inicio ||
+                  currentTab == HomeTab.guardado ||
+                  currentTab == HomeTab.perfil
+              ? null
+              : FloatingActionButton(
+                  heroTag: 'home_shell_add_fab',
+                  onPressed: () => _onAdicionar(context),
+                  child: const Icon(Icons.add),
+                ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           height: 70,
@@ -104,6 +108,10 @@ class HomeShellScreen extends StatelessWidget {
               context.go(AppRoutes.receberPath);
               return;
             }
+            if (index == 3) {
+              context.go(AppRoutes.guardadoPath);
+              return;
+            }
             context.go(AppRoutes.perfilPath);
           },
           destinations: const [
@@ -121,6 +129,11 @@ class HomeShellScreen extends StatelessWidget {
               icon: Icon(Icons.handshake_outlined),
               selectedIcon: Icon(Icons.handshake),
               label: 'A Receber',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.savings_outlined),
+              selectedIcon: Icon(Icons.savings),
+              label: 'Guardado',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),

@@ -4,6 +4,7 @@ import '../models/cartao_credito.dart';
 import '../models/categoria_personalizada.dart';
 import '../models/conta.dart';
 import '../models/gasto.dart';
+import '../models/guardado.dart';
 import '../models/preferencias_novo_gasto.dart';
 import '../models/regra_categoria_importacao.dart';
 
@@ -79,12 +80,17 @@ abstract class FinanceRepository {
   Stream<List<CartaoCredito>> get cartoesCredito;
   Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao;
   Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas;
+  Stream<List<Guardado>> get guardados;
 
   Future<void> adicionarRecebivel(Conta conta);
   Future<void> alternarStatusRecebivel(String id, bool statusAtual);
   Future<void> deletarRecebivel(String id);
   Future<void> atualizarRecebivel(Conta conta);
   Future<void> restaurarRecebivel(Conta conta);
+
+  Future<void> salvarGuardado(Guardado guardado);
+  Future<void> atualizarGuardado(Guardado guardado);
+  Future<void> deletarGuardado(String id);
 
   Future<void> adicionarGasto(Gasto gasto);
   Future<ResultadoImportacaoGastos> importarGastosComDeduplicacao(

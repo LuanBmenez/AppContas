@@ -63,7 +63,6 @@ class ResumoMensalRecebimentos extends StatelessWidget {
 
 class _ResumoItem extends StatelessWidget {
   const _ResumoItem({
-    super.key,
     required this.label,
     required this.valor,
     required this.color,

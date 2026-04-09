@@ -307,4 +307,19 @@ class _TestFinanceRepository implements FinanceRepository {
       totalPorCategoria: const <CategoriaGasto, double>{},
     );
   }
+
+  // --- MÉTODOS DE GUARDADO ADICIONADOS ABAIXO ---
+
+  @override
+  Stream<List<Guardado>> get guardados => const Stream<List<Guardado>>.empty();
+
+  @override
+  Future<void> salvarGuardado(Guardado guardado) => throw UnimplementedError();
+
+  @override
+  Future<void> atualizarGuardado(Guardado guardado) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> deletarGuardado(String id) => throw UnimplementedError();
 }

@@ -5,3 +5,5 @@ export 'dashboard_drilldown_filter.dart';
 export 'gasto.dart';
 export 'preferencias_novo_gasto.dart';
 export 'regra_categoria_importacao.dart';
+
+export 'guardado.dart';
