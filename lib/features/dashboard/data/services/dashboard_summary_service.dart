@@ -148,23 +148,27 @@ class DashboardSummaryService {
     double totalPendente = 0;
     double totalRecebidoPeriodo = 0;
     double totalRecebidoPeriodoAnterior = 0;
+
     for (final Conta conta in resumo.contas) {
       if (!conta.foiPago) {
         totalPendente += conta.valor;
-      } else {
-        if (_estaNaFaixa(
-          conta.data,
-          faixaAtual.inicio,
-          faixaAtual.fimExclusivo,
-        )) {
-          totalRecebidoPeriodo += conta.valor;
-        } else if (_estaNaFaixa(
-          conta.data,
-          faixaAnterior.inicio,
-          faixaAnterior.fimExclusivo,
-        )) {
-          totalRecebidoPeriodoAnterior += conta.valor;
-        }
+        continue;
+      }
+
+      final DateTime dataReferenciaRecebimento = _dataReferenciaConta(conta);
+
+      if (_estaNaFaixa(
+        dataReferenciaRecebimento,
+        faixaAtual.inicio,
+        faixaAtual.fimExclusivo,
+      )) {
+        totalRecebidoPeriodo += conta.valor;
+      } else if (_estaNaFaixa(
+        dataReferenciaRecebimento,
+        faixaAnterior.inicio,
+        faixaAnterior.fimExclusivo,
+      )) {
+        totalRecebidoPeriodoAnterior += conta.valor;
       }
     }
 
@@ -179,6 +183,7 @@ class DashboardSummaryService {
 
     final Map<String, DashboardCategoriaResumo> totaisPorCategoria =
         <String, DashboardCategoriaResumo>{};
+
     for (final Gasto gasto in resumo.gastos) {
       if (!_passaFiltroGasto(
         gasto,
@@ -198,6 +203,7 @@ class DashboardSummaryService {
         final String id = custom
             ? 'custom:${gasto.categoriaPersonalizadaId ?? gasto.categoriaLabelExibicao}'
             : 'std:${gasto.categoria.name}';
+
         final DashboardCategoriaResumo atual =
             totaisPorCategoria[id] ??
             DashboardCategoriaResumo(
@@ -212,6 +218,7 @@ class DashboardSummaryService {
                   ? gasto.categoriaPersonalizadaId
                   : null,
             );
+
         totaisPorCategoria[id] = DashboardCategoriaResumo(
           id: atual.id,
           label: atual.label,
@@ -251,6 +258,10 @@ class DashboardSummaryService {
     _cacheLru[cacheKey] = _DashboardCacheEntry(calculado, referencia);
     _evictOverflow();
     return calculado;
+  }
+
+  DateTime _dataReferenciaConta(Conta conta) {
+    return conta.recebidaEm ?? conta.data;
   }
 
   void _evictExpired(DateTime now) {

@@ -17,6 +17,8 @@ import 'package:paga_o_que_me_deve/features/dashboard/domain/models/previsao_fec
 import 'package:paga_o_que_me_deve/features/dashboard/presentation/widgets/dashboard_loading_view.dart';
 import 'package:paga_o_que_me_deve/features/insights/insights.dart';
 import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
+import 'package:paga_o_que_me_deve/features/recorrencias/data/services/recorrencias_service.dart';
+import 'package:paga_o_que_me_deve/features/recorrencias/domain/models/recorrencia_ativa.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -45,6 +47,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late final DashboardDataService _dashboardDataService;
   late final Stream<List<OrcamentoCategoriaResumo>> _orcamentosMesStream;
+  late final RecorrenciasService _recorrenciasService;
+
   final DashboardSummaryService _summaryService = DashboardSummaryService();
   final PrevisaoFechamentoService _previsaoFechamentoService =
       const PrevisaoFechamentoService();
@@ -63,9 +67,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _dashboardDataService = DashboardDataService(widget.db);
+    _recorrenciasService = RecorrenciasService(repository: widget.db);
 
     final Stream<List<OrcamentoCategoriaResumo>>? streamOverride =
         widget.orcamentosMesStreamOverride;
+
     if (streamOverride != null) {
       _orcamentosMesStream = streamOverride.isBroadcast
           ? streamOverride
@@ -79,6 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       final Stream<List<OrcamentoCategoriaResumo>> stream = orcamentosService
           .calcularResumoPorCategoria(DateTime.now(), limite: 5);
+
       _orcamentosMesStream = stream.isBroadcast
           ? stream
           : stream.asBroadcastStream();
@@ -87,6 +94,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const <OrcamentoCategoriaResumo>[],
       ).asBroadcastStream();
     }
+  }
+
+  DateTime _mesReferenciaRecorrencias(DateTime agora) {
+    return _mesEspecifico == null
+        ? DateTime(agora.year, agora.month, 1)
+        : DateTime(_mesEspecifico!.year, _mesEspecifico!.month, 1);
+  }
+
+  int _contarOcorrenciasRestantesNoMes(
+    RecorrenciaAtiva recorrencia,
+    DateTime referenciaMes,
+  ) {
+    return recorrencia.ativosDesdeHoje.where((gasto) {
+      return gasto.data.year == referenciaMes.year &&
+          gasto.data.month == referenciaMes.month;
+    }).length;
+  }
+
+  double _calcularRecorrenciasRestantesMes(
+    List<RecorrenciaAtiva> recorrencias,
+    DateTime referenciaMes,
+  ) {
+    double total = 0;
+
+    for (final RecorrenciaAtiva recorrencia in recorrencias) {
+      final int ocorrencias = _contarOcorrenciasRestantesNoMes(
+        recorrencia,
+        referenciaMes,
+      );
+      total += recorrencia.valorMedio * ocorrencias;
+    }
+
+    return total;
   }
 
   Widget _buildOrcamentosMesCard(ThemeData theme) {
@@ -303,6 +343,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final double participacao = resumo.totalGastosPeriodo <= 0
         ? 0
         : (lider.valor / resumo.totalGastosPeriodo) * 100;
+
     return '${lider.label} concentra ${participacao.toStringAsFixed(1)}% das saídas. Considere revisar esse grupo primeiro.';
   }
 
@@ -615,6 +656,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       error: Color(0xFFD64545),
       errorContainer: Color(0xFFFDE8E8),
     );
+
     final AppSemanticColors semantic =
         theme.extension<AppSemanticColors>() ?? fallbackSemantic;
     final bool saldoPositivo = resumo.saldoPositivo;
@@ -777,173 +819,204 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     return StreamBuilder<List<OrcamentoCategoriaResumo>>(
       stream: _orcamentosMesStream,
-      builder: (context, snapshot) {
+      builder: (context, snapshotOrcamentos) {
         final List<OrcamentoCategoriaResumo> orcamentos =
-            snapshot.data ?? <OrcamentoCategoriaResumo>[];
+            snapshotOrcamentos.data ?? <OrcamentoCategoriaResumo>[];
+
         final PrevisaoFechamentoMes previsao = _previsaoFechamentoService
             .calcular(
               resumo: resumoBruto,
               orcamentosCategoria: orcamentos,
               agora: agora,
             );
+
         final List<PrevisaoCategoriaRisco> riscos = previsao.categoriasComRisco
             .take(3)
             .toList();
-        final List<InsightItem> insights = _insightsService.gerarInsights(
-          resumo: resumo,
-          previsao: previsao,
-          orcamentos: orcamentos,
-          agora: agora,
-          limite: 5,
-        );
 
-        return Column(
-          children: [
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-                side: BorderSide(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.08),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.s18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Previsão do mês',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+        return StreamBuilder<List<RecorrenciaAtiva>>(
+          stream: _recorrenciasService.streamRecorrenciasAtivas(),
+          builder: (context, snapshotRecorrencias) {
+            final List<RecorrenciaAtiva> recorrencias =
+                snapshotRecorrencias.data ?? <RecorrenciaAtiva>[];
+
+            final DateTime referenciaMes = _mesReferenciaRecorrencias(agora);
+
+            final double recorrenciasRestantesCorrigidas =
+                _calcularRecorrenciasRestantesMes(recorrencias, referenciaMes);
+
+            final double projecaoTotalCorrigida =
+                previsao.projecaoTotal -
+                previsao.recorrenciasRestantes +
+                recorrenciasRestantesCorrigidas;
+
+            final List<InsightItem> insights = _insightsService.gerarInsights(
+              resumo: resumo,
+              previsao: previsao,
+              orcamentos: orcamentos,
+              agora: agora,
+              limite: 5,
+            );
+
+            return Column(
+              children: [
+                Card(
+                  elevation: 0,
+                  color: theme.colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    side: BorderSide(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.08),
                     ),
-                    const SizedBox(height: AppSpacing.s6),
-                    Text(
-                      'Com base no ritmo diário e recorrências previstas.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.s16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary.withValues(alpha: 0.13),
-                            theme.colorScheme.primary.withValues(alpha: 0.06),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.12,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.s18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Previsão do mês',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Fechamento previsto',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w700,
+                        const SizedBox(height: AppSpacing.s6),
+                        Text(
+                          'Com base no ritmo diário e recorrências previstas.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.s16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary.withValues(
+                                  alpha: 0.13,
+                                ),
+                                theme.colorScheme.primary.withValues(
+                                  alpha: 0.06,
+                                ),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.12,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.s8),
-                          Text(
-                            AppFormatters.moeda(previsao.projecaoTotal),
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.4,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Fechamento previsto',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s8),
+                              Text(
+                                AppFormatters.moeda(projecaoTotalCorrigida),
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s6),
+                              Text(
+                                'Mantendo o ritmo atual, você deve fechar o mês em ${AppFormatters.moeda(projecaoTotalCorrigida)}.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.s6),
+                        ),
+                        const SizedBox(height: AppSpacing.s12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.s14),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Recorrências restantes',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s6),
+                              Text(
+                                AppFormatters.moeda(
+                                  recorrenciasRestantesCorrigidas,
+                                ),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s4),
+                              Text(
+                                recorrenciasRestantesCorrigidas > 0
+                                    ? 'Ainda faltam ${AppFormatters.moeda(recorrenciasRestantesCorrigidas)} em despesas recorrentes previstas.'
+                                    : 'Sem despesas recorrentes pendentes para este mês.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s16),
+                        Text(
+                          'Categorias em risco',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s10),
+                        if (riscos.isEmpty)
                           Text(
-                            'Mantendo o ritmo atual, você deve fechar o mês em ${AppFormatters.moeda(previsao.projecaoTotal)}.',
+                            'Sem risco de estouro nas categorias com orçamento.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
+                          )
+                        else
+                          Column(
+                            children: riscos.map((
+                              PrevisaoCategoriaRisco risco,
+                            ) {
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.s10,
+                                ),
+                                child: _PrevisaoCategoriaRiscoItem(
+                                  risco: risco,
+                                ),
+                              );
+                            }).toList(),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.s12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.s14),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Recorrências restantes',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s6),
-                          Text(
-                            AppFormatters.moeda(previsao.recorrenciasRestantes),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s4),
-                          Text(
-                            previsao.recorrenciasRestantes > 0
-                                ? 'Ainda faltam ${AppFormatters.moeda(previsao.recorrenciasRestantes)} em despesas recorrentes previstas.'
-                                : 'Sem despesas recorrentes pendentes para este mês.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    Text(
-                      'Categorias em risco',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s10),
-                    if (riscos.isEmpty)
-                      Text(
-                        'Sem risco de estouro nas categorias com orçamento.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    else
-                      Column(
-                        children: riscos.map((PrevisaoCategoriaRisco risco) {
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppSpacing.s10,
-                            ),
-                            child: _PrevisaoCategoriaRiscoItem(risco: risco),
-                          );
-                        }).toList(),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s14),
-            InsightsListCard(insights: insights),
-          ],
+                const SizedBox(height: AppSpacing.s14),
+                InsightsListCard(insights: insights),
+              ],
+            );
+          },
         );
       },
     );
@@ -952,6 +1025,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+
     const AppSemanticColors fallbackSemantic = AppSemanticColors(
       success: Color(0xFF0F9D7A),
       successContainer: Color(0xFFE5F6F2),
@@ -960,6 +1034,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       error: Color(0xFFD64545),
       errorContainer: Color(0xFFFDE8E8),
     );
+
     final AppSemanticColors semantic =
         theme.extension<AppSemanticColors>() ?? fallbackSemantic;
 
@@ -1297,6 +1372,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             resumo.categoriaMaisGasta?.valor ??
                                             0,
                                       );
+
                                       final Widget
                                       cardMenor = _InsightResumoCard(
                                         titulo: 'Menor participação',
@@ -1305,6 +1381,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             resumo.categoriaMenosGasta?.valor ??
                                             0,
                                       );
+
                                       final Widget cardAtivas =
                                           _InsightResumoCard(
                                             titulo: 'Categorias ativas',

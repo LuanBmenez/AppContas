@@ -47,20 +47,41 @@ class CancelamentoSection extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 4),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               ElevatedButton.icon(
-                icon: const Icon(Icons.cancel),
-                label: const Text('Ignorar ambos'),
+                icon: const Icon(Icons.cancel, size: 18),
+                label: const Text(
+                  'Ignorar ambos',
+                  style: TextStyle(fontSize: 13),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red[100],
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: () => onAcao(c, true),
               ),
-              const SizedBox(width: 8),
               OutlinedButton.icon(
-                icon: const Icon(Icons.link_off),
-                label: const Text('Manter separado'),
+                icon: const Icon(Icons.link_off, size: 18),
+                label: const Text(
+                  'Manter separado',
+                  style: TextStyle(fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: () => onAcao(c, false),
               ),
             ],

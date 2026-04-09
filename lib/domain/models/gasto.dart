@@ -13,6 +13,29 @@ enum CategoriaGasto {
   outros,
 }
 
+IconData _mapearIconeCategoria(int? codePoint) {
+  switch (codePoint) {
+    case 0xe88a:
+      return Icons.home_rounded;
+    case 0xe56c:
+      return Icons.restaurant_rounded;
+    case 0xe531:
+      return Icons.directions_car_rounded;
+    case 0xe57d:
+      return Icons.shopping_bag_rounded;
+    case 0xe227:
+      return Icons.attach_money_rounded;
+    case 0xe263:
+      return Icons.favorite_rounded;
+    case 0xe87d:
+      return Icons.person_rounded;
+    case 0xe8cc:
+      return Icons.credit_card_rounded;
+    default:
+      return Icons.category_rounded;
+  }
+}
+
 enum TipoGasto { fixo, variavel }
 
 enum OrigemGasto { manual, cartaoCredito }
@@ -280,10 +303,7 @@ class Gasto {
   IconData get categoriaIconeExibicao {
     if (usaCategoriaPersonalizada &&
         categoriaPersonalizadaIconeCodePoint != null) {
-      return IconData(
-        categoriaPersonalizadaIconeCodePoint!,
-        fontFamily: 'MaterialIcons',
-      );
+      return _mapearIconeCategoria(categoriaPersonalizadaIconeCodePoint);
     }
     return categoria.icon;
   }

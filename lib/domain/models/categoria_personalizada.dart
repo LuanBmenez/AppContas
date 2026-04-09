@@ -26,7 +26,7 @@ class CategoriaPersonalizada {
 
   Color get cor => Color(corValue);
 
-  IconData get icone => IconData(iconeCodePoint, fontFamily: 'MaterialIcons');
+  final icone = Icons.home_rounded;
 
   factory CategoriaPersonalizada.fromMap(Map<String, dynamic> map, String id) {
     return CategoriaPersonalizada(
