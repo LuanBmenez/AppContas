@@ -32,6 +32,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
   bool _selecionandoLote = false;
   bool _processandoLote = false;
   final Set<String> _idsSelecionados = <String>{};
+  DateTime _mesSelecionado = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
 
   static const AppSemanticColors _fallbackSemanticColors = AppSemanticColors(
     success: Color(0xFF0F9D7A),
@@ -41,6 +45,12 @@ class _AReceberScreenState extends State<AReceberScreen> {
     error: Color(0xFFD64545),
     errorContainer: Color(0xFFFDE8E8),
   );
+
+  DateTime get _inicioMes =>
+      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
+
+  DateTime get _fimMesExclusivo =>
+      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
 
   @override
   void initState() {
@@ -64,6 +74,128 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
   AppSemanticColors _semanticColors(ThemeData theme) {
     return theme.extension<AppSemanticColors>() ?? _fallbackSemanticColors;
+  }
+
+  DateTime _dataReferenciaConta(Conta conta) {
+    if (conta.foiPago) {
+      return conta.recebidaEm ?? conta.data;
+    }
+    return conta.data;
+  }
+
+  bool _estaNoMes(DateTime data) {
+    return !data.isBefore(_inicioMes) && data.isBefore(_fimMesExclusivo);
+  }
+
+  Future<void> _selecionarMes() async {
+    final DateTime hoje = DateTime.now();
+    int anoSelecionado = _mesSelecionado.year;
+    int mesSelecionado = _mesSelecionado.month;
+
+    final DateTime? selecionado = await showModalBottomSheet<DateTime>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s16,
+                AppSpacing.s8,
+                AppSpacing.s16,
+                AppSpacing.s16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Selecionar mês',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: mesSelecionado,
+                          decoration: const InputDecoration(labelText: 'Mês'),
+                          items: List<DropdownMenuItem<int>>.generate(12, (
+                            index,
+                          ) {
+                            final int month = index + 1;
+                            return DropdownMenuItem<int>(
+                              value: month,
+                              child: Text(AppFormatters.nomeMes(month)),
+                            );
+                          }),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setModalState(() => mesSelecionado = value);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.s12),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: anoSelecionado,
+                          decoration: const InputDecoration(labelText: 'Ano'),
+                          items: List<DropdownMenuItem<int>>.generate(81, (
+                            index,
+                          ) {
+                            final int year = 2020 + index;
+                            return DropdownMenuItem<int>(
+                              value: year,
+                              child: Text(year.toString()),
+                            );
+                          }),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setModalState(() => anoSelecionado = value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s16),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, null),
+                        child: const Text('Cancelar'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(
+                          context,
+                          DateTime(anoSelecionado, mesSelecionado),
+                        ),
+                        child: const Text('Aplicar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  TextButton.icon(
+                    onPressed: () =>
+                        Navigator.pop(context, DateTime(hoje.year, hoje.month)),
+                    icon: const Icon(Icons.today_outlined),
+                    label: const Text('Ir para mês atual'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selecionado != null) {
+      setState(() {
+        _mesSelecionado = DateTime(selecionado.year, selecionado.month);
+      });
+    }
   }
 
   void _setStatePreservandoScroll(VoidCallback fn) {
@@ -251,7 +383,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Organize entradas e acompanhe pagamentos.',
+            'Organize entradas e acompanhe pagamentos por mês.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -357,8 +489,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
   Widget _buildCardResumo({
     required ThemeData theme,
-    required double totalReceber,
-    required double totalPendente,
+    required double totalRecebidoMes,
+    required double totalPendenteMes,
     required double progresso,
   }) {
     final AppSemanticColors semantic = _semanticColors(theme);
@@ -414,7 +546,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
               const SizedBox(width: AppSpacing.s10),
               Expanded(
                 child: Text(
-                  'Resumo financeiro',
+                  'Resumo do mês',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -422,12 +554,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(
-                '${(progresso * 100).toStringAsFixed(0)}%',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: semantic.success,
-                  fontWeight: FontWeight.w800,
-                ),
+              TextButton.icon(
+                onPressed: _selecionarMes,
+                icon: const Icon(Icons.calendar_month, size: 18),
+                label: Text(AppFormatters.mesAno(_mesSelecionado)),
               ),
             ],
           ),
@@ -437,8 +567,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
               Expanded(
                 child: _buildResumoFinanceiroCard(
                   theme: theme,
-                  titulo: 'Recebido',
-                  valor: AppFormatters.moeda(totalReceber),
+                  titulo: 'Recebido no mês',
+                  valor: AppFormatters.moeda(totalRecebidoMes),
                   cor: semantic.success,
                   icon: Icons.check_circle_outline_rounded,
                 ),
@@ -447,8 +577,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
               Expanded(
                 child: _buildResumoFinanceiroCard(
                   theme: theme,
-                  titulo: 'Pendente',
-                  valor: AppFormatters.moeda(totalPendente),
+                  titulo: 'Pendente no mês',
+                  valor: AppFormatters.moeda(totalPendenteMes),
                   cor: semantic.error,
                   icon: Icons.pending_actions_outlined,
                 ),
@@ -465,14 +595,24 @@ class _AReceberScreenState extends State<AReceberScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(semantic.success),
             ),
           ),
-          if (widget.somentePendentes) ...[
-            const SizedBox(height: 8),
-            _buildResumoPill(
-              theme: theme,
-              icon: Icons.filter_alt_outlined,
-              label: 'Filtro ativo: somente pendentes',
-            ),
-          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildResumoPill(
+                theme: theme,
+                icon: Icons.calendar_today_outlined,
+                label: AppFormatters.mesAno(_mesSelecionado),
+              ),
+              if (widget.somentePendentes)
+                _buildResumoPill(
+                  theme: theme,
+                  icon: Icons.filter_alt_outlined,
+                  label: 'Somente pendentes',
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -638,6 +778,11 @@ class _AReceberScreenState extends State<AReceberScreen> {
     );
   }
 
+  String _dataContaLabel(Conta conta) {
+    final DateTime dataBase = _dataReferenciaConta(conta);
+    return AppFormatters.dataCurta(dataBase);
+  }
+
   Widget _buildContaTile({
     required ThemeData theme,
     required Conta conta,
@@ -719,14 +864,26 @@ class _AReceberScreenState extends State<AReceberScreen> {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            conta.descricao.isEmpty ? 'Sem descrição' : conta.descricao,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.25,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                conta.descricao.isEmpty ? 'Sem descrição' : conta.descricao,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _dataContaLabel(conta),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
         trailing: Column(
@@ -855,10 +1012,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
                   const SizedBox(width: 12),
                   _buildEmptyActionCard(
                     theme: theme,
-                    icon: Icons.person_search_outlined,
-                    title: 'Organizar',
-                    subtitle: 'Mantenha controle de quem te deve',
-                    onTap: () {},
+                    icon: Icons.calendar_month_outlined,
+                    title: 'Trocar mês',
+                    subtitle: 'Veja recebimentos e pendências de outro mês',
+                    onTap: _selecionarMes,
                   ),
                 ],
               ),
@@ -898,8 +1055,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
                     buscando
                         ? 'Nenhum devedor encontrado'
                         : (widget.somentePendentes
-                              ? 'Nenhuma conta pendente'
-                              : 'Nenhuma cobrança cadastrada'),
+                              ? 'Nenhuma conta pendente neste mês'
+                              : 'Nenhuma cobrança neste mês'),
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
@@ -909,7 +1066,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
                   Text(
                     buscando
                         ? 'Tente outro nome do devedor para encontrar a cobrança desejada.'
-                        : 'Cadastre uma nova cobrança para acompanhar quem ainda precisa te pagar.',
+                        : 'Altere o mês selecionado ou cadastre uma nova cobrança.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -964,9 +1121,13 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
         final List<Conta> todasAsContas = snapshot.data ?? <Conta>[];
 
+        final List<Conta> contasDoMes = todasAsContas.where((conta) {
+          return _estaNoMes(_dataReferenciaConta(conta));
+        }).toList();
+
         final List<Conta> listaContas = widget.somentePendentes
-            ? todasAsContas.where((conta) => !conta.foiPago).toList()
-            : todasAsContas;
+            ? contasDoMes.where((conta) => !conta.foiPago).toList()
+            : contasDoMes;
 
         final List<Conta> contasFiltradas = listaContas
             .where(_filtrarPorNome)
@@ -974,21 +1135,21 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
         final List<Conta> selecionados = _selecionadosDe(contasFiltradas);
 
-        double totalReceber = 0;
-        double totalPendente = 0;
+        double totalRecebidoMes = 0;
+        double totalPendenteMes = 0;
 
-        for (final conta in todasAsContas) {
+        for (final Conta conta in contasDoMes) {
           if (conta.foiPago) {
-            totalReceber += conta.valor;
+            totalRecebidoMes += conta.valor;
           } else {
-            totalPendente += conta.valor;
+            totalPendenteMes += conta.valor;
           }
         }
 
-        final double totalGeral = totalReceber + totalPendente;
-        final double progresso = totalGeral == 0
+        final double totalGeralMes = totalRecebidoMes + totalPendenteMes;
+        final double progresso = totalGeralMes == 0
             ? 0
-            : totalReceber / totalGeral;
+            : totalRecebidoMes / totalGeralMes;
         final bool buscando = _termoBusca.trim().isNotEmpty;
 
         return Container(
@@ -1001,8 +1162,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
                 if (!_selecionandoLote && !buscando)
                   _buildCardResumo(
                     theme: theme,
-                    totalReceber: totalReceber,
-                    totalPendente: totalPendente,
+                    totalRecebidoMes: totalRecebidoMes,
+                    totalPendenteMes: totalPendenteMes,
                     progresso: progresso,
                   ),
                 _buildBuscaField(theme),

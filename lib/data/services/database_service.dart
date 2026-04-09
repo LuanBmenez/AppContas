@@ -51,11 +51,14 @@ class DatabaseService implements FinanceRepository {
     final DocumentReference<Map<String, dynamic>> docRef = _receberCollection
         .doc();
     final DateTime agora = DateTime.now();
+    final DateTime? dataRecebimento =
+        conta.recebidaEm ?? (conta.foiPago ? agora : null);
+
     final Conta contaComId = conta.copyWith(
       id: docRef.id,
       data: conta.data,
       atualizadaEm: agora,
-      recebidaEm: conta.foiPago ? agora : conta.recebidaEm,
+      recebidaEm: dataRecebimento,
       historico: conta.historico.isEmpty
           ? <ContaHistoricoEvento>[
               ContaHistoricoEvento(
@@ -67,7 +70,7 @@ class DatabaseService implements FinanceRepository {
                 ContaHistoricoEvento(
                   tipo: ContaHistoricoTipo.recebida,
                   descricao: 'Cobrança marcada como recebida',
-                  data: agora,
+                  data: dataRecebimento ?? agora,
                 ),
             ]
           : conta.historico,
@@ -150,12 +153,22 @@ class DatabaseService implements FinanceRepository {
           ? Conta.fromMap(snapshot.data() ?? <String, dynamic>{}, conta.id)
           : conta;
       final DateTime agora = DateTime.now();
+      final DateTime? novaRecebidaEm = conta.recebidaEm ?? atual.recebidaEm;
+      final bool virouRecebidaAgora =
+          conta.foiPago == true &&
+          novaRecebidaEm != null &&
+          atual.recebidaEm != novaRecebidaEm;
+
       final List<ContaHistoricoEvento> historico = <ContaHistoricoEvento>[
         ...atual.historico,
         ContaHistoricoEvento(
-          tipo: ContaHistoricoTipo.atualizada,
-          descricao: 'Cobrança atualizada',
-          data: agora,
+          tipo: virouRecebidaAgora
+              ? ContaHistoricoTipo.recebida
+              : ContaHistoricoTipo.atualizada,
+          descricao: virouRecebidaAgora
+              ? 'Cobrança marcada como recebida'
+              : 'Cobrança atualizada',
+          data: virouRecebidaAgora ? novaRecebidaEm : agora,
         ),
       ];
 
@@ -165,7 +178,7 @@ class DatabaseService implements FinanceRepository {
             .copyWith(
               id: conta.id,
               data: atual.data,
-              recebidaEm: atual.recebidaEm,
+              recebidaEm: novaRecebidaEm,
               atualizadaEm: agora,
               historico: historico,
             )

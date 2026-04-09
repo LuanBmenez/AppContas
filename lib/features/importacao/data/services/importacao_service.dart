@@ -38,24 +38,43 @@ class ImportacaoService {
     );
   }
 
+  bool recebimentoJaImportado({
+    required List<Conta> contas,
+    required String referenciaImportacao,
+  }) {
+    final String marcador = _marcadorImportacao(referenciaImportacao);
+
+    return contas.any((conta) {
+      final bool naDescricao = conta.descricao.contains(marcador);
+      final bool noHistorico = conta.historico.any(
+        (evento) => evento.descricao.contains(marcador),
+      );
+      return naDescricao || noHistorico;
+    });
+  }
+
   Future<void> vincularRecebimentoImportado({
     required Conta conta,
     required String referencia,
+    required String referenciaImportacao,
     required DateTime dataRecebimento,
     required double valorRecebido,
   }) async {
+    if (_descricaoJaContemImportacao(conta.descricao, referenciaImportacao)) {
+      return;
+    }
+
     final String detalhe =
-        'Recebimento via importacao CSV em ${AppFormatters.dataCurta(dataRecebimento)} (${AppFormatters.moeda(valorRecebido)}).';
+        'Recebimento via importacao CSV em ${AppFormatters.dataCurta(dataRecebimento)} '
+        '(${AppFormatters.moeda(valorRecebido)}).';
 
     final String descricaoAtualizada = _anexarDetalhesNaDescricao(
       conta.descricao,
       detalhe,
       referencia,
+      referenciaImportacao,
     );
 
-    // CORREÇÃO: Fazemos uma única atualização no banco garantindo que o status
-    // de pagamento e a data de recebimento corretos sejam salvos,
-    // evitando sobrescrever o status acidentalmente.
     await _repository.atualizarRecebivel(
       conta.copyWith(
         descricao: descricaoAtualizada,
@@ -70,12 +89,24 @@ class ImportacaoService {
     required String descricao,
     required DateTime data,
     required double valor,
+    required String referenciaImportacao,
   }) {
+    final String detalhe =
+        'Recebimento via importacao CSV em ${AppFormatters.dataCurta(data)} '
+        '(${AppFormatters.moeda(valor)}).';
+
+    final String descricaoFinal = _anexarDetalhesNaDescricao(
+      descricao,
+      detalhe,
+      descricao,
+      referenciaImportacao,
+    );
+
     return _repository.adicionarRecebivel(
       Conta(
         id: '',
         nome: nome,
-        descricao: descricao,
+        descricao: descricaoFinal,
         valor: valor,
         data: data,
         foiPago: true,
@@ -84,14 +115,26 @@ class ImportacaoService {
     );
   }
 
+  bool _descricaoJaContemImportacao(
+    String descricaoAtual,
+    String referenciaImportacao,
+  ) {
+    return descricaoAtual.contains(_marcadorImportacao(referenciaImportacao));
+  }
+
+  String _marcadorImportacao(String referenciaImportacao) {
+    return '[Importacao CSV ID:$referenciaImportacao]';
+  }
+
   String _anexarDetalhesNaDescricao(
     String descricaoAtual,
     String detalhe,
     String referencia,
+    String referenciaImportacao,
   ) {
-    final String referenciaLimpa = referencia.trim();
     final String descricaoBase = descricaoAtual.trim();
-    final String marcador = '[Importacao CSV]';
+    final String referenciaLimpa = referencia.trim();
+    final String marcador = _marcadorImportacao(referenciaImportacao);
 
     if (descricaoBase.contains(marcador)) {
       return descricaoBase;
@@ -102,7 +145,8 @@ class ImportacaoService {
         : referenciaLimpa;
 
     final String bloco =
-        '$marcador $detalhe${referenciaCurta.isEmpty ? '' : ' Ref: $referenciaCurta'}';
+        '$marcador $detalhe'
+        '${referenciaCurta.isEmpty ? '' : ' Ref: $referenciaCurta'}';
 
     if (descricaoBase.isEmpty) {
       return bloco;

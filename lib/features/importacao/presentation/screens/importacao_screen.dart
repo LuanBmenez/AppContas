@@ -182,6 +182,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     required List<RecebimentoDetectado> recebimentos,
     required Map<String, List<SugestaoVinculoRecebimento>> sugestoesVinculo,
     required List<Conta> contasPendentes,
+    required List<Conta> todasAsContas,
   }) async {
     if (gastos.isEmpty && recebimentos.isEmpty) {
       AppFeedback.showError(context, 'Nenhum item válido para importar.');
@@ -201,12 +202,25 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       int vinculados = 0;
       int criados = 0;
       int ignorados = 0;
+      int duplicadosRecebimentos = 0;
 
       final Map<String, Conta> contasPorId = <String, Conta>{
         for (final Conta conta in contasPendentes) conta.id: conta,
       };
 
+      final List<Conta> contasConhecidas = List<Conta>.from(todasAsContas);
+
       for (final RecebimentoDetectado recebimento in recebimentos) {
+        final bool jaImportado = _importacaoService.recebimentoJaImportado(
+          contas: contasConhecidas,
+          referenciaImportacao: recebimento.referenciaImportacao,
+        );
+
+        if (jaImportado) {
+          duplicadosRecebimentos++;
+          continue;
+        }
+
         final List<SugestaoVinculoRecebimento> sugestoes =
             sugestoesVinculo[recebimento.id] ??
             const <SugestaoVinculoRecebimento>[];
@@ -242,9 +256,22 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
           await _importacaoService.vincularRecebimentoImportado(
             conta: contaSelecionada,
             referencia: recebimento.descricaoOriginal,
+            referenciaImportacao: recebimento.referenciaImportacao,
             dataRecebimento: recebimento.data,
             valorRecebido: recebimento.valor,
           );
+
+          contasConhecidas.removeWhere((c) => c.id == contaSelecionada.id);
+          contasConhecidas.add(
+            contaSelecionada.copyWith(
+              foiPago: true,
+              recebidaEm: recebimento.data,
+              descricao:
+                  '${contaSelecionada.descricao}\n'
+                  '[Importacao CSV ID:${recebimento.referenciaImportacao}]',
+            ),
+          );
+
           vinculados++;
           continue;
         }
@@ -254,7 +281,23 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
           descricao: 'Importado via CSV: ${recebimento.descricaoOriginal}',
           data: recebimento.data,
           valor: recebimento.valor,
+          referenciaImportacao: recebimento.referenciaImportacao,
         );
+
+        contasConhecidas.add(
+          Conta(
+            id: 'temp_${recebimento.referenciaImportacao}',
+            nome: recebimento.nomeExtraido ?? 'Recebimento importado',
+            descricao:
+                'Importado via CSV: ${recebimento.descricaoOriginal}\n'
+                '[Importacao CSV ID:${recebimento.referenciaImportacao}]',
+            valor: recebimento.valor,
+            data: recebimento.data,
+            foiPago: true,
+            recebidaEm: recebimento.data,
+          ),
+        );
+
         criados++;
       }
 
@@ -267,7 +310,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         context,
         'Importação concluída: '
         '$importados gastos novos, '
-        '$duplicados duplicados ignorados, '
+        '$duplicados gastos duplicados ignorados, '
+        '$duplicadosRecebimentos recebimentos duplicados ignorados, '
         '$vinculados recebimentos vinculados, '
         '$criados recebimentos avulsos, '
         '$ignorados recebimentos ignorados.',
@@ -338,10 +382,11 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
               return StreamBuilder<List<Conta>>(
                 stream: _importacaoService.contasAReceber,
                 builder: (context, contasSnapshot) {
-                  final List<Conta> contasPendentes =
-                      (contasSnapshot.data ?? <Conta>[])
-                          .where((conta) => !conta.foiPago)
-                          .toList();
+                  final List<Conta> todasAsContas =
+                      contasSnapshot.data ?? <Conta>[];
+                  final List<Conta> contasPendentes = todasAsContas
+                      .where((conta) => !conta.foiPago)
+                      .toList();
 
                   final Map<String, List<SugestaoVinculoRecebimento>>
                   sugestoesVinculo = _extratoService
@@ -443,6 +488,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                             ),
                             sugestoesVinculo: sugestoesVinculo,
                             contasPendentes: contasPendentes,
+                            todasAsContas: todasAsContas,
                           ),
                           itensPreview: preview.gastos
                               .take(8)
