@@ -65,14 +65,21 @@ class AppTheme {
   static const double radiusMd = 14;
   static const double radiusLg = 20;
 
-  static ThemeData get light {
+  static ThemeData get light => _build(Brightness.light);
+  static ThemeData get dark => _build(Brightness.dark);
+
+  static ThemeData _build(Brightness brightness) {
+    final bool isDark = brightness == Brightness.dark;
+
     final ColorScheme colorScheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFF0F766E),
-      brightness: Brightness.light,
+      brightness: brightness,
     );
+
     final TextTheme baseTextTheme = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      brightness: brightness,
     ).textTheme;
 
     final TextTheme textTheme = baseTextTheme.copyWith(
@@ -104,21 +111,30 @@ class AppTheme {
       ),
     );
 
-    const AppSemanticColors semanticColors = AppSemanticColors(
-      success: Color(0xFF0F9D7A),
-      successContainer: Color(0xFFE5F6F2),
-      warning: Color(0xFFC26A00),
-      warningContainer: Color(0xFFFFEED9),
-      error: Color(0xFFD64545),
-      errorContainer: Color(0xFFFDE8E8),
+    final AppSemanticColors semanticColors = AppSemanticColors(
+      success: isDark ? const Color(0xFF4ADE80) : const Color(0xFF0F9D7A),
+      successContainer: isDark
+          ? const Color(0xFF123524)
+          : const Color(0xFFE5F6F2),
+      warning: isDark ? const Color(0xFFFBBF24) : const Color(0xFFC26A00),
+      warningContainer: isDark
+          ? const Color(0xFF3D2D12)
+          : const Color(0xFFFFEED9),
+      error: isDark ? const Color(0xFFF87171) : const Color(0xFFD64545),
+      errorContainer: isDark
+          ? const Color(0xFF3C1717)
+          : const Color(0xFFFDE8E8),
     );
 
     return ThemeData(
       useMaterial3: true,
+      brightness: brightness,
       colorScheme: colorScheme,
       textTheme: textTheme,
-      scaffoldBackgroundColor: const Color(0xFFF7FAFC),
-      extensions: const <ThemeExtension<dynamic>>[semanticColors],
+      scaffoldBackgroundColor: isDark
+          ? colorScheme.surface
+          : const Color(0xFFF7FAFC),
+      extensions: <ThemeExtension<dynamic>>[semanticColors],
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -144,9 +160,27 @@ class AppTheme {
           borderRadius: BorderRadius.circular(radiusMd),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: BorderSide(color: colorScheme.primary),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusMd),
           ),
