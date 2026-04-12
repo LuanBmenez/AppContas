@@ -49,6 +49,58 @@ extension GuardadoDestinoX on GuardadoDestino {
   }
 }
 
+enum GuardadoTipoMovimentacao {
+  aporte,
+  resgate,
+}
+
+extension GuardadoTipoMovimentacaoX on GuardadoTipoMovimentacao {
+  String get label {
+    switch (this) {
+      case GuardadoTipoMovimentacao.aporte:
+        return 'Aporte';
+      case GuardadoTipoMovimentacao.resgate:
+        return 'Resgate';
+    }
+  }
+
+  String get acaoLabel {
+    switch (this) {
+      case GuardadoTipoMovimentacao.aporte:
+        return 'Guardar';
+      case GuardadoTipoMovimentacao.resgate:
+        return 'Resgatar';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case GuardadoTipoMovimentacao.aporte:
+        return Icons.arrow_downward_rounded;
+      case GuardadoTipoMovimentacao.resgate:
+        return Icons.arrow_upward_rounded;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case GuardadoTipoMovimentacao.aporte:
+        return const Color(0xFF0F9D7A);
+      case GuardadoTipoMovimentacao.resgate:
+        return const Color(0xFFC26A00);
+    }
+  }
+
+  int get fator {
+    switch (this) {
+      case GuardadoTipoMovimentacao.aporte:
+        return 1;
+      case GuardadoTipoMovimentacao.resgate:
+        return -1;
+    }
+  }
+}
+
 class Guardado {
   const Guardado({
     required this.id,
@@ -56,6 +108,8 @@ class Guardado {
     required this.data,
     required this.competencia,
     required this.destino,
+    this.tipoMovimentacao = GuardadoTipoMovimentacao.aporte,
+    this.metaNome,
     this.observacao,
   });
 
@@ -64,7 +118,11 @@ class Guardado {
   final DateTime data;
   final String competencia;
   final GuardadoDestino destino;
+  final GuardadoTipoMovimentacao tipoMovimentacao;
+  final String? metaNome;
   final String? observacao;
+
+  double get valorAssinado => valor * tipoMovimentacao.fator;
 
   Guardado copyWith({
     String? id,
@@ -72,6 +130,8 @@ class Guardado {
     DateTime? data,
     String? competencia,
     GuardadoDestino? destino,
+    GuardadoTipoMovimentacao? tipoMovimentacao,
+    String? metaNome,
     String? observacao,
   }) {
     return Guardado(
@@ -80,6 +140,8 @@ class Guardado {
       data: data ?? this.data,
       competencia: competencia ?? this.competencia,
       destino: destino ?? this.destino,
+      tipoMovimentacao: tipoMovimentacao ?? this.tipoMovimentacao,
+      metaNome: metaNome ?? this.metaNome,
       observacao: observacao ?? this.observacao,
     );
   }
@@ -90,12 +152,15 @@ class Guardado {
 
   Map<String, dynamic> toMap() {
     final String? obs = observacao?.trim();
+    final String? meta = metaNome?.trim();
 
     return <String, dynamic>{
       'valor': valor,
       'data': Timestamp.fromDate(data),
       'competencia': competencia,
       'destino': destino.name,
+      'tipoMovimentacao': tipoMovimentacao.name,
+      'metaNome': (meta == null || meta.isEmpty) ? null : meta,
       'observacao': (obs == null || obs.isEmpty) ? null : obs,
     };
   }
@@ -116,13 +181,22 @@ class Guardado {
 
     final String destinoRaw =
         (map['destino'] as String?) ?? GuardadoDestino.semDestino.name;
-
     final GuardadoDestino destino = GuardadoDestino.values.firstWhere(
       (item) => item.name == destinoRaw,
       orElse: () => GuardadoDestino.semDestino,
     );
 
+    final String tipoRaw =
+        (map['tipoMovimentacao'] as String?) ??
+        GuardadoTipoMovimentacao.aporte.name;
+    final GuardadoTipoMovimentacao tipoMovimentacao =
+        GuardadoTipoMovimentacao.values.firstWhere(
+          (item) => item.name == tipoRaw,
+          orElse: () => GuardadoTipoMovimentacao.aporte,
+        );
+
     final String? observacao = (map['observacao'] as String?)?.trim();
+    final String? metaNome = (map['metaNome'] as String?)?.trim();
 
     return Guardado(
       id: id,
@@ -133,6 +207,8 @@ class Guardado {
               ? (map['competencia'] as String).trim()
               : competenciaFromDate(data),
       destino: destino,
+      tipoMovimentacao: tipoMovimentacao,
+      metaNome: (metaNome == null || metaNome.isEmpty) ? null : metaNome,
       observacao:
           (observacao == null || observacao.isEmpty) ? null : observacao,
     );

@@ -92,10 +92,24 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     return total;
   }
 
-  double _somarGuardados(Iterable<Guardado> itens) {
+  double _somarValores(
+    Iterable<Guardado> itens, {
+    GuardadoTipoMovimentacao? somenteTipo,
+  }) {
     double total = 0;
     for (final Guardado item in itens) {
+      if (somenteTipo != null && item.tipoMovimentacao != somenteTipo) {
+        continue;
+      }
       total += item.valor;
+    }
+    return total;
+  }
+
+  double _somarLiquido(Iterable<Guardado> itens) {
+    double total = 0;
+    for (final Guardado item in itens) {
+      total += item.valorAssinado;
     }
     return total;
   }
@@ -106,10 +120,39 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     };
 
     for (final Guardado item in itens) {
-      totais[item.destino] = (totais[item.destino] ?? 0) + item.valor;
+      totais[item.destino] = (totais[item.destino] ?? 0) + item.valorAssinado;
     }
 
     return totais;
+  }
+
+  Map<String, double> _agruparPorMeta(Iterable<Guardado> itens) {
+    final Map<String, double> totais = <String, double>{};
+
+    for (final Guardado item in itens) {
+      final String meta = item.metaNome?.trim() ?? '';
+      if (meta.isEmpty) {
+        continue;
+      }
+      totais[meta] = (totais[meta] ?? 0) + item.valorAssinado;
+    }
+
+    final List<MapEntry<String, double>> entradas = totais.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Map<String, double>.fromEntries(entradas);
+  }
+
+  List<String> _metasExistentes(List<Guardado> guardados) {
+    final Set<String> metas = <String>{};
+    for (final Guardado item in guardados) {
+      final String meta = item.metaNome?.trim() ?? '';
+      if (meta.isNotEmpty) {
+        metas.add(meta);
+      }
+    }
+    final List<String> lista = metas.toList()..sort();
+    return lista;
   }
 
   String _formatarMes(DateTime data) {
@@ -131,17 +174,82 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     return double.tryParse(normalizado);
   }
 
-  Future<void> _abrirNovoGuardado(double disponivelMes) async {
+  String _valorFormatadoComSinal(Guardado item) {
+    final String sinal =
+        item.tipoMovimentacao == GuardadoTipoMovimentacao.aporte ? '+' : '-';
+    return '$sinal ${AppFormatters.moeda(item.valor)}';
+  }
+
+  String _metaLabel(String? metaNome) {
+    final String meta = metaNome?.trim() ?? '';
+    return meta.isEmpty ? 'Sem meta' : meta;
+  }
+
+  Future<void> _selecionarDataMovimentacao({
+    required DateTime dataAtual,
+    required ValueChanged<DateTime> onSelecionada,
+  }) async {
+    final DateTime? novaData = await showDatePicker(
+      context: context,
+      initialDate: dataAtual,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'Escolha a data da movimentação',
+    );
+
+    if (novaData != null) {
+      onSelecionada(novaData);
+    }
+  }
+
+  Future<void> _abrirFormularioGuardado({
+    Guardado? existente,
+    required GuardadoTipoMovimentacao tipoInicial,
+    required double saldoMes,
+    required double totalAportesMes,
+    required double saldoGuardadoTotal,
+    required List<String> metasExistentes,
+  }) async {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     final TextEditingController valorController = TextEditingController(
-      text: disponivelMes > 0
-          ? disponivelMes.toStringAsFixed(2).replaceAll('.', ',')
+      text: existente != null
+          ? existente.valor.toStringAsFixed(2).replaceAll('.', ',')
           : '',
     );
-    final TextEditingController observacaoController = TextEditingController();
+    final TextEditingController observacaoController = TextEditingController(
+      text: existente?.observacao ?? '',
+    );
+    final TextEditingController metaController = TextEditingController(
+      text: existente?.metaNome ?? '',
+    );
 
-    GuardadoDestino destinoSelecionado = GuardadoDestino.semDestino;
+    GuardadoDestino destinoSelecionado =
+        existente?.destino ?? GuardadoDestino.semDestino;
+    GuardadoTipoMovimentacao tipoSelecionado =
+        existente?.tipoMovimentacao ?? tipoInicial;
+    DateTime dataSelecionada =
+        existente?.data ??
+        DateTime(
+          _mesSelecionado.year,
+          _mesSelecionado.month,
+          DateTime.now().year == _mesSelecionado.year &&
+                  DateTime.now().month == _mesSelecionado.month
+              ? DateTime.now().day
+              : 1,
+        );
     bool salvando = false;
+
+    final double saldoGuardadoSemAtual =
+        saldoGuardadoTotal - (existente?.valorAssinado ?? 0);
+    final double saldoResgateDisponivel = math.max(0, saldoGuardadoSemAtual);
+    final double aporteDisponivel = math.max(
+      0,
+      saldoMes -
+          (totalAportesMes -
+              ((existente?.tipoMovimentacao == GuardadoTipoMovimentacao.aporte)
+                  ? (existente?.valor ?? 0)
+                  : 0)),
+    );
 
     await showModalBottomSheet<void>(
       context: context,
@@ -149,8 +257,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
       showDragHandle: true,
       builder: (modalContext) {
         return StatefulBuilder(
-          builder: (builderContext, setModalState) {
-            // <-- Renomeado para builderContext
+          builder: (context, setModalState) {
             Future<void> salvar() async {
               if (!formKey.currentState!.validate()) {
                 return;
@@ -161,54 +268,70 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                 return;
               }
 
+              if (tipoSelecionado == GuardadoTipoMovimentacao.resgate &&
+                  valor > saldoResgateDisponivel + 0.001) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'O resgate não pode ser maior que o saldo guardado disponível.',
+                    ),
+                  ),
+                );
+                return;
+              }
+
               setModalState(() => salvando = true);
 
               try {
-                final DateTime agora = DateTime.now();
-                final int dia =
-                    (agora.year == _mesSelecionado.year &&
-                        agora.month == _mesSelecionado.month)
-                    ? agora.day
-                    : 1;
-
-                final Guardado novoItem = Guardado(
-                  id: '',
+                final Guardado item = Guardado(
+                  id: existente?.id ?? '',
                   valor: valor,
-                  data: DateTime(
-                    _mesSelecionado.year,
-                    _mesSelecionado.month,
-                    dia,
-                  ),
-                  competencia: _competenciaSelecionada,
+                  data: dataSelecionada,
+                  competencia: Guardado.competenciaFromDate(dataSelecionada),
                   destino: destinoSelecionado,
+                  tipoMovimentacao: tipoSelecionado,
+                  metaNome: metaController.text.trim().isEmpty
+                      ? null
+                      : metaController.text.trim(),
                   observacao: observacaoController.text.trim().isEmpty
                       ? null
                       : observacaoController.text.trim(),
                 );
 
-                await _guardadoService.salvarGuardado(novoItem);
+                if (existente == null) {
+                  await _guardadoService.salvarGuardado(item);
+                } else {
+                  await _guardadoService.atualizarGuardado(item);
+                }
 
-                // 1. Verifica o contexto do modal antes de fechar
-                if (!modalContext.mounted) return;
-                Navigator.of(modalContext).pop();
-
-                // 2. Verifica o contexto da tela principal antes do SnackBar
                 if (!mounted) return;
+                Navigator.of(modalContext).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Valor guardado com sucesso.')),
+                  SnackBar(
+                    content: Text(
+                      existente == null
+                          ? 'Movimentação salva com sucesso.'
+                          : 'Movimentação atualizada com sucesso.',
+                    ),
+                  ),
                 );
               } catch (_) {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Erro ao salvar guardado.')),
+                  const SnackBar(content: Text('Erro ao salvar movimentação.')),
                 );
               } finally {
-                // 3. Verifica o contexto do construtor interno antes de mudar o estado
-                if (builderContext.mounted) {
+                if (mounted) {
                   setModalState(() => salvando = false);
                 }
               }
             }
+
+            final ThemeData theme = Theme.of(context);
+            final String ajudaTipo =
+                tipoSelecionado == GuardadoTipoMovimentacao.aporte
+                ? 'Disponível para guardar neste mês: ${AppFormatters.moeda(aporteDisponivel)}'
+                : 'Saldo total disponível para resgate: ${AppFormatters.moeda(saldoResgateDisponivel)}';
 
             return Padding(
               padding: EdgeInsets.fromLTRB(
@@ -222,65 +345,194 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Guardar valor',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Escolha para onde foi a sobra deste mês.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: valorController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                  children: [
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              existente == null
+                                  ? 'Nova movimentação'
+                                  : 'Editar movimentação',
+                              style: theme.textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Guarde, resgate e vincule a uma meta escolhida por você.',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: GuardadoTipoMovimentacao.values.map((
+                                tipo,
+                              ) {
+                                return ChoiceChip(
+                                  label: Text(tipo.label),
+                                  selected: tipoSelecionado == tipo,
+                                  avatar: Icon(
+                                    tipo.icon,
+                                    size: 18,
+                                    color: tipo.color,
+                                  ),
+                                  onSelected: (_) {
+                                    setModalState(() => tipoSelecionado = tipo);
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              ajudaTipo,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: valorController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'Valor',
+                                border: OutlineInputBorder(),
+                                hintText: 'Ex: 250,00',
+                              ),
+                              validator: (value) {
+                                final double? valor = _parseValor(value ?? '');
+                                if (valor == null || valor <= 0) {
+                                  return 'Informe um valor válido';
+                                }
+                                if (tipoSelecionado ==
+                                        GuardadoTipoMovimentacao.resgate &&
+                                    valor > saldoResgateDisponivel + 0.001) {
+                                  return 'Resgate maior que o saldo guardado disponível';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<GuardadoDestino>(
+                              initialValue: destinoSelecionado,
+                              decoration: const InputDecoration(
+                                labelText: 'Destino',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: GuardadoDestino.values.map((destino) {
+                                return DropdownMenuItem<GuardadoDestino>(
+                                  value: destino,
+                                  child: Text(destino.label),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setModalState(
+                                    () => destinoSelecionado = value,
+                                  );
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () => _selecionarDataMovimentacao(
+                                dataAtual: dataSelecionada,
+                                onSelecionada: (novaData) {
+                                  setModalState(
+                                    () => dataSelecionada = novaData,
+                                  );
+                                },
+                              ),
+                              child: Ink(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: theme.colorScheme.outline.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  children: <Widget>[
+                                    const Icon(
+                                      Icons.calendar_today_outlined,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            'Mês de referência',
+                                            style: theme.textTheme.labelMedium,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            AppFormatters.dataCurta(
+                                              dataSelecionada,
+                                            ),
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: metaController,
+                              textCapitalization: TextCapitalization.sentences,
+                              decoration: const InputDecoration(
+                                labelText: 'Meta',
+                                border: OutlineInputBorder(),
+                                hintText: 'Ex: reserva de emergência',
+                              ),
+                            ),
+                            if (metasExistentes.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: metasExistentes.map((meta) {
+                                  return ActionChip(
+                                    label: Text(meta),
+                                    onPressed: () {
+                                      setModalState(
+                                        () => metaController.text = meta,
+                                      );
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: observacaoController,
+                              maxLines: 2,
+                              decoration: const InputDecoration(
+                                labelText: 'Observação',
+                                border: OutlineInputBorder(),
+                                hintText: 'Opcional',
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
                       ),
-                      decoration: const InputDecoration(
-                        labelText: 'Valor',
-                        border: OutlineInputBorder(),
-                        hintText: 'Ex: 250,00',
-                      ),
-                      validator: (value) {
-                        final double? valor = _parseValor(value ?? '');
-                        if (valor == null || valor <= 0) {
-                          return 'Informe um valor válido';
-                        }
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<GuardadoDestino>(
-                      initialValue: destinoSelecionado,
-                      decoration: const InputDecoration(
-                        labelText: 'Destino',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: GuardadoDestino.values.map((destino) {
-                        return DropdownMenuItem<GuardadoDestino>(
-                          value: destino,
-                          child: Text(destino.label),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setModalState(() => destinoSelecionado = value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: observacaoController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Observação',
-                        border: OutlineInputBorder(),
-                        hintText: 'Opcional',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
@@ -300,6 +552,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
     valorController.dispose();
     observacaoController.dispose();
+    metaController.dispose();
   }
 
   Future<void> _excluirItem(Guardado item) async {
@@ -434,6 +687,51 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     );
   }
 
+  Widget _buildMetaResumoCard(ThemeData theme, String meta, double valor) {
+    final bool positivo = valor >= 0;
+    final Color color = positivo
+        ? const Color(0xFF2563EB)
+        : const Color(0xFFC26A00);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.flag_outlined, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              meta,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Text(
+            AppFormatters.moeda(valor),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
@@ -450,6 +748,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
           builder: (context, guardadosSnapshot) {
             final List<Guardado> guardados =
                 guardadosSnapshot.data ?? <Guardado>[];
+            final List<String> metasExistentes = _metasExistentes(guardados);
 
             final double totalRecebidoMes = _somarRecebidoMes(
               dashboardResumo.contas,
@@ -463,14 +762,25 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                 .where((item) => item.competencia == _competenciaSelecionada)
                 .toList();
 
-            final double totalGuardadoMes = _somarGuardados(guardadosMes);
+            final double totalAportesMes = _somarValores(
+              guardadosMes,
+              somenteTipo: GuardadoTipoMovimentacao.aporte,
+            );
+            final double totalResgatesMes = _somarValores(
+              guardadosMes,
+              somenteTipo: GuardadoTipoMovimentacao.resgate,
+            );
+            final double saldoLiquidoMes = _somarLiquido(guardadosMes);
+            final double saldoGuardadoTotal = _somarLiquido(guardados);
             final double disponivelParaGuardar = math.max(
               0,
-              saldoMes - totalGuardadoMes,
+              saldoMes - totalAportesMes,
             );
-
             final Map<GuardadoDestino, double> totaisPorDestino =
-                _agruparPorDestino(guardadosMes);
+                _agruparPorDestino(guardados);
+            final Map<String, double> totaisPorMeta = _agruparPorMeta(
+              guardados,
+            );
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -484,7 +794,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Organize a sobra do mês e escolha o destino: caixinha, investimentos ou saldo livre.',
+                  'Organize aportes, resgates e metas do dinheiro que você separou.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -525,53 +835,138 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _abrirFormularioGuardado(
+                          tipoInicial: GuardadoTipoMovimentacao.aporte,
+                          saldoMes: saldoMes,
+                          totalAportesMes: totalAportesMes,
+                          saldoGuardadoTotal: saldoGuardadoTotal,
+                          metasExistentes: metasExistentes,
+                        ),
+                        icon: const Icon(Icons.arrow_downward_rounded),
+                        label: const Text('Guardar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: saldoGuardadoTotal <= 0
+                            ? null
+                            : () => _abrirFormularioGuardado(
+                                tipoInicial: GuardadoTipoMovimentacao.resgate,
+                                saldoMes: saldoMes,
+                                totalAportesMes: totalAportesMes,
+                                saldoGuardadoTotal: saldoGuardadoTotal,
+                                metasExistentes: metasExistentes,
+                              ),
+                        icon: const Icon(Icons.arrow_upward_rounded),
+                        label: const Text('Resgatar'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 _buildResumoCard(
                   theme: theme,
                   titulo: 'Disponível para guardar',
                   valor: AppFormatters.moeda(disponivelParaGuardar),
-                  descricao: 'Saldo do mês menos o que já foi destinado.',
+                  descricao:
+                      'Saldo do mês menos os aportes já feitos neste mês.',
                   icon: Icons.savings_outlined,
                   color: const Color(0xFF0F9D7A),
-                  onTap: () => _abrirNovoGuardado(disponivelParaGuardar),
+                  onTap: () => _abrirFormularioGuardado(
+                    tipoInicial: GuardadoTipoMovimentacao.aporte,
+                    saldoMes: saldoMes,
+                    totalAportesMes: totalAportesMes,
+                    saldoGuardadoTotal: saldoGuardadoTotal,
+                    metasExistentes: metasExistentes,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildResumoCard(
                   theme: theme,
-                  titulo: 'Saldo do mês',
-                  valor: AppFormatters.moeda(saldoMes),
-                  descricao: 'Recebido - gastos no mês selecionado.',
-                  icon: Icons.account_balance_wallet_outlined,
-                  color: saldoMes >= 0
-                      ? const Color(0xFF2563EB)
-                      : const Color(0xFFD64545),
+                  titulo: 'Já guardado no mês',
+                  valor: AppFormatters.moeda(totalAportesMes),
+                  descricao: 'Total que você aportou no mês selecionado.',
+                  icon: Icons.arrow_downward_rounded,
+                  color: const Color(0xFF2563EB),
                 ),
                 const SizedBox(height: 12),
                 _buildResumoCard(
                   theme: theme,
-                  titulo: 'Já destinado no mês',
-                  valor: AppFormatters.moeda(totalGuardadoMes),
+                  titulo: 'Resgatado no mês',
+                  valor: AppFormatters.moeda(totalResgatesMes),
                   descricao:
-                      'Quanto da sobra já foi enviado para algum destino.',
-                  icon: Icons.call_split_outlined,
+                      'Quanto voltou do guardado para uso livre neste mês.',
+                  icon: Icons.arrow_upward_rounded,
+                  color: const Color(0xFFC26A00),
+                ),
+                const SizedBox(height: 12),
+                _buildResumoCard(
+                  theme: theme,
+                  titulo: 'Saldo guardado total',
+                  valor: AppFormatters.moeda(saldoGuardadoTotal),
+                  descricao: 'Saldo acumulado considerando aportes e resgates.',
+                  icon: Icons.account_balance_wallet_outlined,
                   color: const Color(0xFF7C3AED),
                 ),
+                const SizedBox(height: 12),
+                _buildResumoCard(
+                  theme: theme,
+                  titulo: 'Saldo líquido do mês',
+                  valor: AppFormatters.moeda(saldoLiquidoMes),
+                  descricao: 'Aportes menos resgates no mês selecionado.',
+                  icon: Icons.swap_horiz_rounded,
+                  color: saldoLiquidoMes >= 0
+                      ? const Color(0xFF0F9D7A)
+                      : const Color(0xFFD64545),
+                ),
                 const SizedBox(height: 20),
-                Row(
-                  children: <Widget>[
-                    Text(
-                      'Destinos',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                Text(
+                  'Metas',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (totaisPorMeta.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.32),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withValues(
+                          alpha: 0.08,
+                        ),
                       ),
                     ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () =>
-                          _abrirNovoGuardado(disponivelParaGuardar),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Adicionar'),
+                    child: Text(
+                      'Você ainda não vinculou nenhuma meta. Ao criar uma movimentação, informe a meta que quiser.',
+                      style: theme.textTheme.bodyMedium,
                     ),
-                  ],
+                  )
+                else
+                  ...totaisPorMeta.entries.take(6).map((entry) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildMetaResumoCard(
+                        theme,
+                        entry.key,
+                        entry.value,
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 20),
+                Text(
+                  'Destinos',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 ...GuardadoDestino.values.map((destino) {
@@ -606,12 +1001,22 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                       ),
                     ),
                     child: Text(
-                      'Nenhum valor guardado neste mês ainda.',
+                      'Nenhuma movimentação neste mês ainda.',
                       style: theme.textTheme.bodyMedium,
                     ),
                   )
                 else
                   ...guardadosMes.map((item) {
+                    final Color tipoColor = item.tipoMovimentacao.color;
+                    final List<String> partes = <String>[
+                      item.tipoMovimentacao.label,
+                      item.destino.label,
+                      _metaLabel(item.metaNome),
+                    ];
+                    if (item.observacao?.isNotEmpty == true) {
+                      partes.add(item.observacao!);
+                    }
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
@@ -625,36 +1030,58 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                       ),
                       child: ListTile(
                         leading: Container(
-                          width: 40,
-                          height: 40,
+                          width: 42,
+                          height: 42,
                           decoration: BoxDecoration(
-                            color: item.destino.color.withValues(alpha: 0.12),
+                            color: tipoColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
-                            item.destino.icon,
-                            color: item.destino.color,
+                            item.tipoMovimentacao.icon,
+                            color: tipoColor,
                           ),
                         ),
                         title: Text(
-                          item.destino.label,
+                          _metaLabel(item.metaNome),
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        subtitle: Text(
-                          item.observacao?.isNotEmpty == true
-                              ? item.observacao!
-                              : 'Sem observação',
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            const SizedBox(height: 4),
+                            Text(partes.join(' • ')),
+                            const SizedBox(height: 4),
+                            Text(
+                              AppFormatters.dataCurta(item.data),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {
-                            if (value == 'excluir') {
+                            if (value == 'editar') {
+                              _abrirFormularioGuardado(
+                                existente: item,
+                                tipoInicial: item.tipoMovimentacao,
+                                saldoMes: saldoMes,
+                                totalAportesMes: totalAportesMes,
+                                saldoGuardadoTotal: saldoGuardadoTotal,
+                                metasExistentes: metasExistentes,
+                              );
+                            } else if (value == 'excluir') {
                               _excluirItem(item);
                             }
                           },
                           itemBuilder: (context) =>
                               const <PopupMenuEntry<String>>[
+                                PopupMenuItem<String>(
+                                  value: 'editar',
+                                  child: Text('Editar'),
+                                ),
                                 PopupMenuItem<String>(
                                   value: 'excluir',
                                   child: Text('Excluir'),
@@ -665,16 +1092,10 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: <Widget>[
                               Text(
-                                AppFormatters.moeda(item.valor),
+                                _valorFormatadoComSinal(item),
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                AppFormatters.dataCurta(item.data),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: tipoColor,
                                 ),
                               ),
                             ],

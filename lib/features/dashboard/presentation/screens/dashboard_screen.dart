@@ -765,13 +765,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  DateTime _mesReferenciaGuardadoCard(DateTime agora) {
+    if (_mesEspecifico != null) {
+      return DateTime(_mesEspecifico!.year, _mesEspecifico!.month, 1);
+    }
+    return DateTime(agora.year, agora.month, 1);
+  }
+
+  double _calcularJaGuardadoNoMes(
+    List<Guardado> guardados,
+    DateTime referenciaMes,
+  ) {
+    final String competencia = Guardado.competenciaFromDate(referenciaMes);
+    double total = 0;
+
+    for (final Guardado item in guardados) {
+      if (item.competencia != competencia) {
+        continue;
+      }
+      if (item.tipoMovimentacao != GuardadoTipoMovimentacao.aporte) {
+        continue;
+      }
+      total += item.valor;
+    }
+
+    return total;
+  }
 
   Widget _buildSobraGuardadoCard(
     ThemeData theme,
-    DashboardResumoCalculado resumo,
-  ) {
+    DashboardResumoCalculado resumo, {
+    required double jaGuardadoMes,
+    required DateTime referenciaMes,
+  }) {
     final bool temSobra = resumo.saldo > 0;
     final double valorGuardavel = temSobra ? resumo.saldo : 0;
+    final String nomeMes = AppFormatters.nomeMes(referenciaMes.month);
 
     return _DashboardEntry(
       delayMs: 20,
@@ -832,9 +861,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: AppSpacing.s4),
                       Text(
+                        'Já guardado em $nomeMes: ${AppFormatters.moeda(jaGuardadoMes)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
                         temSobra
-                            ? 'Toque para escolher o destino: caixinha, investimentos ou saldo livre.'
-                            : 'Sem sobra neste período. Abra Guardado para organizar valores já separados.',
+                            ? 'Toque para escolher o destino, editar movimentações e acompanhar metas.'
+                            : 'Abra Guardado para ver metas, resgates e valores já separados.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           height: 1.3,
@@ -1234,7 +1271,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const SizedBox(height: 18),
                         _buildHeroSaldoCard(theme, resumo),
                         const SizedBox(height: 12),
-                        _buildSobraGuardadoCard(theme, resumo),
+                        StreamBuilder<List<Guardado>>(
+                          stream: widget.db.guardados,
+                          builder: (context, guardadosSnapshot) {
+                            final List<Guardado> guardados =
+                                guardadosSnapshot.data ?? <Guardado>[];
+                            final DateTime referenciaGuardado =
+                                _mesReferenciaGuardadoCard(agora);
+                            final double jaGuardadoMes =
+                                _calcularJaGuardadoNoMes(
+                                  guardados,
+                                  referenciaGuardado,
+                                );
+
+                            return _buildSobraGuardadoCard(
+                              theme,
+                              resumo,
+                              jaGuardadoMes: jaGuardadoMes,
+                              referenciaMes: referenciaGuardado,
+                            );
+                          },
+                        ),
                         const SizedBox(height: 16),
                         _DashboardEntry(
                           delayMs: 30,
