@@ -7,6 +7,7 @@ class AppRoutes {
   static const String inicioPath = '/inicio';
   static const String gastosPath = '/despesas';
   static const String receberPath = '/receber';
+  static const String guardadoPath = '/guardado';
   static const String perfilPath = '/perfil';
   static const String novoGastoPath = '/despesas/novo';
   static const String orcamentosPath = '/despesas/orcamentos';
@@ -23,6 +24,7 @@ class AppRoutes {
   static const String inicioName = 'inicio';
   static const String gastosName = 'gastos';
   static const String receberName = 'receber';
+  static const String guardadoName = 'guardado';
   static const String perfilName = 'perfil';
   static const String novoGastoName = 'gastos-novo';
   static const String orcamentosName = 'gastos-orcamentos';

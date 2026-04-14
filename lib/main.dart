@@ -4,8 +4,9 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-import 'app/app.dart';
+import 'app/app_bootstrap.dart';
 import 'firebase_options.dart';
 
 export 'app/app.dart';
@@ -14,9 +15,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await initializeDateFormatting('pt_BR');
   await _activateAppCheck();
 
-  runApp(const PagaOQueMeDeveApp());
+  runApp(const AppBootstrap());
 }
 
 Future<void> _activateAppCheck() async {

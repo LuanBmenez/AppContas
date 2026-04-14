@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -54,6 +56,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const PrevisaoFechamentoService();
   final InsightsService _insightsService = const InsightsService();
   final ReportExportService _reportExportService = const ReportExportService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   DashboardPeriodoRapido _periodo = DashboardPeriodoRapido.mes;
   DateTime? _mesEspecifico;
@@ -271,6 +275,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Stream<bool> _mostrarValoresDashboardStream() {
+    final User? user = _auth.currentUser;
+
+    if (user == null) {
+      return Stream<bool>.value(true);
+    }
+
+    return _firestore.collection('users').doc(user.uid).snapshots().map((doc) {
+      final Map<String, dynamic> data = doc.data() ?? <String, dynamic>{};
+      final Map<String, dynamic> preferencias =
+          (data['preferencias'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+
+      final Object? value = preferencias['mostrarValoresDashboard'];
+
+      if (value is bool) {
+        return value;
+      }
+
+      return true;
+    });
+  }
+
+  String _moedaOuMascara(double valor, bool mostrarValores) {
+    return mostrarValores ? AppFormatters.moeda(valor) : '••••';
+  }
+
   String _mensagemErroDashboard(Object? error) {
     final String erro = (error ?? '').toString().toLowerCase();
     if (erro.contains('firestore.googleapis.com') ||
@@ -381,7 +412,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return resumo;
   }
 
-  void _abrirDrillDownCategoria(DashboardCategoriaResumo categoria) {
+  void _abrirDrillDownCategoria(
+    DashboardCategoriaResumo categoria,
+    bool mostrarValores,
+  ) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -438,7 +472,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: AppSpacing.s16),
                 Text(
-                  'Valor: ${AppFormatters.moeda(categoria.valor)}',
+                  mostrarValores
+                      ? 'Valor: ${AppFormatters.moeda(categoria.valor)}'
+                      : 'Valor: ••••',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: AppSpacing.s4),
@@ -647,7 +683,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHeroSaldoCard(ThemeData theme, DashboardResumoCalculado resumo) {
+  Widget _buildHeroSaldoCard(
+    ThemeData theme,
+    DashboardResumoCalculado resumo, {
+    required bool mostrarValores,
+  }) {
     const AppSemanticColors fallbackSemantic = AppSemanticColors(
       success: Color(0xFF0F9D7A),
       successContainer: Color(0xFFE5F6F2),
@@ -742,7 +782,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                AppFormatters.moeda(resumo.saldo),
+                _moedaOuMascara(resumo.saldo, mostrarValores),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 38,
@@ -759,6 +799,137 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  DateTime _mesReferenciaGuardadoCard(DateTime agora) {
+    if (_mesEspecifico != null) {
+      return DateTime(_mesEspecifico!.year, _mesEspecifico!.month, 1);
+    }
+    return DateTime(agora.year, agora.month, 1);
+  }
+
+  double _calcularJaGuardadoNoMes(
+    List<Guardado> guardados,
+    DateTime referenciaMes,
+  ) {
+    final String competencia = Guardado.competenciaFromDate(referenciaMes);
+    double total = 0;
+
+    for (final Guardado item in guardados) {
+      if (item.competencia != competencia) {
+        continue;
+      }
+      if (item.tipoMovimentacao != GuardadoTipoMovimentacao.aporte) {
+        continue;
+      }
+      total += item.valor;
+    }
+
+    return total;
+  }
+
+  Widget _buildSobraGuardadoCard(
+    ThemeData theme,
+    DashboardResumoCalculado resumo, {
+    required double jaGuardadoMes,
+    required DateTime referenciaMes,
+    required bool mostrarValores,
+  }) {
+    final bool temSobra = resumo.saldo > 0;
+    final double valorGuardavel = temSobra ? resumo.saldo : 0;
+    final String nomeMes = AppFormatters.nomeMes(referenciaMes.month);
+
+    return _DashboardEntry(
+      delayMs: 20,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => context.go(AppRoutes.guardadoPath),
+          child: Ink(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.s18),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.08),
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: theme.colorScheme.shadow.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F9D7A).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.savings_outlined,
+                    color: Color(0xFF0F9D7A),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Sobra para guardar',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s6),
+                      Text(
+                        _moedaOuMascara(valorGuardavel, mostrarValores),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        mostrarValores
+                            ? 'Já guardado em $nomeMes: ${AppFormatters.moeda(jaGuardadoMes)}'
+                            : 'Já guardado em $nomeMes: ••••',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        temSobra
+                            ? 'Toque para escolher o destino, editar movimentações e acompanhar metas.'
+                            : 'Abra Guardado para ver metas, resgates e valores já separados.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -815,8 +986,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ThemeData theme,
     DashboardResumo resumoBruto,
     DashboardResumoCalculado resumo,
-    DateTime agora,
-  ) {
+    DateTime agora, {
+    required bool mostrarValores,
+  }) {
     return StreamBuilder<List<OrcamentoCategoriaResumo>>(
       stream: _orcamentosMesStream,
       builder: (context, snapshotOrcamentos) {
@@ -923,7 +1095,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: AppSpacing.s8),
                               Text(
-                                AppFormatters.moeda(projecaoTotalCorrigida),
+                                _moedaOuMascara(
+                                  projecaoTotalCorrigida,
+                                  mostrarValores,
+                                ),
                                 style: theme.textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: -0.4,
@@ -931,7 +1106,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: AppSpacing.s6),
                               Text(
-                                'Mantendo o ritmo atual, você deve fechar o mês em ${AppFormatters.moeda(projecaoTotalCorrigida)}.',
+                                mostrarValores
+                                    ? 'Mantendo o ritmo atual, você deve fechar o mês em ${AppFormatters.moeda(projecaoTotalCorrigida)}.'
+                                    : 'Mantendo o ritmo atual, você deve fechar o mês em ••••.',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -959,8 +1136,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: AppSpacing.s6),
                               Text(
-                                AppFormatters.moeda(
+                                _moedaOuMascara(
                                   recorrenciasRestantesCorrigidas,
+                                  mostrarValores,
                                 ),
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w800,
@@ -969,7 +1147,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(height: AppSpacing.s4),
                               Text(
                                 recorrenciasRestantesCorrigidas > 0
-                                    ? 'Ainda faltam ${AppFormatters.moeda(recorrenciasRestantesCorrigidas)} em despesas recorrentes previstas.'
+                                    ? (mostrarValores
+                                          ? 'Ainda faltam ${AppFormatters.moeda(recorrenciasRestantesCorrigidas)} em despesas recorrentes previstas.'
+                                          : 'Ainda faltam •••• em despesas recorrentes previstas.')
                                     : 'Sem despesas recorrentes pendentes para este mês.',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
@@ -1004,6 +1184,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 child: _PrevisaoCategoriaRiscoItem(
                                   risco: risco,
+                                  mostrarValores: mostrarValores,
                                 ),
                               );
                             }).toList(),
@@ -1038,400 +1219,478 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final AppSemanticColors semantic =
         theme.extension<AppSemanticColors>() ?? fallbackSemantic;
 
-    return StreamBuilder<DashboardResumo>(
-      key: ValueKey<int>(_retryTick),
-      stream: _dashboardDataService.dashboardResumo,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const DashboardLoadingView();
-        }
+    return StreamBuilder<bool>(
+      stream: _mostrarValoresDashboardStream(),
+      initialData: true,
+      builder: (context, mostrarValoresSnapshot) {
+        final bool mostrarValores = mostrarValoresSnapshot.data ?? true;
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.s16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _mensagemErroDashboard(snapshot.error),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  const Text(
-                    'Verifique conexão, permissões do Firebase e tente novamente.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  FilledButton.icon(
-                    onPressed: _tentarNovamente,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Tentar novamente'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+        return StreamBuilder<DashboardResumo>(
+          key: ValueKey<int>(_retryTick),
+          stream: _dashboardDataService.dashboardResumo,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const DashboardLoadingView();
+            }
 
-        final DateTime agora = DateTime.now();
-        final DashboardResumo resumoBruto =
-            snapshot.data ?? const DashboardResumo(<Gasto>[], <Conta>[]);
-        final DashboardResumoCalculado resumo = _calcularResumoMemoizado(
-          resumoBruto,
-          agora,
-        );
-
-        return Container(
-          color: theme.colorScheme.surface,
-          child: SafeArea(
-            bottom: false,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isWide = constraints.maxWidth >= 1100;
-                final bool isMedium = constraints.maxWidth >= 840;
-                final double horizontalPadding = isWide
-                    ? 28
-                    : (isMedium ? 20 : 16);
-
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1080),
-                    child: ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPadding,
-                        20,
-                        horizontalPadding,
-                        28,
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _mensagemErroDashboard(snapshot.error),
+                        textAlign: TextAlign.center,
                       ),
-                      children: [
-                        _buildHeader(theme, agora),
-                        const SizedBox(height: 18),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: DashboardPeriodoRapido.values
-                              .map(
-                                (periodo) => _buildPeriodChip(theme, periodo),
-                              )
-                              .toList(),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                      const SizedBox(height: AppSpacing.s8),
+                      const Text(
+                        'Verifique conexão, permissões do Firebase e tente novamente.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.s12),
+                      FilledButton.icon(
+                        onPressed: _tentarNovamente,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final DateTime agora = DateTime.now();
+            final DashboardResumo resumoBruto =
+                snapshot.data ?? const DashboardResumo(<Gasto>[], <Conta>[]);
+            final DashboardResumoCalculado resumo = _calcularResumoMemoizado(
+              resumoBruto,
+              agora,
+            );
+
+            return Container(
+              color: theme.colorScheme.surface,
+              child: SafeArea(
+                bottom: false,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool isWide = constraints.maxWidth >= 1100;
+                    final bool isMedium = constraints.maxWidth >= 840;
+                    final double horizontalPadding = isWide
+                        ? 28
+                        : (isMedium ? 20 : 16);
+
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1080),
+                        child: ListView(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPadding,
+                            20,
+                            horizontalPadding,
+                            28,
+                          ),
                           children: [
-                            _buildActionPill(
-                              theme: theme,
-                              icon: Icons.calendar_month_outlined,
-                              label: _mesEspecifico == null
-                                  ? 'Escolher mês'
-                                  : AppFormatters.mesAno(_mesEspecifico!),
-                              onTap: _selecionarMesEspecifico,
+                            _buildHeader(theme, agora),
+                            const SizedBox(height: 18),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: DashboardPeriodoRapido.values
+                                  .map(
+                                    (periodo) =>
+                                        _buildPeriodChip(theme, periodo),
+                                  )
+                                  .toList(),
                             ),
-                            if (_mesEspecifico != null)
-                              InputChip(
-                                label: const Text('Mês específico'),
-                                onDeleted: _limparMesEspecifico,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildActionPill(
+                                  theme: theme,
+                                  icon: Icons.calendar_month_outlined,
+                                  label: _mesEspecifico == null
+                                      ? 'Escolher mês'
+                                      : AppFormatters.mesAno(_mesEspecifico!),
+                                  onTap: _selecionarMesEspecifico,
                                 ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        _buildHeroSaldoCard(theme, resumo),
-                        const SizedBox(height: 16),
-                        _DashboardEntry(
-                          delayMs: 30,
-                          child: _buildPrevisaoMesCard(
-                            theme,
-                            resumoBruto,
-                            resumo,
-                            agora,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        _DashboardEntry(
-                          delayMs: 50,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _ComparativoChip(
-                                  titulo: 'Saldo vs ${resumo.comparativoLabel}',
-                                  percentual: resumo.variacaoSaldo,
-                                  positivoEhBom: true,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.s12),
-                              Expanded(
-                                child: _ComparativoChip(
-                                  titulo:
-                                      'Gastos vs ${resumo.comparativoLabel}',
-                                  percentual: resumo.variacaoGastos,
-                                  positivoEhBom: false,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _DashboardEntry(
-                          delayMs: 100,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _MiniSummaryCard(
-                                  titulo: 'Saídas',
-                                  valor: resumo.totalGastosPeriodo,
-                                  cor: semantic.error,
-                                  icone: Icons.arrow_downward_rounded,
-                                  onTap: () {
-                                    widget.onTapSaidasFiltradas?.call(
-                                      DashboardDrillDownFilter(
-                                        mesReferencia:
-                                            _mesEspecifico ?? DateTime.now(),
-                                      ),
+                                if (_mesEspecifico != null)
+                                  InputChip(
+                                    label: const Text('Mês específico'),
+                                    onDeleted: _limparMesEspecifico,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            _buildHeroSaldoCard(
+                              theme,
+                              resumo,
+                              mostrarValores: mostrarValores,
+                            ),
+                            const SizedBox(height: 12),
+                            StreamBuilder<List<Guardado>>(
+                              stream: widget.db.guardados,
+                              builder: (context, guardadosSnapshot) {
+                                final List<Guardado> guardados =
+                                    guardadosSnapshot.data ?? <Guardado>[];
+                                final DateTime referenciaGuardado =
+                                    _mesReferenciaGuardadoCard(agora);
+                                final double jaGuardadoMes =
+                                    _calcularJaGuardadoNoMes(
+                                      guardados,
+                                      referenciaGuardado,
                                     );
-                                    if (widget.onTapSaidasFiltradas == null) {
-                                      widget.onTapSaidas?.call();
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.s12),
-                              Expanded(
-                                child: _MiniSummaryCard(
-                                  titulo: 'A receber',
-                                  valor: resumo.totalPendente,
-                                  cor: semantic.warning,
-                                  icone: Icons.pending_actions_rounded,
-                                  onTap: widget.onTapReceber,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _DashboardEntry(
-                          delayMs: 130,
-                          child: _buildExportCard(theme),
-                        ),
-                        const SizedBox(height: 16),
-                        _DashboardEntry(
-                          delayMs: 150,
-                          child: _buildOrcamentosMesCard(theme),
-                        ),
-                        const SizedBox(height: 20),
-                        _DashboardEntry(
-                          delayMs: 180,
-                          child: Card(
-                            elevation: 0,
-                            color: theme.colorScheme.surface,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                              side: BorderSide(
-                                color: theme.colorScheme.outline.withValues(
-                                  alpha: 0.08,
-                                ),
+
+                                return _buildSobraGuardadoCard(
+                                  theme,
+                                  resumo,
+                                  jaGuardadoMes: jaGuardadoMes,
+                                  referenciaMes: referenciaGuardado,
+                                  mostrarValores: mostrarValores,
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _DashboardEntry(
+                              delayMs: 30,
+                              child: _buildPrevisaoMesCard(
+                                theme,
+                                resumoBruto,
+                                resumo,
+                                agora,
+                                mostrarValores: mostrarValores,
                               ),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.s18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 14),
+                            _DashboardEntry(
+                              delayMs: 50,
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'Categorias de gastos',
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800,
+                                  Expanded(
+                                    child: _ComparativoChip(
+                                      titulo:
+                                          'Saldo vs ${resumo.comparativoLabel}',
+                                      percentual: resumo.variacaoSaldo,
+                                      positivoEhBom: true,
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Distribuição do período selecionado',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
+                                  const SizedBox(width: AppSpacing.s12),
+                                  Expanded(
+                                    child: _ComparativoChip(
+                                      titulo:
+                                          'Gastos vs ${resumo.comparativoLabel}',
+                                      percentual: resumo.variacaoGastos,
+                                      positivoEhBom: false,
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  if (resumo.categoriasOrdenadas.isEmpty)
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.s16,
-                                        vertical: AppSpacing.s24,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: theme
-                                            .colorScheme
-                                            .surfaceContainerHighest
-                                            .withValues(alpha: 0.55),
-                                        borderRadius: BorderRadius.circular(22),
-                                        border: Border.all(
-                                          color: theme
-                                              .colorScheme
-                                              .outlineVariant
-                                              .withValues(alpha: 0.7),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Icon(
-                                            Icons.pie_chart_outline_rounded,
-                                            size: 42,
-                                            color: theme.colorScheme.primary
-                                                .withValues(alpha: 0.35),
-                                          ),
-                                          const SizedBox(
-                                            height: AppSpacing.s12,
-                                          ),
-                                          const Text(
-                                            'Sem gastos no período para montar o gráfico.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          const SizedBox(height: AppSpacing.s4),
-                                          Text(
-                                            'Adicione gastos para ver a distribuição por categoria.',
-                                            textAlign: TextAlign.center,
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                          ),
-                                          const SizedBox(
-                                            height: AppSpacing.s16,
-                                          ),
-                                          Wrap(
-                                            spacing: AppSpacing.s10,
-                                            runSpacing: AppSpacing.s10,
-                                            alignment: WrapAlignment.center,
-                                            children: [
-                                              FilledButton.icon(
-                                                onPressed: () {
-                                                  if (widget.onTapSaidas !=
-                                                      null) {
-                                                    widget.onTapSaidas!.call();
-                                                    return;
-                                                  }
-                                                  context.push(
-                                                    AppRoutes.novoGastoPath,
-                                                  );
-                                                },
-                                                icon: const Icon(
-                                                  Icons.add_rounded,
-                                                ),
-                                                label: const Text(
-                                                  'Adicionar gasto',
-                                                ),
-                                              ),
-                                              OutlinedButton.icon(
-                                                onPressed: () => context.push(
-                                                  AppRoutes.importarPath,
-                                                ),
-                                                icon: const Icon(
-                                                  Icons.upload_file_outlined,
-                                                ),
-                                                label: const Text(
-                                                  'Importar CSV',
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  else
-                                    _CategoriasBarrasCard(
-                                      total: resumo.totalGastosPeriodo,
-                                      periodo: _tituloPeriodo(agora),
-                                      data: resumo.categoriasOrdenadas,
-                                      onTapCategoria: _abrirDrillDownCategoria,
-                                    ),
-                                  const SizedBox(height: AppSpacing.s16),
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final Widget
-                                      cardLider = _InsightResumoCard(
-                                        titulo: 'Categoria líder',
-                                        categoria: resumo.categoriaMaisGasta,
-                                        valor:
-                                            resumo.categoriaMaisGasta?.valor ??
-                                            0,
-                                      );
-
-                                      final Widget
-                                      cardMenor = _InsightResumoCard(
-                                        titulo: 'Menor participação',
-                                        categoria: resumo.categoriaMenosGasta,
-                                        valor:
-                                            resumo.categoriaMenosGasta?.valor ??
-                                            0,
-                                      );
-
-                                      final Widget cardAtivas =
-                                          _InsightResumoCard(
-                                            titulo: 'Categorias ativas',
-                                            valor: resumo
-                                                .categoriasOrdenadas
-                                                .length
-                                                .toDouble(),
-                                            labelUnico: true,
-                                          );
-
-                                      if (constraints.maxWidth < 820) {
-                                        return Column(
-                                          children: [
-                                            cardLider,
-                                            const SizedBox(
-                                              height: AppSpacing.s12,
-                                            ),
-                                            cardMenor,
-                                            const SizedBox(
-                                              height: AppSpacing.s12,
-                                            ),
-                                            cardAtivas,
-                                          ],
-                                        );
-                                      }
-
-                                      return Row(
-                                        children: [
-                                          Expanded(child: cardLider),
-                                          const SizedBox(width: AppSpacing.s12),
-                                          Expanded(child: cardMenor),
-                                          const SizedBox(width: AppSpacing.s12),
-                                          Expanded(child: cardAtivas),
-                                        ],
-                                      );
-                                    },
                                   ),
                                 ],
                               ),
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            _DashboardEntry(
+                              delayMs: 100,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _MiniSummaryCard(
+                                      titulo: 'Saídas',
+                                      valor: resumo.totalGastosPeriodo,
+                                      cor: semantic.error,
+                                      icone: Icons.arrow_downward_rounded,
+                                      mostrarValores: mostrarValores,
+                                      onTap: () {
+                                        widget.onTapSaidasFiltradas?.call(
+                                          DashboardDrillDownFilter(
+                                            mesReferencia:
+                                                _mesEspecifico ??
+                                                DateTime.now(),
+                                          ),
+                                        );
+                                        if (widget.onTapSaidasFiltradas ==
+                                            null) {
+                                          widget.onTapSaidas?.call();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.s12),
+                                  Expanded(
+                                    child: _MiniSummaryCard(
+                                      titulo: 'A receber',
+                                      valor: resumo.totalPendente,
+                                      cor: semantic.warning,
+                                      icone: Icons.pending_actions_rounded,
+                                      mostrarValores: mostrarValores,
+                                      onTap: widget.onTapReceber,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _DashboardEntry(
+                              delayMs: 130,
+                              child: _buildExportCard(theme),
+                            ),
+                            const SizedBox(height: 16),
+                            _DashboardEntry(
+                              delayMs: 150,
+                              child: _buildOrcamentosMesCard(theme),
+                            ),
+                            const SizedBox(height: 20),
+                            _DashboardEntry(
+                              delayMs: 180,
+                              child: Card(
+                                elevation: 0,
+                                color: theme.colorScheme.surface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                  side: BorderSide(
+                                    color: theme.colorScheme.outline.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.s18),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Categorias de gastos',
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Distribuição do período selecionado',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        mostrarValores
+                                            ? 'Total analisado: ${AppFormatters.moeda(resumo.totalGastosPeriodo)} • ${resumo.categoriasOrdenadas.length} categorias ativas'
+                                            : 'Total analisado: •••• • ${resumo.categoriasOrdenadas.length} categorias ativas',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 18),
+                                      if (resumo.categoriasOrdenadas.isEmpty)
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.s16,
+                                            vertical: AppSpacing.s24,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: theme
+                                                .colorScheme
+                                                .surfaceContainerHighest
+                                                .withValues(alpha: 0.55),
+                                            borderRadius: BorderRadius.circular(
+                                              22,
+                                            ),
+                                            border: Border.all(
+                                              color: theme
+                                                  .colorScheme
+                                                  .outlineVariant
+                                                  .withValues(alpha: 0.7),
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Icon(
+                                                Icons.pie_chart_outline_rounded,
+                                                size: 42,
+                                                color: theme.colorScheme.primary
+                                                    .withValues(alpha: 0.35),
+                                              ),
+                                              const SizedBox(
+                                                height: AppSpacing.s12,
+                                              ),
+                                              const Text(
+                                                'Sem gastos no período para montar o gráfico.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              const SizedBox(
+                                                height: AppSpacing.s4,
+                                              ),
+                                              Text(
+                                                'Adicione gastos para ver a distribuição por categoria.',
+                                                textAlign: TextAlign.center,
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                              const SizedBox(
+                                                height: AppSpacing.s16,
+                                              ),
+                                              Wrap(
+                                                spacing: AppSpacing.s10,
+                                                runSpacing: AppSpacing.s10,
+                                                alignment: WrapAlignment.center,
+                                                children: [
+                                                  FilledButton.icon(
+                                                    onPressed: () {
+                                                      if (widget.onTapSaidas !=
+                                                          null) {
+                                                        widget.onTapSaidas!
+                                                            .call();
+                                                        return;
+                                                      }
+                                                      context.push(
+                                                        AppRoutes.novoGastoPath,
+                                                      );
+                                                    },
+                                                    icon: const Icon(
+                                                      Icons.add_rounded,
+                                                    ),
+                                                    label: const Text(
+                                                      'Adicionar gasto',
+                                                    ),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () =>
+                                                        context.push(
+                                                          AppRoutes
+                                                              .importarPath,
+                                                        ),
+                                                    icon: const Icon(
+                                                      Icons
+                                                          .upload_file_outlined,
+                                                    ),
+                                                    label: const Text(
+                                                      'Importar CSV',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      else
+                                        _CategoriasBarrasCard(
+                                          total: resumo.totalGastosPeriodo,
+                                          periodo: _tituloPeriodo(agora),
+                                          data: resumo.categoriasOrdenadas,
+                                          mostrarValores: mostrarValores,
+                                          onTapCategoria: (categoria) =>
+                                              _abrirDrillDownCategoria(
+                                                categoria,
+                                                mostrarValores,
+                                              ),
+                                        ),
+                                      const SizedBox(height: AppSpacing.s16),
+                                      LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final Widget cardLider =
+                                              _InsightResumoCard(
+                                                titulo: 'Categoria líder',
+                                                categoria:
+                                                    resumo.categoriaMaisGasta,
+                                                valor:
+                                                    resumo
+                                                        .categoriaMaisGasta
+                                                        ?.valor ??
+                                                    0,
+                                                mostrarValores: mostrarValores,
+                                              );
+
+                                          final Widget cardMenor =
+                                              _InsightResumoCard(
+                                                titulo: 'Menor participação',
+                                                categoria:
+                                                    resumo.categoriaMenosGasta,
+                                                valor:
+                                                    resumo
+                                                        .categoriaMenosGasta
+                                                        ?.valor ??
+                                                    0,
+                                                mostrarValores: mostrarValores,
+                                              );
+
+                                          final Widget cardAtivas =
+                                              _InsightResumoCard(
+                                                titulo: 'Categorias ativas',
+                                                valor: resumo
+                                                    .categoriasOrdenadas
+                                                    .length
+                                                    .toDouble(),
+                                                labelUnico: true,
+                                                mostrarValores: mostrarValores,
+                                              );
+
+                                          if (constraints.maxWidth < 820) {
+                                            return Column(
+                                              children: [
+                                                cardLider,
+                                                const SizedBox(
+                                                  height: AppSpacing.s12,
+                                                ),
+                                                cardMenor,
+                                                const SizedBox(
+                                                  height: AppSpacing.s12,
+                                                ),
+                                                cardAtivas,
+                                              ],
+                                            );
+                                          }
+
+                                          return Row(
+                                            children: [
+                                              Expanded(child: cardLider),
+                                              const SizedBox(
+                                                width: AppSpacing.s12,
+                                              ),
+                                              Expanded(child: cardMenor),
+                                              const SizedBox(
+                                                width: AppSpacing.s12,
+                                              ),
+                                              Expanded(child: cardAtivas),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
                         ),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1439,9 +1698,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _PrevisaoCategoriaRiscoItem extends StatelessWidget {
-  const _PrevisaoCategoriaRiscoItem({required this.risco});
+  const _PrevisaoCategoriaRiscoItem({
+    required this.risco,
+    required this.mostrarValores,
+  });
 
   final PrevisaoCategoriaRisco risco;
+  final bool mostrarValores;
 
   @override
   Widget build(BuildContext context) {
@@ -1488,7 +1751,9 @@ class _PrevisaoCategoriaRiscoItem extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(
-            'Previsto ${AppFormatters.moeda(risco.projecaoFimMes)} / orçamento ${AppFormatters.moeda(risco.orcamentoLimite)}',
+            mostrarValores
+                ? 'Previsto ${AppFormatters.moeda(risco.projecaoFimMes)} / orçamento ${AppFormatters.moeda(risco.orcamentoLimite)}'
+                : 'Previsto •••• / orçamento ••••',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1505,6 +1770,7 @@ class _MiniSummaryCard extends StatelessWidget {
     required this.valor,
     required this.cor,
     required this.icone,
+    required this.mostrarValores,
     this.onTap,
   });
 
@@ -1512,6 +1778,7 @@ class _MiniSummaryCard extends StatelessWidget {
   final double valor;
   final Color cor;
   final IconData icone;
+  final bool mostrarValores;
   final VoidCallback? onTap;
 
   @override
@@ -1560,7 +1827,7 @@ class _MiniSummaryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  AppFormatters.moeda(valor),
+                  mostrarValores ? AppFormatters.moeda(valor) : '••••',
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.4,
@@ -1706,12 +1973,14 @@ class _InsightResumoCard extends StatelessWidget {
     required this.titulo,
     this.categoria,
     required this.valor,
+    required this.mostrarValores,
     this.labelUnico = false,
   });
 
   final String titulo;
   final DashboardCategoriaResumo? categoria;
   final double valor;
+  final bool mostrarValores;
   final bool labelUnico;
 
   @override
@@ -1775,7 +2044,7 @@ class _InsightResumoCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.s8),
             Text(
-              AppFormatters.moeda(valor),
+              mostrarValores ? AppFormatters.moeda(valor) : '••••',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -1793,12 +2062,14 @@ class _CategoriasBarrasCard extends StatelessWidget {
     required this.total,
     required this.periodo,
     required this.data,
+    required this.mostrarValores,
     this.onTapCategoria,
   });
 
   final double total;
   final String periodo;
   final List<DashboardCategoriaResumo> data;
+  final bool mostrarValores;
   final ValueChanged<DashboardCategoriaResumo>? onTapCategoria;
 
   @override
@@ -1840,7 +2111,7 @@ class _CategoriasBarrasCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.s4),
                     Text(
-                      AppFormatters.moeda(total),
+                      mostrarValores ? AppFormatters.moeda(total) : '••••',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
@@ -1875,6 +2146,7 @@ class _CategoriasBarrasCard extends StatelessWidget {
               child: _BarraCategoriaLinha(
                 categoria: entry,
                 total: total,
+                mostrarValores: mostrarValores,
                 onTap: onTapCategoria == null
                     ? null
                     : () => onTapCategoria!(entry),
@@ -1898,11 +2170,13 @@ class _BarraCategoriaLinha extends StatelessWidget {
   const _BarraCategoriaLinha({
     required this.categoria,
     required this.total,
+    required this.mostrarValores,
     this.onTap,
   });
 
   final DashboardCategoriaResumo categoria;
   final double total;
+  final bool mostrarValores;
   final VoidCallback? onTap;
 
   @override
@@ -1957,7 +2231,9 @@ class _BarraCategoriaLinha extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.s8),
                   Text(
-                    AppFormatters.moeda(categoria.valor),
+                    mostrarValores
+                        ? AppFormatters.moeda(categoria.valor)
+                        : '••••',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),

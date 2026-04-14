@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import '../../data/services/dashboard_saldo_service.dart';
 
 class DashboardSaldoResumo extends StatelessWidget {
-  const DashboardSaldoResumo({super.key, required this.resumo});
+  const DashboardSaldoResumo({
+    super.key,
+    required this.resumo,
+    this.mostrarValores = true,
+  });
 
   final ResumoMensalDashboard resumo;
+  final bool mostrarValores;
 
   @override
   Widget build(BuildContext context) {
@@ -22,21 +27,25 @@ class DashboardSaldoResumo extends StatelessWidget {
               label: 'Saldo Inicial',
               valor: resumo.saldoInicial,
               color: Colors.blue,
+              mostrarValores: mostrarValores,
             ),
             _ResumoItem(
               label: 'Recebido',
               valor: resumo.totalRecebido,
               color: Colors.green,
+              mostrarValores: mostrarValores,
             ),
             _ResumoItem(
               label: 'Despesas',
               valor: resumo.totalDespesas,
               color: Colors.red,
+              mostrarValores: mostrarValores,
             ),
             _ResumoItem(
               label: 'Saldo Final',
               valor: resumo.saldoFinal,
               color: Colors.purple,
+              mostrarValores: mostrarValores,
             ),
           ],
         ),
@@ -47,15 +56,24 @@ class DashboardSaldoResumo extends StatelessWidget {
 
 class _ResumoItem extends StatelessWidget {
   const _ResumoItem({
-    super.key,
     required this.label,
     required this.valor,
     required this.color,
+    required this.mostrarValores,
   });
 
   final String label;
   final double valor;
   final Color color;
+  final bool mostrarValores;
+
+  String _formatarValor() {
+    if (!mostrarValores) {
+      return '••••';
+    }
+
+    return 'R\$ ${valor.toStringAsFixed(2)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +89,7 @@ class _ResumoItem extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'R\$ ${valor.toStringAsFixed(2)}',
+            _formatarValor(),
             textAlign: TextAlign.center,
             style: TextStyle(color: color),
           ),

@@ -742,7 +742,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 ),
               const SizedBox(height: AppSpacing.s8),
               DropdownButtonFormField<AcaoRecebimentoImportacao>(
-                value: acaoSelecionada,
+                initialValue: acaoSelecionada,
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Ação',
@@ -797,7 +797,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                   )
                 else
                   DropdownButtonFormField<String>(
-                    value: contaSelecionadaId,
+                    initialValue: contaSelecionadaId,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Cobrança sugerida',
@@ -908,7 +908,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     }
 
     return DropdownButtonFormField<String?>(
-      value: _mapeamento[campo],
+      initialValue:
+          _mapeamento[campo], // <-- Troque 'value' por 'initialValue' aqui
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
