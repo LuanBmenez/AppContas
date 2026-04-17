@@ -281,21 +281,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
-  Future<void> _atualizarConfirmarAcoes({
-    required String uid,
-    required bool value,
-  }) async {
-    await _executarAcaoPreferencia(
-      key: 'confirmarAcoesDestrutivas',
-      action: () =>
-          _perfilService.atualizarPreferenciaConfirmarAcoesDestrutivas(
-            uid: uid,
-            value: value,
-          ),
-      errorMessage: 'Não foi possível atualizar essa preferência.',
-    );
-  }
-
   Future<void> _atualizarResumoMensal({
     required String uid,
     required bool value,

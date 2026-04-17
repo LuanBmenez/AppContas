@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/presentation/screens/dashboard_screen.dart';
 
 void main() {

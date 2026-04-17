@@ -1,5 +1,4 @@
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
 class GuardadoService {
   const GuardadoService(this._repository);

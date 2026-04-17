@@ -1,3 +1,4 @@
+import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 import 'package:paga_o_que_me_deve/domain/models/categoria_personalizada.dart';
 import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/preferencias_novo_gasto.dart';
@@ -52,5 +53,130 @@ class CategoriasService {
       termo: termo,
       categoria: categoria,
     );
+  }
+
+  Future<void> aprenderRegraParaTitulo({
+    required String titulo,
+    required CategoriaGasto categoria,
+  }) async {
+    final String termo = titulo.trim();
+    if (termo.isEmpty) {
+      return;
+    }
+
+    await salvarRegraCategoriaImportacao(termo: termo, categoria: categoria);
+  }
+
+  List<CategoriaPersonalizada> categoriasAtivas(
+    List<CategoriaPersonalizada> categorias,
+  ) {
+    return categorias.where((categoria) => !categoria.arquivada).toList();
+  }
+
+  List<CategoriaPersonalizada> ordenarCategoriasAtivas(
+    List<CategoriaPersonalizada> categorias,
+  ) {
+    final List<CategoriaPersonalizada> lista = categoriasAtivas(categorias);
+
+    lista.sort((a, b) {
+      if (a.favorita != b.favorita) {
+        return a.favorita ? -1 : 1;
+      }
+
+      final int uso = b.usoCount.compareTo(a.usoCount);
+      if (uso != 0) {
+        return uso;
+      }
+
+      return a.nome.toLowerCase().compareTo(b.nome.toLowerCase());
+    });
+
+    return lista;
+  }
+
+  List<CategoriaPersonalizada> filtrarCategoriasAtivas({
+    required String textoBusca,
+    required List<CategoriaPersonalizada> categorias,
+  }) {
+    final String busca = TextNormalizer.normalizeForSearch(
+      textoBusca,
+    ).trim().toLowerCase();
+
+    final List<CategoriaPersonalizada> base = ordenarCategoriasAtivas(
+      categorias,
+    );
+
+    if (busca.isEmpty) {
+      return base;
+    }
+
+    return base.where((categoria) {
+      final String nome = TextNormalizer.normalizeForSearch(
+        categoria.nome,
+      ).trim().toLowerCase();
+
+      return nome.contains(busca);
+    }).toList();
+  }
+
+  CategoriaPersonalizada? buscarCategoriaAtivaPorId({
+    required List<CategoriaPersonalizada> categorias,
+    required String? id,
+  }) {
+    if (id == null || id.trim().isEmpty) {
+      return null;
+    }
+
+    for (final CategoriaPersonalizada categoria in categoriasAtivas(
+      categorias,
+    )) {
+      if (categoria.id == id) {
+        return categoria;
+      }
+    }
+
+    return null;
+  }
+
+  bool nomeCategoriaDuplicado({
+    required String nome,
+    required List<CategoriaPersonalizada> categorias,
+    String? ignorarId,
+  }) {
+    final String normalizado = TextNormalizer.normalizeForSearch(
+      nome,
+    ).trim().toLowerCase();
+
+    if (normalizado.isEmpty) {
+      return false;
+    }
+
+    for (final CategoriaGasto categoriaPadrao in CategoriaGasto.values) {
+      final String nomePadrao = TextNormalizer.normalizeForSearch(
+        categoriaPadrao.label,
+      ).trim().toLowerCase();
+
+      if (nomePadrao == normalizado) {
+        return true;
+      }
+    }
+
+    for (final CategoriaPersonalizada categoria in categoriasAtivas(
+      categorias,
+    )) {
+      if (categoria.id == ignorarId) {
+        continue;
+      }
+
+      final String nomeExistente = TextNormalizer.normalizeForSearch(
+        categoria.nome,
+      ).trim().toLowerCase();
+
+      if (nomeExistente == normalizado) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

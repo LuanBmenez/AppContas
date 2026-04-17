@@ -1,17 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:paga_o_que_me_deve/core/theme/theme.dart';
+import 'package:paga_o_que_me_deve/core/theme/app_tokens.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/categorias_service.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.dart';
 import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo_gasto_categoria_controller.dart';
-
-import '../widgets/novo_gasto_sections.dart';
 
 class NovoGastoScreen extends StatefulWidget {
   const NovoGastoScreen({super.key, required this.db});
@@ -23,13 +19,15 @@ class NovoGastoScreen extends StatefulWidget {
 }
 
 class _NovoGastoScreenState extends State<NovoGastoScreen> {
+  bool _isDisposed = false;
+
   late final GastosService _gastosService;
   late final CategoriasService _categoriasService;
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _tituloController = TextEditingController();
-  final TextEditingController _valorController = TextEditingController();
-  final TextEditingController _buscaCategoriaController =
-      TextEditingController();
+  TextEditingController? _tituloController = TextEditingController();
+  TextEditingController? _valorController = TextEditingController();
+  TextEditingController? _buscaCategoriaController = TextEditingController();
 
   StreamSubscription<List<CategoriaPersonalizada>>? _categoriasSub;
   StreamSubscription<List<RegraCategoriaImportacao>>? _regrasSub;
@@ -38,10 +36,12 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
   CategoriaGasto _categoriaSelecionada = CategoriaGasto.outros;
   String? _categoriaPersonalizadaSelecionadaId;
+  String? _categoriaPendenteSelecionarId;
   CategoriaGasto? _categoriaSugerida;
   String? _categoriaPersonalizadaSugeridaId;
   TipoGasto _tipoSelecionado = TipoGasto.variavel;
   DateTime _dataSelecionada = DateTime.now();
+
   bool _salvando = false;
   bool _carregandoPreferencias = true;
   bool _selecaoCategoriaManual = false;
@@ -49,78 +49,28 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   bool _recorrenciaConfiguradaManual = false;
   bool _carregandoSugestaoRecorrencia = false;
   bool _carregandoDuplicados = false;
+  bool _salvandoCategoria = false;
+
   int _recorrenciaMesesFuturos = 3;
   int _possiveisDuplicados = 0;
   SugestaoRecorrenciaDespesa? _sugestaoRecorrencia;
 
-  PreferenciasNovoGasto _preferencias = const PreferenciasNovoGasto();
   List<CategoriaPersonalizada> _categoriasPersonalizadas =
       <CategoriaPersonalizada>[];
   List<RegraCategoriaImportacao> _regrasAprendidas =
       <RegraCategoriaImportacao>[];
-
-  static const List<Color> _coresCategoria = <Color>[
-    Color(0xFF0D9488),
-    Color(0xFF2563EB),
-    Color(0xFF9333EA),
-    Color(0xFFDB2777),
-    Color(0xFFEA580C),
-    Color(0xFFB91C1C),
-    Color(0xFF65A30D),
-    Color(0xFF0891B2),
-    Color(0xFF475569),
-    Color(0xFF7C2D12),
-    Color(0xFF0369A1),
-    Color(0xFF4D7C0F),
-  ];
-
-  IconData _mapearIconeCategoria(int? codePoint) {
-    switch (codePoint) {
-      case 0xe88a:
-        return Icons.home_rounded;
-      case 0xe56c:
-        return Icons.restaurant_rounded;
-      case 0xe531:
-        return Icons.directions_car_rounded;
-      case 0xe57d:
-        return Icons.shopping_bag_rounded;
-      case 0xe227:
-        return Icons.attach_money_rounded;
-      case 0xe263:
-        return Icons.favorite_rounded;
-      case 0xe87d:
-        return Icons.person_rounded;
-      case 0xe8cc:
-        return Icons.credit_card_rounded;
-      default:
-        return Icons.category_rounded;
-    }
-  }
-
-  static const List<IconData> _iconesCategoria = <IconData>[
-    Icons.shopping_cart_outlined,
-    Icons.restaurant_outlined,
-    Icons.local_gas_station_outlined,
-    Icons.home_outlined,
-    Icons.school_outlined,
-    Icons.health_and_safety_outlined,
-    Icons.sports_esports_outlined,
-    Icons.work_outline,
-    Icons.pets_outlined,
-    Icons.flight_takeoff_outlined,
-    Icons.fastfood_outlined,
-    Icons.store_outlined,
-  ];
 
   @override
   void initState() {
     super.initState();
     _gastosService = GastosService(widget.db);
     _categoriasService = CategoriasService(widget.db);
-    _tituloController.addListener(_onCamposAlterados);
-    _tituloController.addListener(_onTituloAlteradoParaSugestao);
-    _valorController.addListener(_onCamposAlterados);
-    _buscaCategoriaController.addListener(_onCamposAlterados);
+
+    _tituloController?.addListener(_onCamposAlterados);
+    _tituloController?.addListener(_onTituloAlteradoParaSugestao);
+    _valorController?.addListener(_onCamposAlterados);
+    _buscaCategoriaController?.addListener(_onCamposAlterados);
+
     _inicializarCategorias();
     _agendarSugestaoRecorrencia();
   }
@@ -130,14 +80,21 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     _categoriasSub?.cancel();
     _regrasSub?.cancel();
     _timerSugestaoRecorrencia?.cancel();
-    _tituloController.removeListener(_onCamposAlterados);
-    _tituloController.removeListener(_onTituloAlteradoParaSugestao);
-    _valorController.removeListener(_onCamposAlterados);
-    _buscaCategoriaController.removeListener(_onCamposAlterados);
-    _tituloController.dispose();
-    _valorController.dispose();
-    _buscaCategoriaController.dispose();
     _timerDuplicados?.cancel();
+
+    _tituloController?.removeListener(_onCamposAlterados);
+    _tituloController?.removeListener(_onTituloAlteradoParaSugestao);
+    _valorController?.removeListener(_onCamposAlterados);
+    _buscaCategoriaController?.removeListener(_onCamposAlterados);
+
+    _isDisposed = true;
+
+    _tituloController?.dispose();
+    _valorController?.dispose();
+    _buscaCategoriaController?.dispose();
+    _tituloController = null;
+    _valorController = null;
+    _buscaCategoriaController = null;
     super.dispose();
   }
 
@@ -150,7 +107,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
 
     setState(() {
-      _preferencias = preferencias;
       _tipoSelecionado = preferencias.ultimoTipo ?? _tipoSelecionado;
       _categoriaSelecionada =
           preferencias.ultimaCategoriaPadrao ?? _categoriaSelecionada;
@@ -166,17 +122,52 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
+      final List<CategoriaPersonalizada> categoriasAtivas = _categoriasService
+          .categoriasAtivas(categorias);
+
+      final CategoriaSugestaoResultado sugestao =
+          NovoGastoCategoriaController.sugerirPorTitulo(
+            titulo: _tituloController?.text ?? '',
+            categoriasAtivas: categoriasAtivas,
+            regrasAprendidas: _regrasAprendidas,
+          );
+
+      final bool categoriaPendenteChegou =
+          _categoriaPendenteSelecionarId != null &&
+          categorias.any((c) => c.id == _categoriaPendenteSelecionarId);
+
       setState(() {
         _categoriasPersonalizadas = categorias;
+
         if (_categoriaPersonalizadaSelecionadaId != null &&
             !_categoriasPersonalizadas.any(
               (c) => c.id == _categoriaPersonalizadaSelecionadaId,
             )) {
           _categoriaPersonalizadaSelecionadaId = null;
         }
-      });
 
-      _atualizarSugestaoPorTitulo(aplicarAutomaticamente: true);
+        if (categoriaPendenteChegou) {
+          _categoriaPersonalizadaSelecionadaId = _categoriaPendenteSelecionarId;
+          _categoriaPendenteSelecionarId = null;
+          _selecaoCategoriaManual = true;
+          _categoriaSugerida = null;
+          _categoriaPersonalizadaSugeridaId = null;
+          return;
+        }
+
+        _categoriaSugerida = sugestao.categoriaPadrao;
+        _categoriaPersonalizadaSugeridaId = sugestao.categoriaPersonalizadaId;
+
+        if (!_selecaoCategoriaManual) {
+          if (sugestao.categoriaPersonalizadaId != null) {
+            _categoriaPersonalizadaSelecionadaId =
+                sugestao.categoriaPersonalizadaId;
+          } else if (sugestao.categoriaPadrao != null) {
+            _categoriaPersonalizadaSelecionadaId = null;
+            _categoriaSelecionada = sugestao.categoriaPadrao!;
+          }
+        }
+      });
     });
 
     _regrasSub = _categoriasService.regrasCategoriaImportacao.listen((regras) {
@@ -184,25 +175,41 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
+      final CategoriaSugestaoResultado sugestao =
+          NovoGastoCategoriaController.sugerirPorTitulo(
+            titulo: _tituloController?.text ?? '',
+            categoriasAtivas: _categoriasAtivas,
+            regrasAprendidas: regras,
+          );
+
       setState(() {
         _regrasAprendidas = regras;
-      });
+        _categoriaSugerida = sugestao.categoriaPadrao;
+        _categoriaPersonalizadaSugeridaId = sugestao.categoriaPersonalizadaId;
 
-      _atualizarSugestaoPorTitulo(
-        aplicarAutomaticamente: !_selecaoCategoriaManual,
-      );
+        if (!_selecaoCategoriaManual) {
+          if (sugestao.categoriaPersonalizadaId != null) {
+            _categoriaPersonalizadaSelecionadaId =
+                sugestao.categoriaPersonalizadaId;
+          } else if (sugestao.categoriaPadrao != null) {
+            _categoriaPersonalizadaSelecionadaId = null;
+            _categoriaSelecionada = sugestao.categoriaPadrao!;
+          }
+        }
+      });
     });
   }
 
   void _onCamposAlterados() {
     _agendarVerificacaoDuplicados();
-    if (mounted) {
+    if (mounted && !_isDisposed) {
       setState(() {});
     }
   }
 
   void _onTituloAlteradoParaSugestao() {
-    _atualizarSugestaoPorTitulo(
+    if (_isDisposed) return;
+    _sincronizarSugestaoPorTitulo(
       aplicarAutomaticamente: !_selecaoCategoriaManual,
     );
     _agendarSugestaoRecorrencia();
@@ -224,128 +231,18 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     );
   }
 
-  Future<void> _verificarPossiveisDuplicados() async {
-    final String titulo = _tituloController.text.trim();
-    if (titulo.length < 3) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _possiveisDuplicados = 0;
-        _carregandoDuplicados = false;
-      });
-      return;
-    }
-
-    final double? valor = _valorAtualOuNull();
-    if (valor == null || valor <= 0) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _possiveisDuplicados = 0;
-        _carregandoDuplicados = false;
-      });
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-    setState(() => _carregandoDuplicados = true);
-
-    final List<Gasto> gastos = await _gastosService.meusGastos.first;
-    final String tituloNormalizado = TextNormalizer.normalizeForSearch(titulo);
-    final DateTime dataBase = DateTime(
-      _dataSelecionada.year,
-      _dataSelecionada.month,
-      _dataSelecionada.day,
+  CategoriaSugestaoResultado _calcularSugestaoPorTitulo() {
+    return NovoGastoCategoriaController.sugerirPorTitulo(
+      titulo: _tituloController?.text ?? '',
+      categoriasAtivas: _categoriasAtivas,
+      regrasAprendidas: _regrasAprendidas,
     );
-
-    int duplicados = 0;
-    for (final Gasto gasto in gastos) {
-      final DateTime dataGasto = DateTime(
-        gasto.data.year,
-        gasto.data.month,
-        gasto.data.day,
-      );
-      if (dataGasto != dataBase) {
-        continue;
-      }
-
-      if ((gasto.valor - valor).abs() > 0.001) {
-        continue;
-      }
-
-      final String tituloExistente = TextNormalizer.normalizeForSearch(
-        gasto.titulo,
-      );
-      if (tituloExistente == tituloNormalizado) {
-        duplicados++;
-      }
-    }
-
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _carregandoDuplicados = false;
-      _possiveisDuplicados = duplicados;
-    });
   }
 
-  Future<void> _buscarSugestaoRecorrenciaPorHistorico() async {
-    final String titulo = _tituloController.text.trim();
-    if (titulo.length < 3) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _carregandoSugestaoRecorrencia = false;
-        _sugestaoRecorrencia = null;
-      });
-      return;
-    }
+  void _sincronizarSugestaoPorTitulo({required bool aplicarAutomaticamente}) {
+    final CategoriaSugestaoResultado sugestao = _calcularSugestaoPorTitulo();
 
-    if (!mounted) {
-      return;
-    }
-    setState(() => _carregandoSugestaoRecorrencia = true);
-
-    final SugestaoRecorrenciaDespesa? sugestao = await _gastosService
-        .sugerirRecorrenciaPorTitulo(titulo);
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _carregandoSugestaoRecorrencia = false;
-      _sugestaoRecorrencia = sugestao;
-
-      if (!_recorrenciaConfiguradaManual && sugestao != null) {
-        _recorrenciaAtiva = true;
-        if (_tipoSelecionado != TipoGasto.fixo) {
-          _tipoSelecionado = TipoGasto.fixo;
-        }
-      }
-    });
-  }
-
-  void _atualizarSugestaoPorTitulo({required bool aplicarAutomaticamente}) {
-    final CategoriaSugestaoResultado sugestao =
-        NovoGastoCategoriaController.sugerirPorTitulo(
-          titulo: _tituloController.text,
-          categoriasAtivas: _categoriasAtivas,
-          regrasAprendidas: _regrasAprendidas,
-        );
-
-    if (sugestao.categoriaPadrao == null &&
-        sugestao.categoriaPersonalizadaId == null) {
-      setState(() {
-        _categoriaSugerida = null;
-        _categoriaPersonalizadaSugeridaId = null;
-      });
+    if (!mounted || _isDisposed) {
       return;
     }
 
@@ -367,6 +264,94 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     });
   }
 
+  Future<void> _verificarPossiveisDuplicados() async {
+    final String titulo = _tituloController?.text.trim() ?? '';
+    final double? valor = _valorAtualOuNull();
+
+    if (titulo.length < 3 || valor == null || valor <= 0) {
+      if (!mounted || _isDisposed) {
+        return;
+      }
+      setState(() {
+        _possiveisDuplicados = 0;
+        _carregandoDuplicados = false;
+      });
+      return;
+    }
+
+    if (!mounted || _isDisposed) {
+      return;
+    }
+    setState(() => _carregandoDuplicados = true);
+
+    try {
+      final int duplicados = await _gastosService
+          .contarPossiveisDuplicadosNoMesmoDia(
+            titulo: titulo,
+            valor: valor,
+            data: _dataSelecionada,
+          );
+
+      if (!mounted || _isDisposed) {
+        return;
+      }
+
+      setState(() {
+        _carregandoDuplicados = false;
+        _possiveisDuplicados = duplicados;
+      });
+    } catch (_) {
+      if (!mounted || _isDisposed) {
+        return;
+      }
+
+      setState(() {
+        _carregandoDuplicados = false;
+        _possiveisDuplicados = 0;
+      });
+    }
+  }
+
+  Future<void> _buscarSugestaoRecorrenciaPorHistorico() async {
+    final String titulo = _tituloController?.text.trim() ?? '';
+
+    if (titulo.length < 3) {
+      if (!mounted || _isDisposed) {
+        return;
+      }
+
+      setState(() {
+        _carregandoSugestaoRecorrencia = false;
+        _sugestaoRecorrencia = null;
+      });
+      return;
+    }
+
+    if (!mounted || _isDisposed) {
+      return;
+    }
+    setState(() => _carregandoSugestaoRecorrencia = true);
+
+    final SugestaoRecorrenciaDespesa? sugestao = await _gastosService
+        .sugerirRecorrenciaPorTitulo(titulo);
+
+    if (!mounted || _isDisposed) {
+      return;
+    }
+
+    setState(() {
+      _carregandoSugestaoRecorrencia = false;
+      _sugestaoRecorrencia = sugestao;
+
+      if (!_recorrenciaConfiguradaManual && sugestao != null) {
+        _recorrenciaAtiva = true;
+        if (_tipoSelecionado != TipoGasto.fixo) {
+          _tipoSelecionado = TipoGasto.fixo;
+        }
+      }
+    });
+  }
+
   String _normalizarMensagemErro(Object error) {
     final String lower = error.toString().toLowerCase();
     if (lower.contains('firestore.googleapis.com') ||
@@ -376,45 +361,33 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     return 'Erro ao salvar gasto.';
   }
 
-  String _formatarData(DateTime data) {
-    return AppFormatters.dataCurta(data);
-  }
-
-  String _formatarValorPreview() {
-    try {
-      return AppFormatters.moeda(
-        AppFormatters.parseMoedaInput(_valorController.text),
-      );
-    } catch (_) {
-      return 'R\$ 0,00';
-    }
-  }
+  String _formatarData(DateTime data) => AppFormatters.dataCurta(data);
 
   double? _valorAtualOuNull() {
     try {
-      return AppFormatters.parseMoedaInput(_valorController.text);
+      return AppFormatters.parseMoedaInput(_valorController?.text ?? '');
     } catch (_) {
       return null;
     }
   }
 
+  String _formatarValorPreview() {
+    final double? valor = _valorAtualOuNull();
+    if (valor == null) {
+      return 'R\$ 0,00';
+    }
+    return AppFormatters.moeda(valor);
+  }
+
   List<CategoriaPersonalizada> get _categoriasAtivas {
-    return _categoriasPersonalizadas
-        .where((categoria) => !categoria.arquivada)
-        .toList();
+    return _categoriasService.categoriasAtivas(_categoriasPersonalizadas);
   }
 
   CategoriaPersonalizada? get _categoriaCustomSelecionada {
-    final String? id = _categoriaPersonalizadaSelecionadaId;
-    if (id == null) {
-      return null;
-    }
-    for (final CategoriaPersonalizada categoria in _categoriasPersonalizadas) {
-      if (categoria.id == id) {
-        return categoria;
-      }
-    }
-    return null;
+    return _categoriasService.buscarCategoriaAtivaPorId(
+      categorias: _categoriasPersonalizadas,
+      id: _categoriaPersonalizadaSelecionadaId,
+    );
   }
 
   Color get _categoriaCorPreview {
@@ -441,7 +414,18 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     return _categoriaSelecionada.label;
   }
 
-  bool get _categoriaPersonalizadaAtiva => _categoriaCustomSelecionada != null;
+  List<CategoriaPersonalizada> _categoriasPersonalizadasFiltradas() {
+    return _categoriasService.filtrarCategoriasAtivas(
+      textoBusca: _buscaCategoriaController?.text ?? '',
+      categorias: _categoriasPersonalizadas,
+    );
+  }
+
+  List<CategoriaGasto> _categoriasPadraoFiltradas() {
+    return NovoGastoCategoriaController.filtrarCategoriasPadrao(
+      _buscaCategoriaController?.text ?? '',
+    );
+  }
 
   Future<void> _selecionarData() async {
     final DateTime? novaData = await showDatePicker(
@@ -452,10 +436,36 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       helpText: 'Escolha a data do gasto',
     );
 
-    if (novaData != null) {
-      setState(() => _dataSelecionada = novaData);
-      _agendarVerificacaoDuplicados();
+    if (novaData == null) {
+      return;
     }
+
+    setState(() => _dataSelecionada = novaData);
+    _agendarVerificacaoDuplicados();
+  }
+
+  void _selecionarCategoriaPadrao(CategoriaGasto categoria) {
+    setState(() {
+      _selecaoCategoriaManual = true;
+      _categoriaPersonalizadaSelecionadaId = null;
+      _categoriaSelecionada = categoria;
+    });
+  }
+
+  void _selecionarCategoriaPersonalizada(String id) {
+    setState(() {
+      _selecaoCategoriaManual = true;
+      _categoriaPersonalizadaSelecionadaId = id;
+      _categoriaPendenteSelecionarId = null;
+    });
+  }
+
+  void _aplicarSugestaoRecorrencia() {
+    setState(() {
+      _recorrenciaAtiva = true;
+      _recorrenciaConfiguradaManual = true;
+      _tipoSelecionado = TipoGasto.fixo;
+    });
   }
 
   Future<void> _salvarGasto() async {
@@ -466,12 +476,14 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     setState(() => _salvando = true);
 
     try {
-      final double valor = AppFormatters.parseMoedaInput(_valorController.text);
+      final double valor = AppFormatters.parseMoedaInput(
+        _valorController?.text ?? '',
+      );
       final CategoriaPersonalizada? custom = _categoriaCustomSelecionada;
 
       final Gasto novoGasto = Gasto(
         id: '',
-        titulo: _tituloController.text.trim(),
+        titulo: _tituloController?.text.trim() ?? '',
         valor: valor,
         data: _dataSelecionada,
         categoria: custom == null
@@ -484,17 +496,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         tipo: _tipoSelecionado,
       );
 
-      await _gastosService.adicionarGasto(novoGasto);
-
-      if (_recorrenciaAtiva) {
-        final List<Gasto> futuros = _gerarRecorrenciasFuturas(
-          base: novoGasto,
-          mesesFuturos: _recorrenciaMesesFuturos,
-        );
-        for (final Gasto gasto in futuros) {
-          await _gastosService.adicionarGasto(gasto);
-        }
-      }
+      await _gastosService.salvarGastoComRecorrencias(
+        gastoBase: novoGasto,
+        recorrenciaAtiva: _recorrenciaAtiva,
+        mesesFuturos: _recorrenciaAtiva ? _recorrenciaMesesFuturos : 0,
+      );
 
       await _gastosService.registrarUsoNovoGasto(
         categoriaPadrao: custom == null ? _categoriaSelecionada : null,
@@ -502,14 +508,18 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         tipo: _tipoSelecionado,
       );
 
-      if (mounted) {
-        Navigator.pop(context);
-        AppFeedback.showSuccess(context, 'Gasto salvo com sucesso.');
+      if (!mounted) {
+        return;
       }
+
+      Navigator.pop(context);
+      AppFeedback.showSuccess(context, 'Gasto salvo com sucesso.');
     } catch (e) {
-      if (mounted) {
-        AppFeedback.showError(context, _normalizarMensagemErro(e));
+      if (!mounted) {
+        return;
       }
+
+      AppFeedback.showError(context, _normalizarMensagemErro(e));
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -517,47 +527,72 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
   }
 
-  DateTime _adicionarMesesPreservandoDia(DateTime dataBase, int meses) {
-    final int ano = dataBase.year + ((dataBase.month - 1 + meses) ~/ 12);
-    final int mes = ((dataBase.month - 1 + meses) % 12) + 1;
-    final int ultimoDiaMes = DateTime(ano, mes + 1, 0).day;
-    final int dia = dataBase.day > ultimoDiaMes ? ultimoDiaMes : dataBase.day;
-    return DateTime(ano, mes, dia);
-  }
+  Future<void> _abrirModalNovaCategoria() async {
+    if (_salvandoCategoria) return;
 
-  List<Gasto> _gerarRecorrenciasFuturas({
-    required Gasto base,
-    required int mesesFuturos,
-  }) {
-    final List<Gasto> futuros = <Gasto>[];
-    for (int i = 1; i <= mesesFuturos; i++) {
-      futuros.add(
-        base.copyWith(
-          id: '',
-          data: _adicionarMesesPreservandoDia(base.data, i),
-          dataCompra: base.dataCompra == null
-              ? null
-              : _adicionarMesesPreservandoDia(base.dataCompra!, i),
-          dataLancamento: base.dataLancamento == null
-              ? null
-              : _adicionarMesesPreservandoDia(base.dataLancamento!, i),
-          hashImportacao: null,
-        ),
-      );
+    final _NovaCategoriaDialogResult? result =
+        await showDialog<_NovaCategoriaDialogResult>(
+          context: context,
+          barrierDismissible: true,
+          builder: (dialogContext) => const _NovaCategoriaDialog(),
+        );
+
+    if (!mounted || result == null) {
+      return;
     }
-    return futuros;
-  }
 
-  void _aplicarSugestaoRecorrencia() {
-    setState(() {
-      _recorrenciaAtiva = true;
-      _recorrenciaConfiguradaManual = true;
-      _tipoSelecionado = TipoGasto.fixo;
-    });
-  }
+    final String nome = result.nome.trim();
 
-  Widget _buildSectionCard({required Widget child}) {
-    return AppSectionCard(child: child);
+    if (nome.length < 3) {
+      AppFeedback.showError(
+        context,
+        'Informe um nome com ao menos 3 caracteres.',
+      );
+      return;
+    }
+
+    if (_categoriasService.nomeCategoriaDuplicado(
+      nome: nome,
+      categorias: _categoriasPersonalizadas,
+    )) {
+      AppFeedback.showError(context, 'Já existe uma categoria com esse nome.');
+      return;
+    }
+
+    setState(() => _salvandoCategoria = true);
+
+    try {
+      final CategoriaPersonalizada categoria = CategoriaPersonalizada(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        nome: nome,
+        corValue: result.cor.toARGB32(),
+        iconeCodePoint: result.icone.codePoint,
+        favorita: result.favorita,
+        arquivada: false,
+        usoCount: 0,
+      );
+
+      await _categoriasService.salvarCategoriaPersonalizada(categoria);
+
+      if (!mounted) return;
+
+      setState(() {
+        _categoriaPendenteSelecionarId = categoria.id;
+        _selecaoCategoriaManual = true;
+      });
+
+      AppFeedback.showSuccess(
+        context,
+        'Categoria personalizada criada com sucesso.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.showError(context, 'Não foi possível criar a categoria: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _salvandoCategoria = false);
+      }
+    }
   }
 
   Widget _buildAvisoDuplicados() {
@@ -604,678 +639,634 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     );
   }
 
-  void _selecionarCategoriaPadrao(CategoriaGasto categoria) {
-    setState(() {
-      _selecaoCategoriaManual = true;
-      _categoriaPersonalizadaSelecionadaId = null;
-      _categoriaSelecionada = categoria;
-    });
-  }
-
-  void _selecionarCategoriaPersonalizada(String id) {
-    setState(() {
-      _selecaoCategoriaManual = true;
-      _categoriaPersonalizadaSelecionadaId = id;
-    });
-  }
-
-  List<CategoriaGasto> _categoriasPadraoFiltradas() {
-    return NovoGastoCategoriaController.filtrarCategoriasPadrao(
-      _buscaCategoriaController.text,
-    );
-  }
-
-  List<CategoriaPersonalizada> _categoriasPersonalizadasFiltradas() {
-    return NovoGastoCategoriaController.filtrarCategoriasPersonalizadas(
-      _buscaCategoriaController.text,
-      _categoriasAtivas,
-    );
-  }
-
-  CategoriaPersonalizada? _buscarCategoriaAtivaPorId(String id) {
-    return NovoGastoCategoriaController.buscarCategoriaAtivaPorId(
-      _categoriasAtivas,
-      id,
-    );
-  }
-
-  bool _nomeCategoriaDuplicado(String nome, {String? ignorarId}) {
-    return NovoGastoCategoriaController.nomeCategoriaDuplicado(
-      nome: nome,
-      categoriasAtivas: _categoriasAtivas,
-      ignorarId: ignorarId,
-    );
-  }
-
-  double _contrastRatio(Color a, Color b) {
-    final double l1 = a.computeLuminance();
-    final double l2 = b.computeLuminance();
-    final double claro = l1 > l2 ? l1 : l2;
-    final double escuro = l1 > l2 ? l2 : l1;
-    return (claro + 0.05) / (escuro + 0.05);
-  }
-
-  bool _temContrasteAcessivel(Color cor) {
-    final double comBranco = _contrastRatio(cor, Colors.white);
-    final double comPreto = _contrastRatio(cor, Colors.black);
-    return comBranco >= 4.5 || comPreto >= 4.5;
-  }
-
-  Future<void> _abrirModalCategoria({CategoriaPersonalizada? categoria}) async {
-    final TextEditingController nomeController = TextEditingController(
-      text: categoria?.nome ?? '',
-    );
-    int corValue = categoria?.corValue ?? _coresCategoria.first.toARGB32();
-    int iconeCodePoint =
-        categoria?.iconeCodePoint ?? _iconesCategoria.first.codePoint;
-    bool favorita = categoria?.favorita ?? false;
-
-    final bool? salvar = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final Color corAtual = Color(corValue);
-            final IconData iconeAtual = _mapearIconeCategoria(iconeCodePoint);
-            final Color texto = _contrastRatio(corAtual, Colors.white) >= 4.5
-                ? Colors.white
-                : Colors.black;
-
-            return AlertDialog(
-              title: Text(
-                categoria == null ? 'Nova categoria' : 'Editar categoria',
+  Widget _buildPreviewCard(ThemeData theme) {
+    return AppSectionCard(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        decoration: BoxDecoration(
+          color: _categoriaCorPreview.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _categoriaCorPreview.withValues(alpha: 0.16),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Prévia rápida',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: _categoriaCorPreview,
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: nomeController,
-                      maxLength: 24,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.s12),
-                      decoration: BoxDecoration(
-                        color: corAtual,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(iconeAtual, color: texto),
-                          const SizedBox(width: AppSpacing.s8),
-                          Expanded(
-                            child: Text(
-                              nomeController.text.trim().isEmpty
-                                  ? 'Prévia da categoria'
-                                  : nomeController.text.trim(),
-                              style: TextStyle(
-                                color: texto,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    Text(
-                      'Cor',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s8),
-                    Wrap(
-                      spacing: AppSpacing.s8,
-                      runSpacing: AppSpacing.s8,
-                      children: _coresCategoria.map((cor) {
-                        final bool selecionada = cor.toARGB32() == corValue;
-                        return InkWell(
-                          onTap: () =>
-                              setDialogState(() => corValue = cor.toARGB32()),
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: cor,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: selecionada
-                                    ? Colors.black
-                                    : Colors.transparent,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    Text(
-                      'Ícone',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s8),
-                    Wrap(
-                      spacing: AppSpacing.s8,
-                      runSpacing: AppSpacing.s8,
-                      children: _iconesCategoria.map((icone) {
-                        final bool selecionado =
-                            icone.codePoint == iconeCodePoint;
-                        return InkWell(
-                          onTap: () => setDialogState(
-                            () => iconeCodePoint = icone.codePoint,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: selecionado
-                                  ? Color(corValue).withValues(alpha: 0.16)
-                                  : Colors.transparent,
-                              border: Border.all(
-                                color: selecionado
-                                    ? Color(corValue)
-                                    : Colors.grey.shade300,
-                              ),
-                            ),
-                            child: Icon(icone),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: AppSpacing.s8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: favorita,
-                      onChanged: (value) =>
-                          setDialogState(() => favorita = value),
-                      title: const Text('Favorita'),
-                    ),
-                  ],
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _categoriaCorPreview.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    _categoriaIconePreview,
+                    color: _categoriaCorPreview,
+                  ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    final String nome = nomeController.text.trim();
-                    final bool categoriaNova = categoria == null;
-                    final String categoriaId =
-                        categoria?.id ??
-                        DateTime.now().microsecondsSinceEpoch.toString();
-                    if (nome.length < 3) {
-                      AppFeedback.showError(
-                        context,
-                        'Nome deve ter ao menos 3 caracteres.',
-                      );
-                      return;
-                    }
-                    if (_nomeCategoriaDuplicado(
-                      nome,
-                      ignorarId: categoria?.id,
-                    )) {
-                      AppFeedback.showError(
-                        context,
-                        'Já existe uma categoria com esse nome.',
-                      );
-                      return;
-                    }
-                    if (!_temContrasteAcessivel(Color(corValue))) {
-                      AppFeedback.showError(
-                        context,
-                        'Escolha uma cor com melhor contraste.',
-                      );
-                      return;
-                    }
-
-                    final CategoriaPersonalizada nova = CategoriaPersonalizada(
-                      id: categoriaId,
-                      nome: nome,
-                      corValue: corValue,
-                      iconeCodePoint: iconeCodePoint,
-                      favorita: favorita,
-                      arquivada: false,
-                      usoCount: categoria?.usoCount ?? 0,
-                      criadaEm: categoria?.criadaEm,
-                    );
-
-                    await _categoriasService.salvarCategoriaPersonalizada(nova);
-                    if (!mounted) {
-                      return;
-                    }
-
-                    setState(() {
-                      _selecaoCategoriaManual = true;
-                      _categoriaPersonalizadaSelecionadaId = categoriaId;
-
-                      if (categoriaNova) {
-                        _categoriasPersonalizadas = <CategoriaPersonalizada>[
-                          ..._categoriasPersonalizadas,
-                          nova,
-                        ];
-                      } else {
-                        _categoriasPersonalizadas = _categoriasPersonalizadas
-                            .map((item) => item.id == categoriaId ? nova : item)
-                            .toList();
-                      }
-                    });
-
-                    if (!dialogContext.mounted) {
-                      return;
-                    }
-                    Navigator.pop(dialogContext, true);
-                  },
-                  child: const Text('Salvar'),
+                const SizedBox(width: AppSpacing.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (_tituloController?.text.trim().isEmpty ?? true)
+                            ? 'Sem título'
+                            : _tituloController!.text.trim(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        _categoriaNomePreview,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            );
-          },
-        );
-      },
-    );
-
-    if (salvar == true && mounted) {
-      AppFeedback.showSuccess(context, 'Categoria salva com sucesso.');
-    }
-  }
-
-  Future<void> _abrirAcoesCategoriaPersonalizada(
-    CategoriaPersonalizada categoria,
-  ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Renomear / Trocar cor e ícone'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _abrirModalCategoria(categoria: categoria);
-                },
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              _formatarValorPreview(),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: _categoriaCorPreview,
               ),
-              ListTile(
-                leading: Icon(
-                  categoria.favorita ? Icons.star : Icons.star_outline,
-                ),
-                title: Text(categoria.favorita ? 'Desfavoritar' : 'Favoritar'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  setState(() {
-                    _categoriasPersonalizadas = _categoriasPersonalizadas
-                        .map(
-                          (item) => item.id == categoria.id
-                              ? item.copyWith(favorita: !categoria.favorita)
-                              : item,
-                        )
-                        .toList();
-                  });
-                  await _categoriasService
-                      .alternarFavoritaCategoriaPersonalizada(
-                        categoria.id,
-                        !categoria.favorita,
-                      );
-                },
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              '${_tipoSelecionado.label} • ${_formatarData(_dataSelecionada)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              ListTile(
-                leading: Icon(
-                  categoria.arquivada
-                      ? Icons.unarchive_outlined
-                      : Icons.archive_outlined,
-                ),
-                title: Text(categoria.arquivada ? 'Desarquivar' : 'Arquivar'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final bool novoArquivada = !categoria.arquivada;
-                  setState(() {
-                    _categoriasPersonalizadas = _categoriasPersonalizadas
-                        .map(
-                          (item) => item.id == categoria.id
-                              ? item.copyWith(arquivada: novoArquivada)
-                              : item,
-                        )
-                        .toList();
-                  });
-                  await _categoriasService.arquivarCategoriaPersonalizada(
-                    categoria.id,
-                    novoArquivada,
-                  );
-                  if (_categoriaPersonalizadaSelecionadaId == categoria.id &&
-                      novoArquivada) {
-                    setState(() {
-                      _categoriaPersonalizadaSelecionadaId = null;
-                    });
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Excluir'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  final bool emUso = await _categoriasService
-                      .categoriaPersonalizadaEmUso(categoria.id);
-                  if (emUso) {
-                    if (!mounted) return;
-                    AppFeedback.showError(
-                      context,
-                      'Categoria em uso. Apenas arquivamento é permitido.',
-                    );
-                    setState(() {
-                      _categoriasPersonalizadas = _categoriasPersonalizadas
-                          .map(
-                            (item) => item.id == categoria.id
-                                ? item.copyWith(arquivada: true)
-                                : item,
-                          )
-                          .toList();
-                      if (_categoriaPersonalizadaSelecionadaId ==
-                          categoria.id) {
-                        _categoriaPersonalizadaSelecionadaId = null;
-                      }
-                    });
-                    await _categoriasService.arquivarCategoriaPersonalizada(
-                      categoria.id,
-                      true,
-                    );
-                    return;
-                  }
-
-                  if (!mounted) return;
-                  final bool confirmar = await AppConfirmDialog.show(
-                    context,
-                    title: 'Excluir categoria',
-                    message: 'Deseja excluir ${categoria.nome}?',
-                  );
-                  if (!confirmar) {
-                    return;
-                  }
-
-                  await _categoriasService.deletarCategoriaPersonalizada(
-                    categoria.id,
-                  );
-                  if (!mounted) return;
-                  setState(() {
-                    _categoriasPersonalizadas = _categoriasPersonalizadas
-                        .where((item) => item.id != categoria.id)
-                        .toList();
-                    if (_categoriaPersonalizadaSelecionadaId == categoria.id) {
-                      _categoriaPersonalizadaSelecionadaId = null;
-                    }
-                  });
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildChipSugestao() {
-    final String? customId = _categoriaPersonalizadaSugeridaId;
-    final CategoriaGasto? padrao = _categoriaSugerida;
-    if (customId == null && padrao == null) {
-      return const SizedBox.shrink();
-    }
-
-    String label;
-    if (customId != null) {
-      final CategoriaPersonalizada? custom = _buscarCategoriaAtivaPorId(
-        customId,
-      );
-      label = custom?.nome ?? 'Categoria personalizada';
-    } else {
-      label = padrao!.label;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.s8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: ActionChip(
-          avatar: const Icon(Icons.auto_awesome_outlined, size: 16),
-          label: Text('Sugestão: $label'),
-          onPressed: () {
-            if (customId != null) {
-              _selecionarCategoriaPersonalizada(customId);
-            } else if (padrao != null) {
-              _selecionarCategoriaPadrao(padrao);
-            }
-          },
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCategoriaSection() {
+  Widget _buildCategoriaSection(ThemeData theme) {
     final List<CategoriaGasto> padrao = _categoriasPadraoFiltradas();
     final List<CategoriaPersonalizada> personalizadas =
         _categoriasPersonalizadasFiltradas();
-    final bool compact = MediaQuery.sizeOf(context).width < 420;
-    final int colunas = compact ? 2 : 3;
 
-    final List<Widget> recentes = <Widget>[];
+    final String? categoriaPersonalizadaSelecionadaValida =
+        _categoriaPersonalizadaSelecionadaId != null &&
+            personalizadas.any(
+              (c) => c.id == _categoriaPersonalizadaSelecionadaId,
+            )
+        ? _categoriaPersonalizadaSelecionadaId
+        : null;
 
-    for (final String id in _preferencias.recentesPersonalizadas) {
-      final CategoriaPersonalizada? item = _buscarCategoriaAtivaPorId(id);
-      if (item == null) {
-        continue;
-      }
-      recentes.add(
-        NovoGastoCategoriaQuickChip(
-          label: item.nome,
-          color: item.cor,
-          icon: item.icone,
-          onTap: () => _selecionarCategoriaPersonalizada(item.id),
-        ),
-      );
-      if (recentes.length >= 5) {
-        break;
-      }
-    }
-
-    if (recentes.length < 5) {
-      for (final CategoriaGasto item in _preferencias.recentesPadrao) {
-        recentes.add(
-          NovoGastoCategoriaQuickChip(
-            label: item.label,
-            color: item.color,
-            icon: item.icon,
-            onTap: () => _selecionarCategoriaPadrao(item),
+    return AppSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Categoria',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        );
-        if (recentes.length >= 5) {
-          break;
-        }
-      }
-    }
-
-    return NovoGastoCategoriaSection(
-      categoriaPersonalizadaAtiva: _categoriaPersonalizadaAtiva,
-      buscaCategoriaController: _buscaCategoriaController,
-      recentes: recentes,
-      categoriasPadrao: padrao,
-      categoriasPersonalizadas: personalizadas,
-      categoriaPersonalizadaSelecionadaId: _categoriaPersonalizadaSelecionadaId,
-      categoriaSelecionada: _categoriaSelecionada,
-      onSelecionarCategoriaPadrao: _selecionarCategoriaPadrao,
-      onSelecionarCategoriaPersonalizada: _selecionarCategoriaPersonalizada,
-      onNovaCategoria: _abrirModalCategoria,
-      onAbrirAcoesCategoria: _abrirAcoesCategoriaPersonalizada,
-      colunas: colunas,
+          const SizedBox(height: AppSpacing.s12),
+          TextField(
+            controller: _buscaCategoriaController,
+            decoration: const InputDecoration(
+              labelText: 'Buscar categoria',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          if (_categoriaSugerida != null ||
+              _categoriaPersonalizadaSugeridaId != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.s12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(
+                  alpha: 0.45,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                _categoriaPersonalizadaSugeridaId != null
+                    ? 'Sugestão detectada: categoria personalizada.'
+                    : 'Sugestão detectada: ${_categoriaSugerida!.label}.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          const SizedBox(height: AppSpacing.s12),
+          DropdownButtonFormField<CategoriaGasto>(
+            initialValue: _categoriaSelecionada,
+            decoration: const InputDecoration(
+              labelText: 'Categoria padrão',
+              border: OutlineInputBorder(),
+            ),
+            items: padrao
+                .map(
+                  (categoria) => DropdownMenuItem<CategoriaGasto>(
+                    value: categoria,
+                    child: Text(categoria.label),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                _selecionarCategoriaPadrao(value);
+              }
+            },
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _salvandoCategoria ? null : _abrirModalNovaCategoria,
+              icon: _salvandoCategoria
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(
+                _salvandoCategoria
+                    ? 'Criando categoria...'
+                    : 'Nova categoria personalizada',
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          DropdownButtonFormField<String?>(
+            initialValue: categoriaPersonalizadaSelecionadaValida,
+            decoration: const InputDecoration(
+              labelText: 'Categoria personalizada',
+              border: OutlineInputBorder(),
+            ),
+            items: <DropdownMenuItem<String?>>[
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Nenhuma'),
+              ),
+              ...personalizadas.map(
+                (categoria) => DropdownMenuItem<String?>(
+                  value: categoria.id,
+                  child: Text(categoria.nome),
+                ),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null || value.isEmpty) {
+                setState(() {
+                  _categoriaPersonalizadaSelecionadaId = null;
+                  _categoriaPendenteSelecionarId = null;
+                });
+                return;
+              }
+              _selecionarCategoriaPersonalizada(value);
+            },
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final String valorPreview = _formatarValorPreview();
-    final Color previewAccent = _categoriaCorPreview;
-    final Color previewSurface = Theme.of(context).colorScheme.primaryContainer;
+    final ThemeData theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Novo Gasto'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      bottomNavigationBar: AppFormSubmitBar(
-        onPressed: _salvarGasto,
-        label: 'SALVAR GASTO',
-        isLoading: _salvando,
-      ),
-      body: _carregandoPreferencias
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(AppSpacing.s16),
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 96),
-                  children: [
-                    NovoGastoPreviewCard(
-                      titulo: _tituloController.text.trim(),
-                      categoriaNome: _categoriaNomePreview,
-                      categoriaPersonalizadaAtiva: _categoriaPersonalizadaAtiva,
-                      categoriaIcone: _categoriaIconePreview,
-                      valorPreview: valorPreview,
-                      tipoSelecionado: _tipoSelecionado,
-                      dataFormatada: _formatarData(_dataSelecionada),
-                      previewAccent: previewAccent,
-                      previewSurface: previewSurface,
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    _buildSectionCard(
-                      child: Column(
-                        children: [
-                          TextFormField(
-                            controller: _tituloController,
-                            textCapitalization: TextCapitalization.sentences,
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Título do gasto',
-                              helperText: 'Ex: Mercado, Uber, aluguel',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.edit_note),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Título obrigatório.';
-                              }
-                              return null;
-                            },
-                          ),
-                          _buildChipSugestao(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    _buildSectionCard(
-                      child: TextFormField(
-                        controller: _valorController,
-                        textInputAction: TextInputAction.done,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: <TextInputFormatter>[
-                          MoedaInputFormatter(),
-                        ],
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Valor do gasto',
-                          helperText: 'Valor em reais',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.payments_outlined),
-                          prefixText: 'R\$ ',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Informe o valor.';
-                          }
+    if (_carregandoPreferencias) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-                          try {
-                            final double valor = AppFormatters.parseMoedaInput(
-                              value,
-                            );
-                            if (valor <= 0) {
-                              return 'Valor inválido.';
-                            }
-                          } catch (_) {
-                            return 'Valor inválido.';
-                          }
-
-                          return null;
-                        },
-                      ),
-                    ),
-                    _buildAvisoDuplicados(),
-                    const SizedBox(height: AppSpacing.s16),
-                    _buildCategoriaSection(),
-                    const SizedBox(height: AppSpacing.s16),
-                    NovoGastoTipoSection(
-                      tipoSelecionado: _tipoSelecionado,
-                      onChanged: (tipo) {
-                        setState(() {
-                          _tipoSelecionado = tipo;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    NovoGastoRecorrenciaSection(
-                      ativo: _recorrenciaAtiva,
-                      mesesFuturos: _recorrenciaMesesFuturos,
-                      carregandoSugestao: _carregandoSugestaoRecorrencia,
-                      sugestao: _sugestaoRecorrencia,
-                      onAlterarAtivo: (ativo) {
-                        setState(() {
-                          _recorrenciaAtiva = ativo;
-                          _recorrenciaConfiguradaManual = true;
-                          if (ativo) {
-                            _tipoSelecionado = TipoGasto.fixo;
-                          }
-                        });
-                      },
-                      onAlterarMeses: (meses) {
-                        setState(() {
-                          _recorrenciaMesesFuturos = meses;
-                          _recorrenciaConfiguradaManual = true;
-                        });
-                      },
-                      onAplicarSugestao: _aplicarSugestaoRecorrencia,
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    NovoGastoDataSection(
-                      dataFormatada: _formatarData(_dataSelecionada),
-                      onSelecionarData: _selecionarData,
-                    ),
-                  ],
-                ),
-              ),
+    return Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        children: [
+          Text(
+            'Novo gasto',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
+          ),
+          const SizedBox(height: AppSpacing.s6),
+          Text(
+            'Cadastre uma despesa e use sugestões automáticas para acelerar o preenchimento.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          AppSectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dados principais',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                TextFormField(
+                  controller: _tituloController,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final String texto = (value ?? '').trim();
+                    if (texto.length < 3) {
+                      return 'Informe um título com ao menos 3 caracteres.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                TextFormField(
+                  controller: _valorController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Valor',
+                    hintText: 'Ex: 39,90',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final double? valor = _valorAtualOuNull();
+                    if (valor == null || valor <= 0) {
+                      return 'Informe um valor válido.';
+                    }
+                    return null;
+                  },
+                ),
+                _buildAvisoDuplicados(),
+                const SizedBox(height: AppSpacing.s12),
+                DropdownButtonFormField<TipoGasto>(
+                  initialValue: _tipoSelecionado,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: TipoGasto.values
+                      .map(
+                        (tipo) => DropdownMenuItem<TipoGasto>(
+                          value: tipo,
+                          child: Text(tipo.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _tipoSelecionado = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                FilledButton.tonalIcon(
+                  onPressed: _selecionarData,
+                  icon: const Icon(Icons.calendar_month),
+                  label: Text(_formatarData(_dataSelecionada)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          _buildCategoriaSection(theme),
+          const SizedBox(height: AppSpacing.s12),
+          AppSectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Recorrência',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _recorrenciaAtiva,
+                  onChanged: (value) {
+                    setState(() {
+                      _recorrenciaAtiva = value;
+                      _recorrenciaConfiguradaManual = true;
+                      if (value) {
+                        _tipoSelecionado = TipoGasto.fixo;
+                      }
+                    });
+                  },
+                  title: const Text('Criar recorrência mensal'),
+                  subtitle: const Text(
+                    'Gera automaticamente os próximos lançamentos.',
+                  ),
+                ),
+                if (_recorrenciaAtiva) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  DropdownButtonFormField<int>(
+                    initialValue: _recorrenciaMesesFuturos,
+                    decoration: const InputDecoration(
+                      labelText: 'Gerar próximos meses',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const <DropdownMenuItem<int>>[
+                      DropdownMenuItem<int>(value: 2, child: Text('2 meses')),
+                      DropdownMenuItem<int>(value: 3, child: Text('3 meses')),
+                      DropdownMenuItem<int>(value: 6, child: Text('6 meses')),
+                      DropdownMenuItem<int>(value: 12, child: Text('12 meses')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _recorrenciaMesesFuturos = value);
+                      }
+                    },
+                  ),
+                ],
+                if (_carregandoSugestaoRecorrencia) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  const LinearProgressIndicator(),
+                ],
+                if (_sugestaoRecorrencia != null) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.s12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondaryContainer.withValues(
+                        alpha: 0.42,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sugestão automática: parece ${_sugestaoRecorrencia!.periodicidade}.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s4),
+                        Text(
+                          '${_sugestaoRecorrencia!.ocorrencias} ocorrências, dia ${_sugestaoRecorrencia!.diaPreferencial}, média ${AppFormatters.moeda(_sugestaoRecorrencia!.valorMedio)}.',
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        OutlinedButton.icon(
+                          onPressed: _aplicarSugestaoRecorrencia,
+                          icon: const Icon(Icons.auto_fix_high),
+                          label: const Text('Aplicar sugestão'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          _buildPreviewCard(theme),
+          const SizedBox(height: AppSpacing.s16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _salvando ? null : _salvarGasto,
+              icon: _salvando
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(_salvando ? 'Salvando...' : 'Salvar gasto'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NovaCategoriaDialogResult {
+  const _NovaCategoriaDialogResult({
+    required this.nome,
+    required this.cor,
+    required this.icone,
+    required this.favorita,
+  });
+
+  final String nome;
+  final Color cor;
+  final IconData icone;
+  final bool favorita;
+}
+
+class _NovaCategoriaDialog extends StatefulWidget {
+  const _NovaCategoriaDialog();
+
+  @override
+  State<_NovaCategoriaDialog> createState() => _NovaCategoriaDialogState();
+}
+
+class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
+  late final TextEditingController _nomeController;
+
+  Color _corSelecionada = Colors.teal;
+  IconData _iconeSelecionado = Icons.category_rounded;
+  bool _favorita = false;
+
+  final List<Color> _cores = <Color>[
+    Colors.teal,
+    Colors.blue,
+    Colors.purple,
+    Colors.orange,
+    Colors.red,
+    Colors.green,
+    Colors.indigo,
+    Colors.pink,
+  ];
+
+  final List<IconData> _icones = <IconData>[
+    Icons.category_rounded,
+    Icons.shopping_bag_outlined,
+    Icons.restaurant_outlined,
+    Icons.local_gas_station_outlined,
+    Icons.home_outlined,
+    Icons.health_and_safety_outlined,
+    Icons.school_outlined,
+    Icons.sports_esports_outlined,
+    Icons.work_outline,
+    Icons.pets_outlined,
+    Icons.flight_takeoff_outlined,
+    Icons.store_outlined,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nomeController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    super.dispose();
+  }
+
+  void _salvar() {
+    final String nome = _nomeController.text.trim();
+
+    Navigator.of(context).pop(
+      _NovaCategoriaDialogResult(
+        nome: nome,
+        cor: _corSelecionada,
+        icone: _iconeSelecionado,
+        favorita: _favorita,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nova categoria personalizada'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _nomeController,
+              maxLength: 24,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Nome da categoria',
+                border: OutlineInputBorder(),
+              ),
+              onFieldSubmitted: (_) => _salvar(),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              'Cor',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Wrap(
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
+              children: _cores.map((cor) {
+                final bool selecionada =
+                    cor.toARGB32() == _corSelecionada.toARGB32();
+
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _corSelecionada = cor;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: cor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selecionada ? Colors.black : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              'Ícone',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Wrap(
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
+              children: _icones.map((icone) {
+                final bool selecionado =
+                    icone.codePoint == _iconeSelecionado.codePoint;
+
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _iconeSelecionado = icone;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.s8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: selecionado
+                          ? _corSelecionada.withValues(alpha: 0.16)
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: selecionado
+                            ? _corSelecionada
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Icon(icone),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _favorita,
+              onChanged: (value) {
+                setState(() {
+                  _favorita = value;
+                });
+              },
+              title: const Text('Favorita'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _salvar, child: const Text('Salvar')),
+      ],
     );
   }
 }
