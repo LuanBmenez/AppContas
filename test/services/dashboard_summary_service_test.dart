@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
-import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_summary_service.dart';
 
 void main() {
   group('DashboardSummaryService', () {

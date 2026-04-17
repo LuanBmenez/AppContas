@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/cancelamento_csv_service.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';

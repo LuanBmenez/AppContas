@@ -3,7 +3,6 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/categorias_service.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.dart';
 
@@ -23,21 +22,18 @@ class _GastosScreenState extends State<GastosScreen> {
   late final GastosService _gastosService;
   late final CategoriasService _categoriasService;
   final ScrollController _listController = ScrollController();
+
   Stream<List<Gasto>>? _gastosStream;
+
   DateTime _mesSelecionado = DateTime(
     DateTime.now().year,
     DateTime.now().month,
   );
 
-  DateTime get _inicioMes =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
-
-  DateTime get _fimMesExclusivo =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
-
   CategoriaGasto? _filtroCategoriaPadrao;
   String? _filtroCategoriaPersonalizadaId;
   TipoGasto? _filtroTipo;
+
   bool _selecionandoLote = false;
   bool _processandoLote = false;
   final Set<String> _idsSelecionados = <String>{};
@@ -51,11 +47,24 @@ class _GastosScreenState extends State<GastosScreen> {
     errorContainer: Color(0xFFFDE8E8),
   );
 
+  DateTime get _inicioMes =>
+      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
+
+  DateTime get _fimMesExclusivo =>
+      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
+
+  bool get _temFiltrosAtivos {
+    return _filtroCategoriaPadrao != null ||
+        (_filtroCategoriaPersonalizadaId?.isNotEmpty ?? false) ||
+        _filtroTipo != null;
+  }
+
   @override
   void initState() {
     super.initState();
     _gastosService = GastosService(widget.db);
     _categoriasService = CategoriasService(widget.db);
+
     final DashboardDrillDownFilter? filtro = widget.initialFilter;
     if (filtro != null) {
       _filtroCategoriaPadrao = filtro.categoriaPadrao;
@@ -68,6 +77,7 @@ class _GastosScreenState extends State<GastosScreen> {
         );
       }
     }
+
     _recarregarGastosStream();
   }
 
@@ -75,6 +85,28 @@ class _GastosScreenState extends State<GastosScreen> {
   void dispose() {
     _listController.dispose();
     super.dispose();
+  }
+
+  void _recarregarGastosStream() {
+    _gastosStream = _gastosService.streamGastosPorPeriodo(
+      inicio: _inicioMes,
+      fimExclusivo: _fimMesExclusivo,
+    );
+  }
+
+  Stream<List<Gasto>> _obterGastosStream() {
+    return _gastosStream ??= _gastosService.streamGastosPorPeriodo(
+      inicio: _inicioMes,
+      fimExclusivo: _fimMesExclusivo,
+    );
+  }
+
+  String _formatarMes(DateTime date) => AppFormatters.mesAno(date);
+
+  String _formatarValor(double valor) => AppFormatters.moeda(valor);
+
+  AppSemanticColors _semanticColors(ThemeData theme) {
+    return theme.extension<AppSemanticColors>() ?? _fallbackSemanticColors;
   }
 
   void _setStatePreservandoScroll(VoidCallback fn) {
@@ -93,34 +125,6 @@ class _GastosScreenState extends State<GastosScreen> {
         _listController.jumpTo(destino);
       }
     });
-  }
-
-  void _recarregarGastosStream() {
-    _gastosStream = _gastosService.streamGastosPorPeriodo(
-      inicio: _inicioMes,
-      fimExclusivo: _fimMesExclusivo,
-    );
-  }
-
-  Stream<List<Gasto>> _obterGastosStream() {
-    return _gastosStream ??= _gastosService.streamGastosPorPeriodo(
-      inicio: _inicioMes,
-      fimExclusivo: _fimMesExclusivo,
-    );
-  }
-
-  String _formatarMes(DateTime date) {
-    return AppFormatters.mesAno(date);
-  }
-
-  AppSemanticColors _semanticColors(ThemeData theme) {
-    return theme.extension<AppSemanticColors>() ?? _fallbackSemanticColors;
-  }
-
-  bool get _temFiltrosAtivos {
-    return _filtroCategoriaPadrao != null ||
-        _filtroCategoriaPersonalizadaId != null ||
-        _filtroTipo != null;
   }
 
   Future<void> _selecionarMes() async {
@@ -227,12 +231,14 @@ class _GastosScreenState extends State<GastosScreen> {
       },
     );
 
-    if (selecionado != null) {
-      setState(() {
-        _mesSelecionado = DateTime(selecionado.year, selecionado.month);
-        _recarregarGastosStream();
-      });
+    if (selecionado == null) {
+      return;
     }
+
+    setState(() {
+      _mesSelecionado = DateTime(selecionado.year, selecionado.month);
+      _recarregarGastosStream();
+    });
   }
 
   Future<bool> _confirmarExclusao(Gasto gasto) async {
@@ -240,15 +246,14 @@ class _GastosScreenState extends State<GastosScreen> {
       context,
       title: 'Excluir gasto',
       message: 'Deseja excluir "${gasto.titulo}"?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
     );
-  }
-
-  String _formatarValor(double valor) {
-    return AppFormatters.moeda(valor);
   }
 
   Widget _buildCabecalhoTela() {
     final ThemeData theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s16,
@@ -280,29 +285,19 @@ class _GastosScreenState extends State<GastosScreen> {
       if (_filtroCategoriaPadrao != null)
         InputChip(
           label: Text('Categoria: ${_filtroCategoriaPadrao!.label}'),
-          onDeleted: () {
-            setState(() {
-              _filtroCategoriaPadrao = null;
-            });
-          },
+          onDeleted: () => setState(() => _filtroCategoriaPadrao = null),
         ),
-      if (_filtroCategoriaPersonalizadaId != null)
+      if (_filtroCategoriaPersonalizadaId != null &&
+          _filtroCategoriaPersonalizadaId!.isNotEmpty)
         InputChip(
           label: const Text('Categoria personalizada'),
-          onDeleted: () {
-            setState(() {
-              _filtroCategoriaPersonalizadaId = null;
-            });
-          },
+          onDeleted: () =>
+              setState(() => _filtroCategoriaPersonalizadaId = null),
         ),
       if (_filtroTipo != null)
         InputChip(
           label: Text('Tipo: ${_filtroTipo!.label}'),
-          onDeleted: () {
-            setState(() {
-              _filtroTipo = null;
-            });
-          },
+          onDeleted: () => setState(() => _filtroTipo = null),
         ),
     ];
 
@@ -338,14 +333,17 @@ class _GastosScreenState extends State<GastosScreen> {
     if (_filtroTipo != null && gasto.tipo != _filtroTipo) {
       return false;
     }
+
     if (_filtroCategoriaPersonalizadaId != null &&
         _filtroCategoriaPersonalizadaId!.isNotEmpty) {
       return gasto.categoriaPersonalizadaId == _filtroCategoriaPersonalizadaId;
     }
+
     if (_filtroCategoriaPadrao != null) {
       return !gasto.usaCategoriaPersonalizada &&
           gasto.categoria == _filtroCategoriaPadrao;
     }
+
     return true;
   }
 
@@ -423,22 +421,33 @@ class _GastosScreenState extends State<GastosScreen> {
     }
 
     try {
-      final Gasto gastoAtualizado = gasto.copyWith(
-        categoria: categoriaSelecionada,
+      await _gastosService.atualizarGasto(
+        gasto.copyWith(
+          categoria: categoriaSelecionada,
+          categoriaPersonalizadaId: null,
+          categoriaPersonalizadaNome: null,
+          categoriaPersonalizadaCorValue: null,
+          categoriaPersonalizadaIconeCodePoint: null,
+        ),
       );
-      await _gastosService.atualizarGasto(gastoAtualizado);
 
       if (aprenderRegra) {
-        await _categoriasService.salvarRegraCategoriaImportacao(
-          termo: gasto.titulo,
+        await _categoriasService.aprenderRegraParaTitulo(
+          titulo: gasto.titulo,
           categoria: categoriaSelecionada,
         );
       }
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       AppFeedback.showSuccess(context, 'Categoria atualizada com sucesso.');
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       AppFeedback.showError(context, 'Erro ao atualizar categoria: $e');
     }
   }
@@ -498,19 +507,22 @@ class _GastosScreenState extends State<GastosScreen> {
       title: 'Excluir em lote',
       message: 'Deseja excluir ${selecionados.length} gastos selecionados?',
       confirmText: 'Excluir',
+      cancelText: 'Cancelar',
     );
+
     if (!confirmar) {
       return;
     }
 
     setState(() => _processandoLote = true);
+
     try {
-      for (final Gasto gasto in selecionados) {
-        await _gastosService.deletarGasto(gasto.id);
-      }
+      await _gastosService.deletarGastosEmLote(selecionados);
+
       if (!mounted) {
         return;
       }
+
       AppFeedback.showSuccess(
         context,
         '${selecionados.length} gastos excluídos.',
@@ -520,6 +532,7 @@ class _GastosScreenState extends State<GastosScreen> {
       if (!mounted) {
         return;
       }
+
       AppFeedback.showError(context, 'Erro ao excluir em lote: $e');
     } finally {
       if (mounted) {
@@ -534,6 +547,7 @@ class _GastosScreenState extends State<GastosScreen> {
     }
 
     CategoriaGasto categoriaSelecionada = CategoriaGasto.outros;
+
     final bool? confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -582,15 +596,17 @@ class _GastosScreenState extends State<GastosScreen> {
     }
 
     setState(() => _processandoLote = true);
+
     try {
-      for (final Gasto gasto in selecionados) {
-        await _gastosService.atualizarGasto(
-          gasto.copyWith(categoria: categoriaSelecionada),
-        );
-      }
+      await _gastosService.atualizarCategoriaEmLote(
+        gastos: selecionados,
+        categoria: categoriaSelecionada,
+      );
+
       if (!mounted) {
         return;
       }
+
       AppFeedback.showSuccess(
         context,
         'Categoria atualizada em ${selecionados.length} gastos.',
@@ -600,6 +616,7 @@ class _GastosScreenState extends State<GastosScreen> {
       if (!mounted) {
         return;
       }
+
       AppFeedback.showError(context, 'Erro ao alterar categoria em lote: $e');
     } finally {
       if (mounted) {
@@ -614,6 +631,7 @@ class _GastosScreenState extends State<GastosScreen> {
     }
 
     TipoGasto tipoSelecionado = TipoGasto.variavel;
+
     final bool? confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -662,15 +680,17 @@ class _GastosScreenState extends State<GastosScreen> {
     }
 
     setState(() => _processandoLote = true);
+
     try {
-      for (final Gasto gasto in selecionados) {
-        await _gastosService.atualizarGasto(
-          gasto.copyWith(tipo: tipoSelecionado),
-        );
-      }
+      await _gastosService.atualizarTipoEmLote(
+        gastos: selecionados,
+        tipo: tipoSelecionado,
+      );
+
       if (!mounted) {
         return;
       }
+
       AppFeedback.showSuccess(
         context,
         'Tipo atualizado em ${selecionados.length} gastos.',
@@ -680,11 +700,32 @@ class _GastosScreenState extends State<GastosScreen> {
       if (!mounted) {
         return;
       }
+
       AppFeedback.showError(context, 'Erro ao alterar tipo em lote: $e');
     } finally {
       if (mounted) {
         setState(() => _processandoLote = false);
       }
+    }
+  }
+
+  Future<void> _excluirItem(Gasto gasto) async {
+    final bool confirmar = await _confirmarExclusao(gasto);
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      await _gastosService.deletarGasto(gasto.id);
+      if (!mounted) {
+        return;
+      }
+      AppFeedback.showSuccess(context, 'Gasto excluído com sucesso.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppFeedback.showError(context, 'Erro ao excluir gasto: $e');
     }
   }
 
@@ -719,7 +760,7 @@ class _GastosScreenState extends State<GastosScreen> {
         final List<Gasto> selecionados = _selecionadosDe(gastosFiltrados);
 
         double totalGasto = 0;
-        for (final gasto in gastosFiltrados) {
+        for (final Gasto gasto in gastosFiltrados) {
           totalGasto += gasto.valor;
         }
 
@@ -808,7 +849,7 @@ class _GastosScreenState extends State<GastosScreen> {
                             gasto.id,
                           );
 
-                          final Widget tile = Card(
+                          return Card(
                             key: ValueKey<String>('gasto_tile_${gasto.id}'),
                             margin: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.s16,
@@ -838,7 +879,7 @@ class _GastosScreenState extends State<GastosScreen> {
                                   : CircleAvatar(
                                       backgroundColor: gasto
                                           .categoriaCorExibicao
-                                          .withValues(alpha: 0.15),
+                                          .withValues(alpha: 0.14),
                                       child: Icon(
                                         gasto.categoriaIconeExibicao,
                                         color: gasto.categoriaCorExibicao,
@@ -850,71 +891,79 @@ class _GastosScreenState extends State<GastosScreen> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              subtitle: Text(
-                                _buildSubtitle(gasto),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              trailing: Text(
-                                _formatarValor(gasto.valor),
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: semantic.error,
-                                ),
-                              ),
+                              subtitle: Text(_buildSubtitle(gasto)),
+                              trailing: _selecionandoLote
+                                  ? null
+                                  : PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        if (value == 'editar') {
+                                          _editarCategoria(gasto);
+                                        } else if (value == 'excluir') {
+                                          _excluirItem(gasto);
+                                        }
+                                      },
+                                      itemBuilder: (context) =>
+                                          const <PopupMenuEntry<String>>[
+                                            PopupMenuItem<String>(
+                                              value: 'editar',
+                                              child: Text('Editar categoria'),
+                                            ),
+                                            PopupMenuItem<String>(
+                                              value: 'excluir',
+                                              child: Text('Excluir'),
+                                            ),
+                                          ],
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            _formatarValor(gasto.valor),
+                                            style: theme.textTheme.titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: semantic.error,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            gasto.tipo.label,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                             ),
-                          );
-
-                          return Dismissible(
-                            key: Key(gasto.id),
-                            direction: _selecionandoLote
-                                ? DismissDirection.none
-                                : DismissDirection.endToStart,
-                            confirmDismiss: (direction) async {
-                              if (_selecionandoLote) {
-                                return false;
-                              }
-                              return _confirmarExclusao(gasto);
-                            },
-                            onDismissed: (direction) async {
-                              if (_selecionandoLote) {
-                                return;
-                              }
-                              try {
-                                await _gastosService.deletarGasto(gasto.id);
-                              } catch (e) {
-                                if (context.mounted) {
-                                  AppFeedback.showError(
-                                    context,
-                                    'Erro ao excluir gasto: $e',
-                                  );
-                                }
-                              }
-                            },
-                            background: Container(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s16,
-                                vertical: AppSpacing.s6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: semantic.error,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(
-                                right: AppSpacing.s20,
-                              ),
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                              ),
-                            ),
-                            child: tile,
                           );
                         },
                       ),
                     ),
+                    // const SizedBox(height: AppSpacing.s8),
+                    // Padding(
+                    //   padding: const EdgeInsets.all(AppSpacing.s16),
+                    //   child: SizedBox(
+                    //     width: double.infinity,
+                    //     child: FilledButton.icon(
+                    //       onPressed: () {
+                    //         Navigator.push(
+                    //           context,
+                    //           MaterialPageRoute(
+                    //             builder: (_) => NovoGastoScreen(db: widget.db),
+                    //           ),
+                    //         );
+                    //       },
+                    //       icon: const Icon(Icons.add),
+                    //       label: const Text('Novo gasto'),
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -925,8 +974,6 @@ class _GastosScreenState extends State<GastosScreen> {
     );
   }
 }
-
-typedef MeusGastosScreen = GastosScreen;
 
 class ExpenseSummaryCard extends StatelessWidget {
   const ExpenseSummaryCard({
@@ -953,109 +1000,118 @@ class ExpenseSummaryCard extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colorScheme = theme.colorScheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.s16),
+    return Card(
       margin: const EdgeInsets.fromLTRB(
         AppSpacing.s16,
-        0,
-        AppSpacing.s16,
         AppSpacing.s8,
+        AppSpacing.s16,
+        AppSpacing.s12,
       ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.tertiaryContainer,
-            colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
-          ],
-        ),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.s16),
-        border: Border.all(
+        side: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.45),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: colorScheme.tertiary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(AppSpacing.s10),
-                ),
-                child: Icon(
-                  Icons.pie_chart_outline_rounded,
-                  color: colorScheme.tertiary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s10),
-              Expanded(
-                child: Text(
-                  totalLabel,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurface,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.tertiaryContainer,
+              colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(AppSpacing.s16),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: colorScheme.tertiary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(AppSpacing.s10),
+                  ),
+                  child: Icon(
+                    Icons.pie_chart_outline_rounded,
+                    color: colorScheme.tertiary,
+                    size: 20,
                   ),
                 ),
-              ),
-              TextButton.icon(
-                onPressed: onSelectMonth,
-                icon: const Icon(Icons.calendar_month, size: 18),
-                label: Text(monthLabel),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  foregroundColor: colorScheme.onSurfaceVariant,
+                const SizedBox(width: AppSpacing.s10),
+                Expanded(
+                  child: Text(
+                    totalLabel,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          Text(
-            totalValue,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s4),
-          Text(
-            'Resumo do mês selecionado',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s8),
-          Wrap(
-            spacing: AppSpacing.s8,
-            runSpacing: AppSpacing.s8,
-            children: [
-              Chip(
-                avatar: const Icon(Icons.receipt_long_outlined, size: 18),
-                label: Text('$itemCount item${itemCount == 1 ? '' : 's'}'),
-                visualDensity: VisualDensity.compact,
-              ),
-              if (hasActiveFilters)
-                const Chip(
-                  avatar: Icon(Icons.filter_alt_outlined, size: 18),
-                  label: Text('Filtros ativos'),
-                  visualDensity: VisualDensity.compact,
+                TextButton.icon(
+                  onPressed: onSelectMonth,
+                  icon: const Icon(Icons.calendar_month, size: 18),
+                  label: Text(monthLabel),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-            ],
-          ),
-          if (filterChips.isNotEmpty) ...[
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              totalValue,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              'Resumo do mês selecionado',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: AppSpacing.s8),
             Wrap(
               spacing: AppSpacing.s8,
               runSpacing: AppSpacing.s8,
-              children: filterChips,
+              children: [
+                Chip(
+                  avatar: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: Text('$itemCount item${itemCount == 1 ? '' : 's'}'),
+                  visualDensity: VisualDensity.compact,
+                ),
+                if (hasActiveFilters)
+                  const Chip(
+                    avatar: Icon(Icons.filter_alt_outlined, size: 18),
+                    label: Text('Filtros ativos'),
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
             ),
+            if (filterChips.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.s8),
+              Wrap(
+                spacing: AppSpacing.s8,
+                runSpacing: AppSpacing.s8,
+                children: filterChips,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

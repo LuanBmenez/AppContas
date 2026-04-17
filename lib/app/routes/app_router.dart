@@ -7,7 +7,6 @@ import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/app/session/presentation/screens/home_shell_screen.dart';
 import 'package:paga_o_que_me_deve/data/services/services.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 import 'package:paga_o_que_me_deve/features/a_receber/a_receber.dart';
 import 'package:paga_o_que_me_deve/features/auth/auth.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
