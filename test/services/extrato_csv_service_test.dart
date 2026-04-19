@@ -7,7 +7,7 @@ import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv
 
 void main() {
   group('ExtratoCsvService', () {
-    const CartaoCredito cartao = CartaoCredito(
+    const cartao = CartaoCredito(
       id: 'c1',
       nome: 'Meu Cartao',
       finalCartao: '1234',
@@ -16,14 +16,14 @@ void main() {
     );
 
     test('deve ignorar duplicados no mesmo arquivo', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '01/03/2026;IFOOD PEDIDO;45,50\n'
         '01/03/2026;IFOOD PEDIDO;45,50\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -39,13 +39,13 @@ void main() {
     });
 
     test('deve usar regra aprendida exata para categorizar', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '02/03/2026;Padaria Boa Massa;30,00\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -68,13 +68,13 @@ void main() {
     });
 
     test('deve manter no mesmo mes quando compra for antes do fechamento', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '09/03/2026;Farmacia;25,00\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -89,13 +89,13 @@ void main() {
     });
 
     test('deve manter no mesmo mes quando compra for no dia do fechamento', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '10/03/2026;Supermercado;100,00\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -110,13 +110,13 @@ void main() {
     });
 
     test('deve ir para o mes seguinte quando compra for apos fechamento', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '11/03/2026;Assinatura;39,90\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -133,13 +133,13 @@ void main() {
     test(
       'deve ajustar para o ultimo dia quando o proximo mes nao tiver o mesmo dia',
       () {
-        final ExtratoCsvService service = ExtratoCsvService();
-        final ResultadoLeituraCsv csv = service.lerCsv(
+        final service = ExtratoCsvService();
+        final csv = service.lerCsv(
           'data;descricao;valor\n'
           '31/03/2026;Compra pontual;50,00\n',
         );
 
-        final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+        final resultado = service.mapearParaGastos(
           csv: csv,
           mapeamento: <CampoExtrato, String?>{
             CampoExtrato.dataLancamento: 'data',
@@ -155,13 +155,13 @@ void main() {
     );
 
     test('deve virar dezembro para janeiro mantendo o dia quando valido', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '15/12/2026;Eletronicos;250,00\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -176,14 +176,14 @@ void main() {
     });
 
     test('deve detectar entrada positiva como recebimento e nao como gasto', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '03/03/2026;Transferencia recebida pelo Pix - LUCIANA BARROS VIEIRA;150,00\n'
         '04/03/2026;IFOOD PEDIDO;-40,00\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -206,13 +206,13 @@ void main() {
     });
 
     test('deve marcar valores muito baixos como suspeitos', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final ResultadoLeituraCsv csv = service.lerCsv(
+      final service = ExtratoCsvService();
+      final csv = service.lerCsv(
         'data;descricao;valor\n'
         '05/03/2026;Transferencia Recebida;0,01\n',
       );
 
-      final ResultadoMapeamentoExtrato resultado = service.mapearParaGastos(
+      final resultado = service.mapearParaGastos(
         csv: csv,
         mapeamento: <CampoExtrato, String?>{
           CampoExtrato.dataLancamento: 'data',
@@ -227,8 +227,8 @@ void main() {
     });
 
     test('deve sugerir cobranca pendente com nome e valor compativeis', () {
-      final ExtratoCsvService service = ExtratoCsvService();
-      final RecebimentoDetectado recebimento = RecebimentoDetectado(
+      final service = ExtratoCsvService();
+      final recebimento = RecebimentoDetectado(
         id: 'r1',
         data: DateTime(2026, 3, 3),
         valor: 150,
@@ -240,26 +240,24 @@ void main() {
         referenciaImportacao: 'h1',
       );
 
-      final List<Conta> pendentes = <Conta>[
+      final pendentes = <Conta>[
         Conta(
           id: 'c1',
           nome: 'Luciana Barros Vieira',
           descricao: 'Servico prestado',
           valor: 150,
-          data: DateTime(2026, 3, 1),
-          foiPago: false,
+          data: DateTime(2026, 3),
         ),
         Conta(
           id: 'c2',
           nome: 'Outro Cliente',
           descricao: 'Projeto',
           valor: 150,
-          data: DateTime(2026, 3, 1),
-          foiPago: false,
+          data: DateTime(2026, 3),
         ),
       ];
 
-      final List<SugestaoVinculoRecebimento> sugestoes = service
+      final sugestoes = service
           .sugerirVinculosParaRecebimento(
             recebimento: recebimento,
             contasPendentes: pendentes,

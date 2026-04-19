@@ -7,11 +7,11 @@ class DashboardLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s16),
+    return const Padding(
+      padding: EdgeInsets.all(AppSpacing.s16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
+        children: [
           AppSkeletonBox(height: 28, width: 220),
           SizedBox(height: AppSpacing.s8),
           AppSkeletonBox(height: 18, width: 180),

@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 class DashboardHeaderSection extends StatelessWidget {
   const DashboardHeaderSection({
-    super.key,
-    required this.tituloPeriodo,
-    required this.insight,
+    required this.tituloPeriodo, required this.insight, super.key,
   });
 
   final String tituloPeriodo;
@@ -12,7 +10,7 @@ class DashboardHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

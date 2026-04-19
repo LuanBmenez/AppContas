@@ -41,10 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _entrando = true);
     try {
-      final FirebaseAuth auth = FirebaseAuth.instance;
-      final String email = _emailController.text.trim();
-      final String senha = _senhaController.text;
-      final String nomeBase = email.contains('@')
+      final auth = FirebaseAuth.instance;
+      final email = _emailController.text.trim();
+      final senha = _senhaController.text;
+      final nomeBase = email.contains('@')
           ? email.split('@').first
           : 'Usuario';
 
@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
           email: email,
           password: senha,
         );
-        final User? novoUser = auth.currentUser;
+        final novoUser = auth.currentUser;
         if (novoUser != null &&
             (novoUser.displayName == null ||
                 novoUser.displayName!.trim().isEmpty)) {
@@ -63,8 +63,8 @@ class _LoginScreenState extends State<LoginScreen> {
         await auth.signInWithEmailAndPassword(email: email, password: senha);
       }
 
-      final String uid = auth.currentUser!.uid;
-      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final uid = auth.currentUser!.uid;
+      final firestore = FirebaseFirestore.instance;
       await firestore.collection('users').doc(uid).set({
         'email': email,
         'nome': nomeBase,
@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String _mensagemErroAuth(FirebaseAuthException e) {
-    final String mensagem = (e.message ?? '').toUpperCase();
+    final mensagem = (e.message ?? '').toUpperCase();
     if (mensagem.contains('CONFIGURATION_NOT_FOUND')) {
       return 'Configuração do Firebase Auth ausente para este app Android. Atualize o google-services.json e os SHA-1/SHA-256 no Firebase.';
     }
@@ -134,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double tecladoAberto = MediaQuery.viewInsetsOf(context).bottom;
+    final tecladoAberto = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       body: SafeArea(
@@ -187,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 prefixIcon: Icon(Icons.alternate_email),
                               ),
                               validator: (value) {
-                                final String email = (value ?? '').trim();
+                                final email = (value ?? '').trim();
                                 if (email.isEmpty) {
                                   return 'Informe o e-mail.';
                                 }
@@ -223,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               validator: (value) {
-                                final String senha = value ?? '';
+                                final senha = value ?? '';
                                 if (senha.isEmpty) {
                                   return 'Informe a senha.';
                                 }

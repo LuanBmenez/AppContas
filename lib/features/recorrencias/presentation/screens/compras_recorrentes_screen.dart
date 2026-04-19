@@ -7,7 +7,7 @@ import 'package:paga_o_que_me_deve/features/recorrencias/data/services/recorrenc
 import 'package:paga_o_que_me_deve/features/recorrencias/domain/models/recorrencia_ativa.dart';
 
 class ComprasRecorrentesScreen extends StatefulWidget {
-  const ComprasRecorrentesScreen({super.key, required this.db});
+  const ComprasRecorrentesScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -49,7 +49,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Future<void> _pausarRecorrencia(RecorrenciaAtiva item) async {
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Pausar recorrência',
       message:
@@ -65,8 +65,8 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Future<void> _reativarRecorrencia(RecorrenciaAtiva item) async {
-    int meses = 3;
-    final bool? confirmar = await showDialog<bool>(
+    var meses = 3;
+    final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -115,9 +115,9 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Future<void> _configurarNotificacao(RecorrenciaAtiva item) async {
-    bool ativa = item.notificacaoAtiva;
-    int diasAntes = item.diasAntesNotificacao;
-    final bool? confirmar = await showDialog<bool>(
+    var ativa = item.notificacaoAtiva;
+    var diasAntes = item.diasAntesNotificacao;
+    final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -185,7 +185,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Future<void> _removerProximos(RecorrenciaAtiva item) async {
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Remover próximos lançamentos',
       message:
@@ -201,7 +201,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Future<void> _removerCompleta(RecorrenciaAtiva item) async {
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Remover recorrência',
       message:
@@ -327,7 +327,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Compras recorrentes')),
@@ -349,8 +349,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
             );
           }
 
-          final List<RecorrenciaAtiva> recorrencias =
-              snapshot.data ?? <RecorrenciaAtiva>[];
+          final recorrencias = snapshot.data ?? <RecorrenciaAtiva>[];
           if (recorrencias.isEmpty) {
             return Center(
               child: Padding(

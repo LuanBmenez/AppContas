@@ -7,10 +7,7 @@ enum HomeTab { inicio, gastos, receber, guardado, perfil }
 
 class HomeShellScreen extends StatelessWidget {
   const HomeShellScreen({
-    super.key,
-    required this.db,
-    required this.currentTab,
-    required this.child,
+    required this.db, required this.currentTab, required this.child, super.key,
   });
 
   final FinanceRepository db;
@@ -85,7 +82,7 @@ class HomeShellScreen extends StatelessWidget {
           height: 70,
           elevation: 4,
           labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
-            final bool ativo = states.contains(WidgetState.selected);
+            final ativo = states.contains(WidgetState.selected);
             return TextStyle(
               fontSize: 12,
               fontWeight: ativo ? FontWeight.w700 : FontWeight.w500,

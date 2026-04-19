@@ -117,7 +117,7 @@ class RecorrenciasService {
   List<DateTime> _gerarProximasDatas({required DateTime aPartirDe, required int diaDoMes, required int quantidade}) {
     final datas = <DateTime>[];
     var cursor = _calcularProximoVencimento(aPartirDe, diaDoMes);
-    for (int i = 0; i < quantidade; i++) {
+    for (var i = 0; i < quantidade; i++) {
       datas.add(cursor);
       cursor = _dataComDia(cursor.year, cursor.month + 1, diaDoMes);
     }

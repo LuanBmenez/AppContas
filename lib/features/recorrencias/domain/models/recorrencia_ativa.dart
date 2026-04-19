@@ -48,9 +48,9 @@ class RecorrenciaAtiva {
   int get quantidadeFutura => ativosDesdeHoje.length;
 
   int get venceEmDias {
-    final DateTime hoje = DateTime.now();
-    final DateTime inicioHoje = DateTime(hoje.year, hoje.month, hoje.day);
-    final DateTime inicioVencimento = DateTime(
+    final hoje = DateTime.now();
+    final inicioHoje = DateTime(hoje.year, hoje.month, hoje.day);
+    final inicioVencimento = DateTime(
       proximoVencimento.year,
       proximoVencimento.month,
       proximoVencimento.day,

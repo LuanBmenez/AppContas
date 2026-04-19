@@ -113,6 +113,55 @@ class Guardado {
     this.observacao,
   });
 
+  factory Guardado.fromMap(Map<String, dynamic> map, String id) {
+    final dynamic rawData = map['data'];
+    DateTime data;
+
+    if (rawData is Timestamp) {
+      data = rawData.toDate();
+    } else if (rawData is DateTime) {
+      data = rawData;
+    } else if (rawData is String) {
+      data = DateTime.tryParse(rawData) ?? DateTime.now();
+    } else {
+      data = DateTime.now();
+    }
+
+    final destinoRaw =
+        (map['destino'] as String?) ?? GuardadoDestino.semDestino.name;
+    final destino = GuardadoDestino.values.firstWhere(
+      (item) => item.name == destinoRaw,
+      orElse: () => GuardadoDestino.semDestino,
+    );
+
+    final tipoRaw =
+        (map['tipoMovimentacao'] as String?) ??
+        GuardadoTipoMovimentacao.aporte.name;
+    final tipoMovimentacao =
+        GuardadoTipoMovimentacao.values.firstWhere(
+          (item) => item.name == tipoRaw,
+          orElse: () => GuardadoTipoMovimentacao.aporte,
+        );
+
+    final observacao = (map['observacao'] as String?)?.trim();
+    final metaNome = (map['metaNome'] as String?)?.trim();
+
+    return Guardado(
+      id: id,
+      valor: (map['valor'] as num?)?.toDouble() ?? 0,
+      data: data,
+      competencia:
+          (map['competencia'] as String?)?.trim().isNotEmpty == true
+              ? (map['competencia'] as String).trim()
+              : competenciaFromDate(data),
+      destino: destino,
+      tipoMovimentacao: tipoMovimentacao,
+      metaNome: (metaNome == null || metaNome.isEmpty) ? null : metaNome,
+      observacao:
+          (observacao == null || observacao.isEmpty) ? null : observacao,
+    );
+  }
+
   final String id;
   final double valor;
   final DateTime data;
@@ -151,8 +200,8 @@ class Guardado {
   }
 
   Map<String, dynamic> toMap() {
-    final String? obs = observacao?.trim();
-    final String? meta = metaNome?.trim();
+    final obs = observacao?.trim();
+    final meta = metaNome?.trim();
 
     return <String, dynamic>{
       'valor': valor,
@@ -163,54 +212,5 @@ class Guardado {
       'metaNome': (meta == null || meta.isEmpty) ? null : meta,
       'observacao': (obs == null || obs.isEmpty) ? null : obs,
     };
-  }
-
-  factory Guardado.fromMap(Map<String, dynamic> map, String id) {
-    final dynamic rawData = map['data'];
-    DateTime data;
-
-    if (rawData is Timestamp) {
-      data = rawData.toDate();
-    } else if (rawData is DateTime) {
-      data = rawData;
-    } else if (rawData is String) {
-      data = DateTime.tryParse(rawData) ?? DateTime.now();
-    } else {
-      data = DateTime.now();
-    }
-
-    final String destinoRaw =
-        (map['destino'] as String?) ?? GuardadoDestino.semDestino.name;
-    final GuardadoDestino destino = GuardadoDestino.values.firstWhere(
-      (item) => item.name == destinoRaw,
-      orElse: () => GuardadoDestino.semDestino,
-    );
-
-    final String tipoRaw =
-        (map['tipoMovimentacao'] as String?) ??
-        GuardadoTipoMovimentacao.aporte.name;
-    final GuardadoTipoMovimentacao tipoMovimentacao =
-        GuardadoTipoMovimentacao.values.firstWhere(
-          (item) => item.name == tipoRaw,
-          orElse: () => GuardadoTipoMovimentacao.aporte,
-        );
-
-    final String? observacao = (map['observacao'] as String?)?.trim();
-    final String? metaNome = (map['metaNome'] as String?)?.trim();
-
-    return Guardado(
-      id: id,
-      valor: (map['valor'] as num?)?.toDouble() ?? 0,
-      data: data,
-      competencia:
-          (map['competencia'] as String?)?.trim().isNotEmpty == true
-              ? (map['competencia'] as String).trim()
-              : competenciaFromDate(data),
-      destino: destino,
-      tipoMovimentacao: tipoMovimentacao,
-      metaNome: (metaNome == null || metaNome.isEmpty) ? null : metaNome,
-      observacao:
-          (observacao == null || observacao.isEmpty) ? null : observacao,
-    );
   }
 }

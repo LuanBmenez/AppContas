@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/domain/models/recebimento.dart';
 
 class RecebimentoStatusChip extends StatelessWidget {
-  const RecebimentoStatusChip({super.key, required this.status});
+  const RecebimentoStatusChip({required this.status, super.key});
 
   final StatusRecebimento status;
 
@@ -15,15 +15,12 @@ class RecebimentoStatusChip extends StatelessWidget {
       case StatusRecebimento.pendente:
         color = Colors.orange;
         label = 'Pendente';
-        break;
       case StatusRecebimento.recebido:
         color = Colors.green;
         label = 'Recebido';
-        break;
       case StatusRecebimento.atrasado:
         color = Colors.red;
         label = 'Atrasado';
-        break;
     }
 
     return Chip(

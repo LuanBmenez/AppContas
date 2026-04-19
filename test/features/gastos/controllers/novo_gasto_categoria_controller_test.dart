@@ -7,7 +7,7 @@ import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo
 void main() {
   group('NovoGastoCategoriaController', () {
     test('prioriza regra aprendida sobre sugestao padrao', () {
-      final CategoriaSugestaoResultado resultado =
+      final resultado =
           NovoGastoCategoriaController.sugerirPorTitulo(
             titulo: 'Amazon marketplace pedido 123',
             categoriasAtivas: const <CategoriaPersonalizada>[],
@@ -25,14 +25,14 @@ void main() {
     });
 
     test('prioriza categoria personalizada quando titulo contem nome', () {
-      const CategoriaPersonalizada personalizada = CategoriaPersonalizada(
+      const personalizada = CategoriaPersonalizada(
         id: 'cat1',
         nome: 'Casa',
         corValue: 0xFF0D9488,
         iconeCodePoint: 0xe88a,
       );
 
-      final CategoriaSugestaoResultado resultado =
+      final resultado =
           NovoGastoCategoriaController.sugerirPorTitulo(
             titulo: 'Conta casa energisa',
             categoriasAtivas: const <CategoriaPersonalizada>[personalizada],

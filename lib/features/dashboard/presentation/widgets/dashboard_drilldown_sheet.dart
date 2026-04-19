@@ -18,7 +18,7 @@ Future<void> showDashboardDrillDownSheet({
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (context) {
-      final double percentual = totalBase <= 0
+      final percentual = totalBase <= 0
           ? 0
           : (categoria.valor / totalBase) * 100;
 

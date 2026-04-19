@@ -1,4 +1,4 @@
-import '../models/recebimento.dart';
+import 'package:paga_o_que_me_deve/domain/models/recebimento.dart';
 
 abstract class RecebimentosRepository {
   Stream<List<Recebimento>> streamRecebimentosPorMes(String competenciaMes);

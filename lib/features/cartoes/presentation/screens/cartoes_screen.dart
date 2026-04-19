@@ -5,7 +5,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/data/services/cartoes_service.dart';
 
 class CartoesScreen extends StatelessWidget {
-  const CartoesScreen({super.key, required this.db});
+  const CartoesScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -40,7 +40,7 @@ class CartoesScreen extends StatelessWidget {
             );
           }
 
-          final List<CartaoCredito> cartoes =
+          final cartoes =
               snapshot.data ?? <CartaoCredito>[];
           if (cartoes.isEmpty) {
             return const Center(
@@ -59,7 +59,7 @@ class CartoesScreen extends StatelessWidget {
             itemCount: cartoes.length,
             separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.s12),
             itemBuilder: (context, index) {
-              final CartaoCredito cartao = cartoes[index];
+              final cartao = cartoes[index];
 
               return Card(
                 child: ListTile(
@@ -85,7 +85,7 @@ class CartoesScreen extends StatelessWidget {
     BuildContext context,
     CartaoCredito cartao,
   ) async {
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Excluir cartao',
       message: 'Deseja excluir ${cartao.label}?',
@@ -99,17 +99,17 @@ class CartoesScreen extends StatelessWidget {
   }
 
   Future<void> _abrirNovoCartaoDialog(BuildContext context) async {
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-    final TextEditingController nomeController = TextEditingController();
-    final TextEditingController finalController = TextEditingController();
-    final TextEditingController fechamentoController = TextEditingController(
+    final formKey = GlobalKey<FormState>();
+    final nomeController = TextEditingController();
+    final finalController = TextEditingController();
+    final fechamentoController = TextEditingController(
       text: '10',
     );
-    final TextEditingController vencimentoController = TextEditingController(
+    final vencimentoController = TextEditingController(
       text: '20',
     );
 
-    final bool? salvar = await showDialog<bool>(
+    final salvar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -138,7 +138,7 @@ class CartoesScreen extends StatelessWidget {
                       labelText: 'Final (4 digitos)',
                     ),
                     validator: (value) {
-                      final String digits = (value ?? '').replaceAll(
+                      final digits = (value ?? '').replaceAll(
                         RegExp(r'\D'),
                         '',
                       );
@@ -187,7 +187,7 @@ class CartoesScreen extends StatelessWidget {
       return;
     }
 
-    final CartaoCredito novo = CartaoCredito(
+    final novo = CartaoCredito(
       id: '',
       nome: nomeController.text.trim(),
       finalCartao: finalController.text.replaceAll(RegExp(r'\D'), ''),
@@ -199,7 +199,7 @@ class CartoesScreen extends StatelessWidget {
   }
 
   String? _validarDia(String? value) {
-    final int? dia = int.tryParse((value ?? '').trim());
+    final dia = int.tryParse((value ?? '').trim());
     if (dia == null || dia < 1 || dia > 31) {
       return 'Dia deve ser 1..31.';
     }

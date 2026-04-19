@@ -4,9 +4,9 @@ import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_te
 void main() {
   group('AppTelemetryService', () {
     test('ignora evento fora do contrato', () {
-      final _SpyTelemetryProvider spy = _SpyTelemetryProvider();
-      final AppTelemetryService service = AppTelemetryService(
-        providers: <TelemetryProvider>[spy],
+      final spy = _SpyTelemetryProvider();
+      final service = AppTelemetryService(
+        providers: <TelemetrySender>[spy.call],
       );
 
       service.logEvent(
@@ -18,9 +18,9 @@ void main() {
     });
 
     test('filtra parametros nao permitidos pelo contrato', () {
-      final _SpyTelemetryProvider spy = _SpyTelemetryProvider();
-      final AppTelemetryService service = AppTelemetryService(
-        providers: <TelemetryProvider>[spy],
+      final spy = _SpyTelemetryProvider();
+      final service = AppTelemetryService(
+        providers: <TelemetrySender>[spy.call],
       );
 
       service.logEvent(
@@ -39,12 +39,12 @@ void main() {
     });
 
     test('sanitiza mensagem de erro longa', () {
-      final _SpyTelemetryProvider spy = _SpyTelemetryProvider();
-      final AppTelemetryService service = AppTelemetryService(
-        providers: <TelemetryProvider>[spy],
+      final spy = _SpyTelemetryProvider();
+      final service = AppTelemetryService(
+        providers: <TelemetrySender>[spy.call],
       );
 
-      final String erroLongo = 'x' * 500;
+      final erroLongo = 'x' * 500;
       service.logEvent(
         AppTelemetryEvents.dashboardExportPdfException,
         params: <String, Object?>{
@@ -54,17 +54,16 @@ void main() {
         },
       );
 
-      final String mensagem = spy.calls.first.params['erroMensagem']! as String;
+      final mensagem = spy.calls.first.params['erroMensagem']! as String;
       expect(mensagem.length <= 120, isTrue);
     });
   });
 }
 
-class _SpyTelemetryProvider implements TelemetryProvider {
+class _SpyTelemetryProvider {
   final List<_TelemetryCall> calls = <_TelemetryCall>[];
 
-  @override
-  Future<void> send(String event, Map<String, Object?> params) async {
+  Future<void> call(String event, Map<String, Object?> params) async {
     calls.add(_TelemetryCall(event: event, params: params));
   }
 }

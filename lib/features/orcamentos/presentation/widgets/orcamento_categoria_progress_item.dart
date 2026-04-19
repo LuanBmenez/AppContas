@@ -6,8 +6,7 @@ import 'package:paga_o_que_me_deve/features/orcamentos/domain/models/orcamento_c
 
 class OrcamentoCategoriaProgressItem extends StatelessWidget {
   const OrcamentoCategoriaProgressItem({
-    super.key,
-    required this.resumo,
+    required this.resumo, super.key,
     this.onTap,
     this.onDelete,
     this.compacto = false,
@@ -45,9 +44,9 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final Color statusColor = _statusColor(theme);
-    final double progress = resumo.percentualUtilizado.clamp(0, 1).toDouble();
+    final theme = Theme.of(context);
+    final statusColor = _statusColor(theme);
+    final progress = resumo.percentualUtilizado.clamp(0, 1).toDouble();
 
     return Card(
       margin: EdgeInsets.zero,

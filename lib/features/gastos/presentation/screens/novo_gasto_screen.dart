@@ -10,7 +10,7 @@ import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.
 import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo_gasto_categoria_controller.dart';
 
 class NovoGastoScreen extends StatefulWidget {
-  const NovoGastoScreen({super.key, required this.db});
+  const NovoGastoScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -99,7 +99,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Future<void> _inicializarCategorias() async {
-    final PreferenciasNovoGasto preferencias = await _categoriasService
+    final preferencias = await _categoriasService
         .carregarPreferenciasNovoGasto();
 
     if (!mounted) {
@@ -122,17 +122,17 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
-      final List<CategoriaPersonalizada> categoriasAtivas = _categoriasService
+      final categoriasAtivas = _categoriasService
           .categoriasAtivas(categorias);
 
-      final CategoriaSugestaoResultado sugestao =
+      final sugestao =
           NovoGastoCategoriaController.sugerirPorTitulo(
             titulo: _tituloController?.text ?? '',
             categoriasAtivas: categoriasAtivas,
             regrasAprendidas: _regrasAprendidas,
           );
 
-      final bool categoriaPendenteChegou =
+      final categoriaPendenteChegou =
           _categoriaPendenteSelecionarId != null &&
           categorias.any((c) => c.id == _categoriaPendenteSelecionarId);
 
@@ -175,7 +175,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
-      final CategoriaSugestaoResultado sugestao =
+      final sugestao =
           NovoGastoCategoriaController.sugerirPorTitulo(
             titulo: _tituloController?.text ?? '',
             categoriasAtivas: _categoriasAtivas,
@@ -240,7 +240,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   void _sincronizarSugestaoPorTitulo({required bool aplicarAutomaticamente}) {
-    final CategoriaSugestaoResultado sugestao = _calcularSugestaoPorTitulo();
+    final sugestao = _calcularSugestaoPorTitulo();
 
     if (!mounted || _isDisposed) {
       return;
@@ -265,8 +265,8 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Future<void> _verificarPossiveisDuplicados() async {
-    final String titulo = _tituloController?.text.trim() ?? '';
-    final double? valor = _valorAtualOuNull();
+    final titulo = _tituloController?.text.trim() ?? '';
+    final valor = _valorAtualOuNull();
 
     if (titulo.length < 3 || valor == null || valor <= 0) {
       if (!mounted || _isDisposed) {
@@ -285,7 +285,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     setState(() => _carregandoDuplicados = true);
 
     try {
-      final int duplicados = await _gastosService
+      final duplicados = await _gastosService
           .contarPossiveisDuplicadosNoMesmoDia(
             titulo: titulo,
             valor: valor,
@@ -313,7 +313,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Future<void> _buscarSugestaoRecorrenciaPorHistorico() async {
-    final String titulo = _tituloController?.text.trim() ?? '';
+    final titulo = _tituloController?.text.trim() ?? '';
 
     if (titulo.length < 3) {
       if (!mounted || _isDisposed) {
@@ -332,7 +332,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
     setState(() => _carregandoSugestaoRecorrencia = true);
 
-    final SugestaoRecorrenciaDespesa? sugestao = await _gastosService
+    final sugestao = await _gastosService
         .sugerirRecorrenciaPorTitulo(titulo);
 
     if (!mounted || _isDisposed) {
@@ -353,7 +353,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   String _normalizarMensagemErro(Object error) {
-    final String lower = error.toString().toLowerCase();
+    final lower = error.toString().toLowerCase();
     if (lower.contains('firestore.googleapis.com') ||
         lower.contains('permission_denied')) {
       return 'Erro no Firestore. Tente novamente.';
@@ -372,9 +372,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   String _formatarValorPreview() {
-    final double? valor = _valorAtualOuNull();
+    final valor = _valorAtualOuNull();
     if (valor == null) {
-      return 'R\$ 0,00';
+      return r'R$ 0,00';
     }
     return AppFormatters.moeda(valor);
   }
@@ -391,7 +391,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Color get _categoriaCorPreview {
-    final CategoriaPersonalizada? custom = _categoriaCustomSelecionada;
+    final custom = _categoriaCustomSelecionada;
     if (custom != null) {
       return custom.cor;
     }
@@ -399,7 +399,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   IconData get _categoriaIconePreview {
-    final CategoriaPersonalizada? custom = _categoriaCustomSelecionada;
+    final custom = _categoriaCustomSelecionada;
     if (custom != null) {
       return custom.icone;
     }
@@ -407,7 +407,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   String get _categoriaNomePreview {
-    final CategoriaPersonalizada? custom = _categoriaCustomSelecionada;
+    final custom = _categoriaCustomSelecionada;
     if (custom != null) {
       return custom.nome;
     }
@@ -428,7 +428,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Future<void> _selecionarData() async {
-    final DateTime? novaData = await showDatePicker(
+    final novaData = await showDatePicker(
       context: context,
       initialDate: _dataSelecionada,
       firstDate: DateTime(2020),
@@ -476,12 +476,12 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     setState(() => _salvando = true);
 
     try {
-      final double valor = AppFormatters.parseMoedaInput(
+      final valor = AppFormatters.parseMoedaInput(
         _valorController?.text ?? '',
       );
-      final CategoriaPersonalizada? custom = _categoriaCustomSelecionada;
+      final custom = _categoriaCustomSelecionada;
 
-      final Gasto novoGasto = Gasto(
+      final novoGasto = Gasto(
         id: '',
         titulo: _tituloController?.text.trim() ?? '',
         valor: valor,
@@ -530,10 +530,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   Future<void> _abrirModalNovaCategoria() async {
     if (_salvandoCategoria) return;
 
-    final _NovaCategoriaDialogResult? result =
+    final result =
         await showDialog<_NovaCategoriaDialogResult>(
           context: context,
-          barrierDismissible: true,
           builder: (dialogContext) => const _NovaCategoriaDialog(),
         );
 
@@ -541,7 +540,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       return;
     }
 
-    final String nome = result.nome.trim();
+    final nome = result.nome.trim();
 
     if (nome.length < 3) {
       AppFeedback.showError(
@@ -562,14 +561,12 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     setState(() => _salvandoCategoria = true);
 
     try {
-      final CategoriaPersonalizada categoria = CategoriaPersonalizada(
+      final categoria = CategoriaPersonalizada(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         nome: nome,
         corValue: result.cor.toARGB32(),
         iconeCodePoint: result.icone.codePoint,
         favorita: result.favorita,
-        arquivada: false,
-        usoCount: 0,
       );
 
       await _categoriasService.salvarCategoriaPersonalizada(categoria);
@@ -723,11 +720,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Widget _buildCategoriaSection(ThemeData theme) {
-    final List<CategoriaGasto> padrao = _categoriasPadraoFiltradas();
-    final List<CategoriaPersonalizada> personalizadas =
+    final padrao = _categoriasPadraoFiltradas();
+    final personalizadas =
         _categoriasPersonalizadasFiltradas();
 
-    final String? categoriaPersonalizadaSelecionadaValida =
+    final categoriaPersonalizadaSelecionadaValida =
         _categoriaPersonalizadaSelecionadaId != null &&
             personalizadas.any(
               (c) => c.id == _categoriaPersonalizadaSelecionadaId,
@@ -824,7 +821,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
             ),
             items: <DropdownMenuItem<String?>>[
               const DropdownMenuItem<String?>(
-                value: null,
                 child: Text('Nenhuma'),
               ),
               ...personalizadas.map(
@@ -852,7 +848,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     if (_carregandoPreferencias) {
       return const Center(child: CircularProgressIndicator());
@@ -896,7 +892,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) {
-                    final String texto = (value ?? '').trim();
+                    final texto = (value ?? '').trim();
                     if (texto.length < 3) {
                       return 'Informe um título com ao menos 3 caracteres.';
                     }
@@ -915,7 +911,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) {
-                    final double? valor = _valorAtualOuNull();
+                    final valor = _valorAtualOuNull();
                     if (valor == null || valor <= 0) {
                       return 'Informe um valor válido.';
                     }
@@ -1138,7 +1134,7 @@ class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
   }
 
   void _salvar() {
-    final String nome = _nomeController.text.trim();
+    final nome = _nomeController.text.trim();
 
     Navigator.of(context).pop(
       _NovaCategoriaDialogResult(
@@ -1181,7 +1177,7 @@ class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
               spacing: AppSpacing.s8,
               runSpacing: AppSpacing.s8,
               children: _cores.map((cor) {
-                final bool selecionada =
+                final selecionada =
                     cor.toARGB32() == _corSelecionada.toARGB32();
 
                 return InkWell(
@@ -1218,7 +1214,7 @@ class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
               spacing: AppSpacing.s8,
               runSpacing: AppSpacing.s8,
               children: _icones.map((icone) {
-                final bool selecionado =
+                final selecionado =
                     icone.codePoint == _iconeSelecionado.codePoint;
 
                 return InkWell(

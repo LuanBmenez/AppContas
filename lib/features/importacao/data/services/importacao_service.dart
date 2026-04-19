@@ -42,11 +42,11 @@ class ImportacaoService {
     required List<Conta> contas,
     required String referenciaImportacao,
   }) {
-    final String marcador = _marcadorImportacao(referenciaImportacao);
+    final marcador = _marcadorImportacao(referenciaImportacao);
 
     return contas.any((conta) {
-      final bool naDescricao = conta.descricao.contains(marcador);
-      final bool noHistorico = conta.historico.any(
+      final naDescricao = conta.descricao.contains(marcador);
+      final noHistorico = conta.historico.any(
         (evento) => evento.descricao.contains(marcador),
       );
       return naDescricao || noHistorico;
@@ -64,11 +64,11 @@ class ImportacaoService {
       return;
     }
 
-    final String detalhe =
+    final detalhe =
         'Recebimento via importacao CSV em ${AppFormatters.dataCurta(dataRecebimento)} '
         '(${AppFormatters.moeda(valorRecebido)}).';
 
-    final String descricaoAtualizada = _anexarDetalhesNaDescricao(
+    final descricaoAtualizada = _anexarDetalhesNaDescricao(
       conta.descricao,
       detalhe,
       referencia,
@@ -91,11 +91,11 @@ class ImportacaoService {
     required double valor,
     required String referenciaImportacao,
   }) {
-    final String detalhe =
+    final detalhe =
         'Recebimento via importacao CSV em ${AppFormatters.dataCurta(data)} '
         '(${AppFormatters.moeda(valor)}).';
 
-    final String descricaoFinal = _anexarDetalhesNaDescricao(
+    final descricaoFinal = _anexarDetalhesNaDescricao(
       descricao,
       detalhe,
       descricao,
@@ -132,19 +132,19 @@ class ImportacaoService {
     String referencia,
     String referenciaImportacao,
   ) {
-    final String descricaoBase = descricaoAtual.trim();
-    final String referenciaLimpa = referencia.trim();
-    final String marcador = _marcadorImportacao(referenciaImportacao);
+    final descricaoBase = descricaoAtual.trim();
+    final referenciaLimpa = referencia.trim();
+    final marcador = _marcadorImportacao(referenciaImportacao);
 
     if (descricaoBase.contains(marcador)) {
       return descricaoBase;
     }
 
-    final String referenciaCurta = referenciaLimpa.length > 120
+    final referenciaCurta = referenciaLimpa.length > 120
         ? '${referenciaLimpa.substring(0, 120)}...'
         : referenciaLimpa;
 
-    final String bloco =
+    final bloco =
         '$marcador $detalhe'
         '${referenciaCurta.isEmpty ? '' : ' Ref: $referenciaCurta'}';
 

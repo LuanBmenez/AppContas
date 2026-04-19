@@ -6,11 +6,7 @@ import 'package:paga_o_que_me_deve/features/dashboard/presentation/widgets/barra
 
 class CategoriasBarrasCard extends StatelessWidget {
   const CategoriasBarrasCard({
-    super.key,
-    required this.total,
-    required this.periodo,
-    required this.data,
-    required this.mostrarValores,
+    required this.total, required this.periodo, required this.data, required this.mostrarValores, super.key,
     this.onTapCategoria,
   });
 
@@ -22,8 +18,8 @@ class CategoriasBarrasCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final List<DashboardCategoriaResumo> barras = data.take(6).toList();
+    final theme = Theme.of(context);
+    final barras = data.take(6).toList();
 
     return Container(
       width: double.infinity,

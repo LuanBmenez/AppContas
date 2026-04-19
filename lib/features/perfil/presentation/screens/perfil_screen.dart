@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
@@ -38,7 +37,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   Future<void> _inicializarPerfilSePossivel({
     bool showErrorFeedback = false,
   }) async {
-    final User? user = _perfilService.usuarioAtual;
+    final user = _perfilService.usuarioAtual;
     if (user == null || _isInitializingProfile) {
       return;
     }
@@ -94,12 +93,11 @@ class _PerfilScreenState extends State<PerfilScreen> {
       return;
     }
 
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Sair da conta',
       message: 'Deseja encerrar a sessão neste dispositivo?',
       confirmText: 'Sair',
-      cancelText: 'Cancelar',
     );
 
     if (!confirmar) {
@@ -135,7 +133,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
       return;
     }
 
-    final String? novoNome = await _abrirDialogEditarNome(
+    final novoNome = await _abrirDialogEditarNome(
       nomeAtual: perfil.nomeExibicao,
     );
 
@@ -175,12 +173,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Future<String?> _abrirDialogEditarNome({required String nomeAtual}) async {
-    final TextEditingController controller = TextEditingController(
+    final controller = TextEditingController(
       text: nomeAtual,
     );
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+    final formKey = GlobalKey<FormState>();
 
-    final String? result = await showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -196,7 +194,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
-                final String text = (value ?? '').trim();
+                final text = (value ?? '').trim();
 
                 if (text.length < 2) {
                   return 'Informe um nome com ao menos 2 letras.';
@@ -319,7 +317,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final User? user = _perfilService.usuarioAtual;
+    final user = _perfilService.usuarioAtual;
 
     if (user == null) {
       _agendarRedirecionamentoLogin();
@@ -360,7 +358,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           );
         }
 
-        final PerfilUsuario? perfil = snapshot.data;
+        final perfil = snapshot.data;
 
         if (perfil == null) {
           return _buildCenteredState(
@@ -379,8 +377,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _buildPerfilContent(PerfilUsuario perfil) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.s16),
@@ -576,8 +574,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _buildHeaderCard(PerfilUsuario perfil) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return AppSectionCard(
       child: Column(
@@ -659,7 +657,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required String label,
     required String value,
   }) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -689,8 +687,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required String title,
     required String subtitle,
   }) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,7 +713,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    final bool isBusy = _isBusy(actionKey);
+    final isBusy = _isBusy(actionKey);
 
     return ListTile(
       contentPadding: EdgeInsets.zero,

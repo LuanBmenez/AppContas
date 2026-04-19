@@ -5,9 +5,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 
 class DashboardHeroSaldoCard extends StatelessWidget {
   const DashboardHeroSaldoCard({
-    super.key,
-    required this.resumo,
-    required this.mostrarValores,
+    required this.resumo, required this.mostrarValores, super.key,
     this.onTap,
   });
 
@@ -17,9 +15,9 @@ class DashboardHeroSaldoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
-    const AppSemanticColors fallbackSemantic = AppSemanticColors(
+    const fallbackSemantic = AppSemanticColors(
       success: Color(0xFF0F9D7A),
       successContainer: Color(0xFFE5F6F2),
       warning: Color(0xFFC26A00),
@@ -28,10 +26,10 @@ class DashboardHeroSaldoCard extends StatelessWidget {
       errorContainer: Color(0xFFFDE8E8),
     );
 
-    final AppSemanticColors semantic =
+    final semantic =
         theme.extension<AppSemanticColors>() ?? fallbackSemantic;
-    final bool saldoPositivo = resumo.saldoPositivo;
-    final List<Color> colors = saldoPositivo
+    final saldoPositivo = resumo.saldoPositivo;
+    final colors = saldoPositivo
         ? [semantic.success, semantic.success.withValues(alpha: 0.85)]
         : [semantic.error, semantic.error.withValues(alpha: 0.85)];
 

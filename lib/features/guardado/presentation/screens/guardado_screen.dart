@@ -7,7 +7,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/guardado/data/services/guardado_service.dart';
 
 class GuardadoScreen extends StatefulWidget {
-  const GuardadoScreen({super.key, required this.db});
+  const GuardadoScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -21,7 +21,6 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   DateTime _mesSelecionado = DateTime(
     DateTime.now().year,
     DateTime.now().month,
-    1,
   );
 
   @override
@@ -31,10 +30,10 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   DateTime get _inicioMes =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
+      DateTime(_mesSelecionado.year, _mesSelecionado.month);
 
   DateTime get _fimMesExclusivo =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
+      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1);
 
   String get _competenciaSelecionada =>
       Guardado.competenciaFromDate(_mesSelecionado);
@@ -44,7 +43,6 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
       _mesSelecionado = DateTime(
         _mesSelecionado.year,
         _mesSelecionado.month - 1,
-        1,
       );
     });
   }
@@ -54,7 +52,6 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
       _mesSelecionado = DateTime(
         _mesSelecionado.year,
         _mesSelecionado.month + 1,
-        1,
       );
     });
   }
@@ -69,7 +66,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
   double _somarGastosMes(List<Gasto> gastos) {
     double total = 0;
-    for (final Gasto gasto in gastos) {
+    for (final gasto in gastos) {
       if (_estaNoMes(gasto.data)) {
         total += gasto.valor;
       }
@@ -79,12 +76,12 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
   double _somarRecebidoMes(List<Conta> contas) {
     double total = 0;
-    for (final Conta conta in contas) {
+    for (final conta in contas) {
       if (!conta.foiPago) {
         continue;
       }
 
-      final DateTime dataReferencia = _dataReferenciaConta(conta);
+      final dataReferencia = _dataReferenciaConta(conta);
       if (_estaNoMes(dataReferencia)) {
         total += conta.valor;
       }
@@ -97,7 +94,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     GuardadoTipoMovimentacao? somenteTipo,
   }) {
     double total = 0;
-    for (final Guardado item in itens) {
+    for (final item in itens) {
       if (somenteTipo != null && item.tipoMovimentacao != somenteTipo) {
         continue;
       }
@@ -108,18 +105,18 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
   double _somarLiquido(Iterable<Guardado> itens) {
     double total = 0;
-    for (final Guardado item in itens) {
+    for (final item in itens) {
       total += item.valorAssinado;
     }
     return total;
   }
 
   Map<GuardadoDestino, double> _agruparPorDestino(Iterable<Guardado> itens) {
-    final Map<GuardadoDestino, double> totais = <GuardadoDestino, double>{
+    final totais = <GuardadoDestino, double>{
       for (final GuardadoDestino destino in GuardadoDestino.values) destino: 0,
     };
 
-    for (final Guardado item in itens) {
+    for (final item in itens) {
       totais[item.destino] = (totais[item.destino] ?? 0) + item.valorAssinado;
     }
 
@@ -127,31 +124,31 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   Map<String, double> _agruparPorMeta(Iterable<Guardado> itens) {
-    final Map<String, double> totais = <String, double>{};
+    final totais = <String, double>{};
 
-    for (final Guardado item in itens) {
-      final String meta = item.metaNome?.trim() ?? '';
+    for (final item in itens) {
+      final meta = item.metaNome?.trim() ?? '';
       if (meta.isEmpty) {
         continue;
       }
       totais[meta] = (totais[meta] ?? 0) + item.valorAssinado;
     }
 
-    final List<MapEntry<String, double>> entradas = totais.entries.toList()
+    final entradas = totais.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return Map<String, double>.fromEntries(entradas);
   }
 
   List<String> _metasExistentes(List<Guardado> guardados) {
-    final Set<String> metas = <String>{};
-    for (final Guardado item in guardados) {
-      final String meta = item.metaNome?.trim() ?? '';
+    final metas = <String>{};
+    for (final item in guardados) {
+      final meta = item.metaNome?.trim() ?? '';
       if (meta.isNotEmpty) {
         metas.add(meta);
       }
     }
-    final List<String> lista = metas.toList()..sort();
+    final lista = metas.toList()..sort();
     return lista;
   }
 
@@ -160,9 +157,9 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   double? _parseValor(String texto) {
-    final String normalizado = texto
+    final normalizado = texto
         .trim()
-        .replaceAll('R\$', '')
+        .replaceAll(r'R$', '')
         .replaceAll(' ', '')
         .replaceAll('.', '')
         .replaceAll(',', '.');
@@ -175,13 +172,13 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   String _valorFormatadoComSinal(Guardado item) {
-    final String sinal =
+    final sinal =
         item.tipoMovimentacao == GuardadoTipoMovimentacao.aporte ? '+' : '-';
     return '$sinal ${AppFormatters.moeda(item.valor)}';
   }
 
   String _metaLabel(String? metaNome) {
-    final String meta = metaNome?.trim() ?? '';
+    final meta = metaNome?.trim() ?? '';
     return meta.isEmpty ? 'Sem meta' : meta;
   }
 
@@ -189,7 +186,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     required DateTime dataAtual,
     required ValueChanged<DateTime> onSelecionada,
   }) async {
-    final DateTime? novaData = await showDatePicker(
+    final novaData = await showDatePicker(
       context: context,
       initialDate: dataAtual,
       firstDate: DateTime(2020),
@@ -203,12 +200,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   Future<void> _abrirFormularioGuardado({
-    Guardado? existente,
-    required GuardadoTipoMovimentacao tipoInicial,
-    required double saldoMes,
-    required double totalAportesMes,
-    required double saldoGuardadoTotal,
-    required List<String> metasExistentes,
+    required GuardadoTipoMovimentacao tipoInicial, required double saldoMes, required double totalAportesMes, required double saldoGuardadoTotal, required List<String> metasExistentes, Guardado? existente,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -231,12 +223,10 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   Future<void> _excluirItem(Guardado item) async {
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Excluir movimentação',
       message: 'Deseja excluir esta movimentação do guardado?',
-      confirmText: 'Excluir',
-      cancelText: 'Cancelar',
     );
 
     if (!confirmar) {
@@ -249,7 +239,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
         return;
       }
       AppFeedback.showSuccess(context, 'Movimentação excluída com sucesso.');
-    } catch (e) {
+    } on Exception catch (e) {
       if (!mounted) {
         return;
       }
@@ -375,8 +365,8 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   Widget _buildMetaResumoCard(ThemeData theme, String meta, double valor) {
-    final bool positivo = valor >= 0;
-    final Color color = positivo
+    final positivo = valor >= 0;
+    final color = positivo
         ? const Color(0xFF2563EB)
         : const Color(0xFFC26A00);
 
@@ -421,31 +411,31 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return StreamBuilder<DashboardResumo>(
       stream: widget.db.dashboardResumo,
       builder: (context, dashboardSnapshot) {
-        final DashboardResumo dashboardResumo =
+        final dashboardResumo =
             dashboardSnapshot.data ??
             const DashboardResumo(<Gasto>[], <Conta>[]);
 
         return StreamBuilder<List<Guardado>>(
           stream: _guardadoService.guardados,
           builder: (context, guardadosSnapshot) {
-            final List<Guardado> guardados =
+            final guardados =
                 guardadosSnapshot.data ?? <Guardado>[];
-            final List<String> metasExistentes = _metasExistentes(guardados);
+            final metasExistentes = _metasExistentes(guardados);
 
-            final double totalRecebidoMes = _somarRecebidoMes(
+            final totalRecebidoMes = _somarRecebidoMes(
               dashboardResumo.contas,
             );
-            final double totalGastosMes = _somarGastosMes(
+            final totalGastosMes = _somarGastosMes(
               dashboardResumo.gastos,
             );
-            final double saldoMes = totalRecebidoMes - totalGastosMes;
+            final saldoMes = totalRecebidoMes - totalGastosMes;
 
-            final List<Guardado> guardadosMes =
+            final guardadosMes =
                 guardados
                     .where(
                       (item) => item.competencia == _competenciaSelecionada,
@@ -453,23 +443,23 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                     .toList()
                   ..sort((a, b) => b.data.compareTo(a.data));
 
-            final double totalAportesMes = _somarValores(
+            final totalAportesMes = _somarValores(
               guardadosMes,
               somenteTipo: GuardadoTipoMovimentacao.aporte,
             );
-            final double totalResgatesMes = _somarValores(
+            final totalResgatesMes = _somarValores(
               guardadosMes,
               somenteTipo: GuardadoTipoMovimentacao.resgate,
             );
-            final double saldoLiquidoMes = _somarLiquido(guardadosMes);
-            final double saldoGuardadoTotal = _somarLiquido(guardados);
+            final saldoLiquidoMes = _somarLiquido(guardadosMes);
+            final saldoGuardadoTotal = _somarLiquido(guardados);
             final double disponivelParaGuardar = math.max(
               0,
               saldoMes - totalAportesMes,
             );
-            final Map<GuardadoDestino, double> totaisPorDestino =
+            final totaisPorDestino =
                 _agruparPorDestino(guardados);
-            final Map<String, double> totaisPorMeta = _agruparPorMeta(
+            final totaisPorMeta = _agruparPorMeta(
               guardados,
             );
 
@@ -698,8 +688,8 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                   )
                 else
                   ...guardadosMes.map((item) {
-                    final Color tipoColor = item.tipoMovimentacao.color;
-                    final List<String> partes = <String>[
+                    final tipoColor = item.tipoMovimentacao.color;
+                    final partes = <String>[
                       item.tipoMovimentacao.label,
                       item.destino.label,
                       _metaLabel(item.metaNome),
@@ -848,7 +838,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
   double get _valorExistente => widget.existente?.valor ?? 0;
 
   double get _limiteAporte {
-    final double ajuste =
+    final ajuste =
         widget.existente?.tipoMovimentacao == GuardadoTipoMovimentacao.aporte
         ? _valorExistente
         : 0;
@@ -856,7 +846,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
   }
 
   double get _limiteResgate {
-    final double ajuste =
+    final ajuste =
         widget.existente?.tipoMovimentacao == GuardadoTipoMovimentacao.resgate
         ? _valorExistente
         : 0;
@@ -901,15 +891,15 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
       return;
     }
 
-    final double valor = widget.parseValor(valorController.text.trim()) ?? 0;
-    final String? meta = metaController.text.trim().isEmpty
+    final valor = widget.parseValor(valorController.text.trim()) ?? 0;
+    final meta = metaController.text.trim().isEmpty
         ? null
         : metaController.text.trim();
-    final String? observacao = observacaoController.text.trim().isEmpty
+    final observacao = observacaoController.text.trim().isEmpty
         ? null
         : observacaoController.text.trim();
 
-    final Guardado guardado = Guardado(
+    final guardado = Guardado(
       id: widget.existente?.id ?? '',
       valor: valor,
       data: dataSelecionada,
@@ -958,9 +948,9 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final bool editando = widget.existente != null;
-    final double limiteAtual =
+    final theme = Theme.of(context);
+    final editando = widget.existente != null;
+    final limiteAtual =
         tipoSelecionado == GuardadoTipoMovimentacao.aporte
         ? _limiteAporte
         : _limiteResgate;
@@ -1029,7 +1019,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
                     prefixIcon: const Icon(Icons.attach_money_rounded),
                   ),
                   validator: (value) {
-                    final double? valor = widget.parseValor(value ?? '');
+                    final valor = widget.parseValor(value ?? '');
                     if (valor == null || valor <= 0) {
                       return 'Informe um valor válido.';
                     }

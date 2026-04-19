@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/cancelamento_csv_service.dart';
 
 class CancelamentoSection extends StatelessWidget {
+  const CancelamentoSection({
+    required this.cancelamentos, required this.onAcao, super.key,
+  });
   final List<TransacaoCanceladaDetectada> cancelamentos;
   final void Function(TransacaoCanceladaDetectada, bool) onAcao;
-  const CancelamentoSection({
-    super.key,
-    required this.cancelamentos,
-    required this.onAcao,
-  });
 
   @override
   Widget build(BuildContext context) {

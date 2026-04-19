@@ -4,7 +4,7 @@ import 'package:paga_o_que_me_deve/domain/services/recorrencia_despesa_service.d
 
 void main() {
   group('RecorrenciaDespesaService', () {
-    const RecorrenciaDespesaService service = RecorrenciaDespesaService();
+    const service = RecorrenciaDespesaService();
 
     Gasto gasto(DateTime data, double valor) {
       return Gasto(

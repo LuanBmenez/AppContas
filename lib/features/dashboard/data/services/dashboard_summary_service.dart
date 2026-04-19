@@ -9,15 +9,6 @@ import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 enum DashboardPeriodoRapido { hoje, seteDias, mes, trimestre }
 
 class DashboardCategoriaResumo {
-  final String id;
-  final String label;
-  final Color color;
-  final IconData icon;
-  final double valor;
-  final bool custom;
-  final CategoriaGasto? categoriaPadrao;
-  final String? categoriaPersonalizadaId;
-
   const DashboardCategoriaResumo({
     required this.id,
     required this.label,
@@ -28,20 +19,17 @@ class DashboardCategoriaResumo {
     this.categoriaPadrao,
     this.categoriaPersonalizadaId,
   });
+  final String id;
+  final String label;
+  final Color color;
+  final IconData icon;
+  final double valor;
+  final bool custom;
+  final CategoriaGasto? categoriaPadrao;
+  final String? categoriaPersonalizadaId;
 }
 
 class DashboardResumoCalculado {
-  final double totalGastosPeriodo;
-  final double totalPendente;
-  final double saldo;
-  final bool saldoPositivo;
-  final double variacaoSaldo;
-  final double variacaoGastos;
-  final String comparativoLabel;
-  final List<DashboardCategoriaResumo> categoriasOrdenadas;
-  final DashboardCategoriaResumo? categoriaMaisGasta;
-  final DashboardCategoriaResumo? categoriaMenosGasta;
-
   const DashboardResumoCalculado({
     required this.totalGastosPeriodo,
     required this.totalPendente,
@@ -54,6 +42,16 @@ class DashboardResumoCalculado {
     required this.categoriaMaisGasta,
     required this.categoriaMenosGasta,
   });
+  final double totalGastosPeriodo;
+  final double totalPendente;
+  final double saldo;
+  final bool saldoPositivo;
+  final double variacaoSaldo;
+  final double variacaoGastos;
+  final String comparativoLabel;
+  final List<DashboardCategoriaResumo> categoriasOrdenadas;
+  final DashboardCategoriaResumo? categoriaMaisGasta;
+  final DashboardCategoriaResumo? categoriaMenosGasta;
 }
 
 class DashboardSummaryService {
@@ -84,15 +82,14 @@ class DashboardSummaryService {
     DateTime? fimExclusivoOverride,
     DateTime? agora,
   }) {
-    final DateTime referencia = agora ?? DateTime.now();
+    final referencia = agora ?? DateTime.now();
     _evictExpired(referencia);
 
-    final ({DateTime inicio, DateTime fimExclusivo}) faixaAtual =
-        inicioOverride != null && fimExclusivoOverride != null
+    final faixaAtual = inicioOverride != null && fimExclusivoOverride != null
         ? (inicio: inicioOverride, fimExclusivo: fimExclusivoOverride)
         : _faixaAtual(periodo, referencia);
 
-    final String cacheKey = [
+    final cacheKey = [
       identityHashCode(resumo),
       resumo.gastos.length,
       resumo.contas.length,
@@ -104,23 +101,24 @@ class DashboardSummaryService {
       filtroTipo?.name ?? '',
     ].join('|');
 
-    final _DashboardCacheEntry? cacheEntry = _cacheLru.remove(cacheKey);
+    final cacheEntry = _cacheLru.remove(cacheKey);
     if (cacheEntry != null) {
-      final bool expirado =
-          referencia.difference(cacheEntry.criadoEm) > _cacheTtl;
+      final expirado = referencia.difference(cacheEntry.criadoEm) > _cacheTtl;
       if (!expirado) {
         _cacheLru[cacheKey] = cacheEntry;
         return cacheEntry.valor;
       }
     }
 
-    final ({DateTime inicio, DateTime fimExclusivo}) faixaAnterior =
-        _faixaAnterior(faixaAtual.inicio, faixaAtual.fimExclusivo);
+    final faixaAnterior = _faixaAnterior(
+      faixaAtual.inicio,
+      faixaAtual.fimExclusivo,
+    );
 
     double totalGastosPeriodo = 0;
     double totalGastosPeriodoAnterior = 0;
 
-    for (final Gasto gasto in resumo.gastos) {
+    for (final gasto in resumo.gastos) {
       if (!_passaFiltroGasto(
         gasto,
         filtroCategoriaPadrao: filtroCategoriaPadrao,
@@ -149,13 +147,13 @@ class DashboardSummaryService {
     double totalRecebidoPeriodo = 0;
     double totalRecebidoPeriodoAnterior = 0;
 
-    for (final Conta conta in resumo.contas) {
+    for (final conta in resumo.contas) {
       if (!conta.foiPago) {
         totalPendente += conta.valor;
         continue;
       }
 
-      final DateTime dataReferenciaRecebimento = _dataReferenciaConta(conta);
+      final dataReferenciaRecebimento = _dataReferenciaConta(conta);
 
       if (_estaNaFaixa(
         dataReferenciaRecebimento,
@@ -172,19 +170,18 @@ class DashboardSummaryService {
       }
     }
 
-    final double saldo = totalRecebidoPeriodo - totalGastosPeriodo;
-    final double saldoMesAnterior =
+    final saldo = totalRecebidoPeriodo - totalGastosPeriodo;
+    final saldoMesAnterior =
         totalRecebidoPeriodoAnterior - totalGastosPeriodoAnterior;
-    final double variacaoSaldo = _variacaoPercentual(saldo, saldoMesAnterior);
-    final double variacaoGastos = _variacaoPercentual(
+    final variacaoSaldo = _variacaoPercentual(saldo, saldoMesAnterior);
+    final variacaoGastos = _variacaoPercentual(
       totalGastosPeriodo,
       totalGastosPeriodoAnterior,
     );
 
-    final Map<String, DashboardCategoriaResumo> totaisPorCategoria =
-        <String, DashboardCategoriaResumo>{};
+    final totaisPorCategoria = <String, DashboardCategoriaResumo>{};
 
-    for (final Gasto gasto in resumo.gastos) {
+    for (final gasto in resumo.gastos) {
       if (!_passaFiltroGasto(
         gasto,
         filtroCategoriaPadrao: filtroCategoriaPadrao,
@@ -199,12 +196,12 @@ class DashboardSummaryService {
         faixaAtual.inicio,
         faixaAtual.fimExclusivo,
       )) {
-        final bool custom = gasto.usaCategoriaPersonalizada;
-        final String id = custom
+        final custom = gasto.usaCategoriaPersonalizada;
+        final id = custom
             ? 'custom:${gasto.categoriaPersonalizadaId ?? gasto.categoriaLabelExibicao}'
             : 'std:${gasto.categoria.name}';
 
-        final DashboardCategoriaResumo atual =
+        final atual =
             totaisPorCategoria[id] ??
             DashboardCategoriaResumo(
               id: id,
@@ -232,13 +229,12 @@ class DashboardSummaryService {
       }
     }
 
-    final List<DashboardCategoriaResumo> categoriasOrdenadas =
-        totaisPorCategoria.values.toList()
-          ..sort((a, b) => b.valor.compareTo(a.valor));
+    final categoriasOrdenadas = totaisPorCategoria.values.toList()
+      ..sort((a, b) => b.valor.compareTo(a.valor));
 
-    final String comparativoLabel = _labelComparativo(faixaAnterior.inicio);
+    final comparativoLabel = _labelComparativo(faixaAnterior.inicio);
 
-    final DashboardResumoCalculado calculado = DashboardResumoCalculado(
+    final calculado = DashboardResumoCalculado(
       totalGastosPeriodo: totalGastosPeriodo,
       totalPendente: totalPendente,
       saldo: saldo,
@@ -269,16 +265,14 @@ class DashboardSummaryService {
       return;
     }
 
-    final List<String> expirados = <String>[];
-    _cacheLru.forEach((String key, _DashboardCacheEntry entry) {
+    final expirados = <String>[];
+    _cacheLru.forEach((key, entry) {
       if (now.difference(entry.criadoEm) > _cacheTtl) {
         expirados.add(key);
       }
     });
 
-    for (final String key in expirados) {
-      _cacheLru.remove(key);
-    }
+    expirados.forEach(_cacheLru.remove);
   }
 
   void _evictOverflow() {
@@ -298,7 +292,7 @@ class DashboardSummaryService {
     DashboardPeriodoRapido periodo,
     DateTime agora,
   ) {
-    final DateTime hoje = DateTime(agora.year, agora.month, agora.day);
+    final hoje = DateTime(agora.year, agora.month, agora.day);
 
     switch (periodo) {
       case DashboardPeriodoRapido.hoje:
@@ -309,13 +303,13 @@ class DashboardSummaryService {
           fimExclusivo: hoje.add(const Duration(days: 1)),
         );
       case DashboardPeriodoRapido.mes:
-        final DateTime inicioMes = DateTime(agora.year, agora.month, 1);
+        final inicioMes = DateTime(agora.year, agora.month);
         return (
           inicio: inicioMes,
-          fimExclusivo: DateTime(inicioMes.year, inicioMes.month + 1, 1),
+          fimExclusivo: DateTime(inicioMes.year, inicioMes.month + 1),
         );
       case DashboardPeriodoRapido.trimestre:
-        final DateTime inicioTrim = DateTime(agora.year, agora.month - 2, 1);
+        final inicioTrim = DateTime(agora.year, agora.month - 2);
         return (
           inicio: inicioTrim,
           fimExclusivo: hoje.add(const Duration(days: 1)),
@@ -327,9 +321,9 @@ class DashboardSummaryService {
     DateTime inicioAtual,
     DateTime fimAtualExclusivo,
   ) {
-    final Duration duracao = fimAtualExclusivo.difference(inicioAtual);
-    final DateTime fimAnterior = inicioAtual;
-    final DateTime inicioAnterior = fimAnterior.subtract(duracao);
+    final duracao = fimAtualExclusivo.difference(inicioAtual);
+    final fimAnterior = inicioAtual;
+    final inicioAnterior = fimAnterior.subtract(duracao);
     return (inicio: inicioAnterior, fimExclusivo: fimAnterior);
   }
 

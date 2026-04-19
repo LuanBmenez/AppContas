@@ -6,10 +6,10 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/categorias_service.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.dart';
 
-import 'novo_gasto_screen.dart';
+import 'package:paga_o_que_me_deve/features/gastos/presentation/screens/novo_gasto_screen.dart';
 
 class GastosScreen extends StatefulWidget {
-  const GastosScreen({super.key, required this.db, this.initialFilter});
+  const GastosScreen({required this.db, super.key, this.initialFilter});
 
   final FinanceRepository db;
   final DashboardDrillDownFilter? initialFilter;
@@ -48,10 +48,10 @@ class _GastosScreenState extends State<GastosScreen> {
   );
 
   DateTime get _inicioMes =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
+      DateTime(_mesSelecionado.year, _mesSelecionado.month);
 
   DateTime get _fimMesExclusivo =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
+      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1);
 
   bool get _temFiltrosAtivos {
     return _filtroCategoriaPadrao != null ||
@@ -65,7 +65,7 @@ class _GastosScreenState extends State<GastosScreen> {
     _gastosService = GastosService(widget.db);
     _categoriasService = CategoriasService(widget.db);
 
-    final DashboardDrillDownFilter? filtro = widget.initialFilter;
+    final filtro = widget.initialFilter;
     if (filtro != null) {
       _filtroCategoriaPadrao = filtro.categoriaPadrao;
       _filtroCategoriaPersonalizadaId = filtro.categoriaPersonalizadaId;
@@ -110,8 +110,8 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   void _setStatePreservandoScroll(VoidCallback fn) {
-    final bool tinhaClientes = _listController.hasClients;
-    final double offsetAntes = tinhaClientes ? _listController.offset : 0;
+    final tinhaClientes = _listController.hasClients;
+    final offsetAntes = tinhaClientes ? _listController.offset : 0;
 
     setState(fn);
 
@@ -119,8 +119,8 @@ class _GastosScreenState extends State<GastosScreen> {
       if (!_listController.hasClients) {
         return;
       }
-      final double max = _listController.position.maxScrollExtent;
-      final double destino = offsetAntes.clamp(0, max).toDouble();
+      final max = _listController.position.maxScrollExtent;
+      final destino = offsetAntes.clamp(0, max).toDouble();
       if ((_listController.offset - destino).abs() > 0.5) {
         _listController.jumpTo(destino);
       }
@@ -128,11 +128,11 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   Future<void> _selecionarMes() async {
-    final DateTime hoje = DateTime.now();
-    int anoSelecionado = _mesSelecionado.year;
-    int mesSelecionado = _mesSelecionado.month;
+    final hoje = DateTime.now();
+    var anoSelecionado = _mesSelecionado.year;
+    var mesSelecionado = _mesSelecionado.month;
 
-    final DateTime? selecionado = await showModalBottomSheet<DateTime>(
+    final selecionado = await showModalBottomSheet<DateTime>(
       context: context,
       showDragHandle: true,
       builder: (context) {
@@ -163,7 +163,7 @@ class _GastosScreenState extends State<GastosScreen> {
                           items: List<DropdownMenuItem<int>>.generate(12, (
                             index,
                           ) {
-                            final int month = index + 1;
+                            final month = index + 1;
                             return DropdownMenuItem<int>(
                               value: month,
                               child: Text(AppFormatters.nomeMes(month)),
@@ -184,7 +184,7 @@ class _GastosScreenState extends State<GastosScreen> {
                           items: List<DropdownMenuItem<int>>.generate(81, (
                             index,
                           ) {
-                            final int year = 2020 + index;
+                            final year = 2020 + index;
                             return DropdownMenuItem<int>(
                               value: year,
                               child: Text(year.toString()),
@@ -203,7 +203,7 @@ class _GastosScreenState extends State<GastosScreen> {
                   Row(
                     children: [
                       TextButton(
-                        onPressed: () => Navigator.pop(context, null),
+                        onPressed: () => Navigator.pop(context),
                         child: const Text('Cancelar'),
                       ),
                       const Spacer(),
@@ -246,13 +246,11 @@ class _GastosScreenState extends State<GastosScreen> {
       context,
       title: 'Excluir gasto',
       message: 'Deseja excluir "${gasto.titulo}"?',
-      confirmText: 'Excluir',
-      cancelText: 'Cancelar',
     );
   }
 
   Widget _buildCabecalhoTela() {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -281,7 +279,7 @@ class _GastosScreenState extends State<GastosScreen> {
     required double totalGasto,
     required int quantidade,
   }) {
-    final List<Widget> chipsFiltros = <Widget>[
+    final chipsFiltros = <Widget>[
       if (_filtroCategoriaPadrao != null)
         InputChip(
           label: Text('Categoria: ${_filtroCategoriaPadrao!.label}'),
@@ -313,7 +311,7 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   String _buildSubtitle(Gasto gasto) {
-    final List<String> partes = <String>[
+    final partes = <String>[
       'Dia ${gasto.data.day.toString().padLeft(2, '0')}',
       gasto.categoriaLabelExibicao,
     ];
@@ -348,10 +346,10 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   Future<void> _editarCategoria(Gasto gasto) async {
-    CategoriaGasto categoriaSelecionada = gasto.categoria;
-    bool aprenderRegra = gasto.origem == OrigemGasto.cartaoCredito;
+    var categoriaSelecionada = gasto.categoria;
+    var aprenderRegra = gasto.origem == OrigemGasto.cartaoCredito;
 
-    final bool? confirmar = await showDialog<bool>(
+    final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -424,10 +422,6 @@ class _GastosScreenState extends State<GastosScreen> {
       await _gastosService.atualizarGasto(
         gasto.copyWith(
           categoria: categoriaSelecionada,
-          categoriaPersonalizadaId: null,
-          categoriaPersonalizadaNome: null,
-          categoriaPersonalizadaCorValue: null,
-          categoriaPersonalizadaIconeCodePoint: null,
         ),
       );
 
@@ -502,12 +496,10 @@ class _GastosScreenState extends State<GastosScreen> {
       return;
     }
 
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Excluir em lote',
       message: 'Deseja excluir ${selecionados.length} gastos selecionados?',
-      confirmText: 'Excluir',
-      cancelText: 'Cancelar',
     );
 
     if (!confirmar) {
@@ -546,9 +538,9 @@ class _GastosScreenState extends State<GastosScreen> {
       return;
     }
 
-    CategoriaGasto categoriaSelecionada = CategoriaGasto.outros;
+    var categoriaSelecionada = CategoriaGasto.outros;
 
-    final bool? confirmar = await showDialog<bool>(
+    final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -630,9 +622,9 @@ class _GastosScreenState extends State<GastosScreen> {
       return;
     }
 
-    TipoGasto tipoSelecionado = TipoGasto.variavel;
+    var tipoSelecionado = TipoGasto.variavel;
 
-    final bool? confirmar = await showDialog<bool>(
+    final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -710,7 +702,7 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   Future<void> _excluirItem(Gasto gasto) async {
-    final bool confirmar = await _confirmarExclusao(gasto);
+    final confirmar = await _confirmarExclusao(gasto);
     if (!confirmar) {
       return;
     }
@@ -731,8 +723,8 @@ class _GastosScreenState extends State<GastosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final AppSemanticColors semantic = _semanticColors(theme);
+    final theme = Theme.of(context);
+    final semantic = _semanticColors(theme);
 
     return StreamBuilder<List<Gasto>>(
       stream: _obterGastosStream(),
@@ -753,14 +745,14 @@ class _GastosScreenState extends State<GastosScreen> {
           );
         }
 
-        final List<Gasto> gastosBrutos = snapshot.data ?? <Gasto>[];
-        final List<Gasto> gastosFiltrados = gastosBrutos
+        final gastosBrutos = snapshot.data ?? <Gasto>[];
+        final gastosFiltrados = gastosBrutos
             .where(_passaFiltrosAtivos)
             .toList();
-        final List<Gasto> selecionados = _selecionadosDe(gastosFiltrados);
+        final selecionados = _selecionadosDe(gastosFiltrados);
 
         double totalGasto = 0;
-        for (final Gasto gasto in gastosFiltrados) {
+        for (final gasto in gastosFiltrados) {
           totalGasto += gasto.valor;
         }
 
@@ -844,8 +836,8 @@ class _GastosScreenState extends State<GastosScreen> {
                         controller: _listController,
                         itemCount: gastosFiltrados.length,
                         itemBuilder: (context, index) {
-                          final Gasto gasto = gastosFiltrados[index];
-                          final bool selecionado = _idsSelecionados.contains(
+                          final gasto = gastosFiltrados[index];
+                          final selecionado = _idsSelecionados.contains(
                             gasto.id,
                           );
 
@@ -977,14 +969,7 @@ class _GastosScreenState extends State<GastosScreen> {
 
 class ExpenseSummaryCard extends StatelessWidget {
   const ExpenseSummaryCard({
-    super.key,
-    required this.totalLabel,
-    required this.totalValue,
-    required this.monthLabel,
-    required this.itemCount,
-    required this.hasActiveFilters,
-    required this.filterChips,
-    required this.onSelectMonth,
+    required this.totalLabel, required this.totalValue, required this.monthLabel, required this.itemCount, required this.hasActiveFilters, required this.filterChips, required this.onSelectMonth, super.key,
   });
 
   final String totalLabel;
@@ -997,8 +982,8 @@ class ExpenseSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Card(
       margin: const EdgeInsets.fromLTRB(
@@ -1119,16 +1104,7 @@ class ExpenseSummaryCard extends StatelessWidget {
 
 class BulkActionBar extends StatelessWidget {
   const BulkActionBar({
-    super.key,
-    required this.selectedCount,
-    required this.isBusy,
-    required this.canSelectAll,
-    required this.canActOnSelection,
-    required this.onCancel,
-    required this.onSelectAll,
-    required this.onChangeCategory,
-    required this.onChangeType,
-    required this.onDelete,
+    required this.selectedCount, required this.isBusy, required this.canSelectAll, required this.canActOnSelection, required this.onCancel, required this.onSelectAll, required this.onChangeCategory, required this.onChangeType, required this.onDelete, super.key,
   });
 
   final int selectedCount;
@@ -1143,7 +1119,7 @@ class BulkActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Card(
       child: Padding(

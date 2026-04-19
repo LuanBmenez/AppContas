@@ -3,12 +3,7 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 
 class MiniSummaryCard extends StatelessWidget {
   const MiniSummaryCard({
-    super.key,
-    required this.titulo,
-    required this.valor,
-    required this.cor,
-    required this.icone,
-    required this.mostrarValores,
+    required this.titulo, required this.valor, required this.cor, required this.icone, required this.mostrarValores, super.key,
     this.onTap,
   });
 
@@ -21,7 +16,7 @@ class MiniSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Material(
       color: Colors.transparent,

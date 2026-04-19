@@ -7,7 +7,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/a_receber/data/services/recebiveis_service.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
-  const NovoRecebivelScreen({super.key, required this.db});
+  const NovoRecebivelScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -48,8 +48,8 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   }
 
   String _normalizarMensagemErro(Object error) {
-    final String texto = error.toString();
-    final String lower = texto.toLowerCase();
+    final texto = error.toString();
+    final lower = texto.toLowerCase();
 
     if (lower.contains('firestore.googleapis.com') ||
         lower.contains('permission_denied')) {
@@ -77,7 +77,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
         AppFormatters.parseMoedaInput(_valorController.text),
       );
     } catch (_) {
-      return 'R\$ 0,00';
+      return r'R$ 0,00';
     }
   }
 
@@ -90,7 +90,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   }
 
   Widget _buildSectionTitle({required String title, required IconData icon}) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
     return Row(
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.primary),
@@ -105,17 +105,16 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
       setState(() => _salvando = true);
 
       try {
-        final double valor = AppFormatters.parseMoedaInput(
+        final valor = AppFormatters.parseMoedaInput(
           _valorController.text,
         );
 
-        final Conta novaConta = Conta(
+        final novaConta = Conta(
           id: '',
           nome: _nomeController.text.trim(),
           descricao: _descricaoController.text.trim(),
           valor: valor,
           data: DateTime.now(),
-          foiPago: false,
         );
 
         await _recebiveisService.adicionarRecebivel(novaConta);
@@ -138,15 +137,15 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final AppSemanticColors semantic = _semanticColors(theme);
-    final String nomePreview = _nomeController.text.trim().isEmpty
+    final theme = Theme.of(context);
+    final semantic = _semanticColors(theme);
+    final nomePreview = _nomeController.text.trim().isEmpty
         ? 'Sem nome'
         : _nomeController.text.trim();
-    final String descricaoPreview = _descricaoController.text.trim().isEmpty
+    final descricaoPreview = _descricaoController.text.trim().isEmpty
         ? 'Sem referência'
         : _descricaoController.text.trim();
-    final String valorPreview = _formatarValorPreview();
+    final valorPreview = _formatarValorPreview();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Novo Item a Receber')),
@@ -372,7 +371,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                           helperText: 'Valor em reais',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.attach_money),
-                          prefixText: 'R\$ ',
+                          prefixText: r'R$ ',
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -380,7 +379,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                           }
 
                           try {
-                            final double valor = AppFormatters.parseMoedaInput(
+                            final valor = AppFormatters.parseMoedaInput(
                               value,
                             );
                             if (valor <= 0) {

@@ -1,10 +1,6 @@
-import 'gasto.dart';
+import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 
 class RegraCategoriaImportacao {
-  final String id;
-  final String termo;
-  final CategoriaGasto categoria;
-
   const RegraCategoriaImportacao({
     required this.id,
     required this.termo,
@@ -24,9 +20,11 @@ class RegraCategoriaImportacao {
       ),
     );
   }
+  final String id;
+  final String termo;
+  final CategoriaGasto categoria;
 
   Map<String, dynamic> toMap() {
     return {'termo': termo, 'categoria': categoria.name};
   }
 }
-

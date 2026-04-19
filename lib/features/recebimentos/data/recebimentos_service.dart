@@ -1,18 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../../domain/models/recebimento.dart';
-import '../../../domain/repositories/recebimentos_repository.dart';
+import 'package:paga_o_que_me_deve/domain/models/recebimento.dart';
+import 'package:paga_o_que_me_deve/domain/repositories/recebimentos_repository.dart';
 
 class RecebimentosService implements RecebimentosRepository {
-  final FirebaseFirestore firestore;
-  final FirebaseAuth auth;
 
   RecebimentosService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
   })  : firestore = firestore ?? FirebaseFirestore.instance,
         auth = auth ?? FirebaseAuth.instance;
+  final FirebaseFirestore firestore;
+  final FirebaseAuth auth;
 
   String get _uid {
     final user = auth.currentUser;

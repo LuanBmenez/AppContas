@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../theme/theme.dart';
+import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class AppFormSubmitBar extends StatelessWidget {
   const AppFormSubmitBar({
-    super.key,
-    required this.onPressed,
-    required this.label,
+    required this.onPressed, required this.label, super.key,
     this.isLoading = false,
     this.loadingLabel = 'Salvando...',
   });

@@ -7,11 +7,11 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 
 class DashboardGuardadoCard extends StatelessWidget {
   const DashboardGuardadoCard({
-    super.key,
     required this.resumo,
     required this.jaGuardadoMes,
     required this.referenciaMes,
     required this.mostrarValores,
+    super.key,
   });
 
   final DashboardResumoCalculado resumo;
@@ -21,10 +21,10 @@ class DashboardGuardadoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final bool temSobra = resumo.saldo > 0;
-    final double valorGuardavel = temSobra ? resumo.saldo : 0;
-    final String nomeMes = AppFormatters.nomeMes(referenciaMes.month);
+    final theme = Theme.of(context);
+    final temSobra = resumo.saldo > 0;
+    final valorGuardavel = temSobra ? resumo.saldo : 0.00;
+    final nomeMes = AppFormatters.nomeMes(referenciaMes.month);
 
     return Material(
       color: Colors.transparent,

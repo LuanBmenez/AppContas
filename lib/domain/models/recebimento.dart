@@ -3,31 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum StatusRecebimento { pendente, recebido, atrasado }
 
 class Recebimento {
-  final String id;
-  final double valor;
-  final DateTime dataPrevista;
-  final DateTime? dataRecebido;
-  final StatusRecebimento status;
-  final String competenciaMes;
-
   Recebimento({
     required this.id,
     required this.valor,
     required this.dataPrevista,
-    this.dataRecebido,
     required this.status,
     required this.competenciaMes,
+    this.dataRecebido,
   });
 
   factory Recebimento.fromMap(Map<String, dynamic> map, String id) {
-    final DateTime dataPrevista = (map['dataPrevista'] as Timestamp).toDate();
-    final DateTime? dataRecebido = map['dataRecebido'] != null
+    final dataPrevista = (map['dataPrevista'] as Timestamp).toDate();
+    final dataRecebido = map['dataRecebido'] != null
         ? (map['dataRecebido'] as Timestamp).toDate()
         : null;
 
     // Compatibilidade: calcula competencia se não existir
-    final String competenciaMes =
-        map['competenciaMes'] ??
+    final competenciaMes =
+        map['competenciaMes'] as String? ??
         "${dataPrevista.year.toString().padLeft(4, '0')}-${dataPrevista.month.toString().padLeft(2, '0')}";
 
     StatusRecebimento status;
@@ -48,6 +41,12 @@ class Recebimento {
       competenciaMes: competenciaMes,
     );
   }
+  final String id;
+  final double valor;
+  final DateTime dataPrevista;
+  final DateTime? dataRecebido;
+  final StatusRecebimento status;
+  final String competenciaMes;
 
   Map<String, dynamic> toMap() {
     return {

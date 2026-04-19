@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/utils/text_normalizer.dart';
+import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 
 enum CategoriaGasto {
   moradia,
@@ -122,24 +122,6 @@ extension OrigemGastoInfo on OrigemGasto {
 }
 
 class Gasto {
-  final String id;
-  final String titulo;
-  final double valor;
-  final DateTime data;
-  final CategoriaGasto categoria;
-  final String? categoriaPersonalizadaId;
-  final String? categoriaPersonalizadaNome;
-  final int? categoriaPersonalizadaCorValue;
-  final int? categoriaPersonalizadaIconeCodePoint;
-  final TipoGasto tipo;
-  final OrigemGasto origem;
-  final String? cartaoId;
-  final String? cartaoNome;
-  final String? hashImportacao;
-  final int? parcelaAtual;
-  final int? parcelaTotal;
-  final DateTime? dataCompra;
-  final DateTime? dataLancamento;
 
   Gasto({
     required this.id,
@@ -202,6 +184,24 @@ class Gasto {
       dataLancamento: _parseNullableDate(map['dataLancamento']),
     );
   }
+  final String id;
+  final String titulo;
+  final double valor;
+  final DateTime data;
+  final CategoriaGasto categoria;
+  final String? categoriaPersonalizadaId;
+  final String? categoriaPersonalizadaNome;
+  final int? categoriaPersonalizadaCorValue;
+  final int? categoriaPersonalizadaIconeCodePoint;
+  final TipoGasto tipo;
+  final OrigemGasto origem;
+  final String? cartaoId;
+  final String? cartaoNome;
+  final String? hashImportacao;
+  final int? parcelaAtual;
+  final int? parcelaTotal;
+  final DateTime? dataCompra;
+  final DateTime? dataLancamento;
 
   Map<String, dynamic> toMap() {
     return {

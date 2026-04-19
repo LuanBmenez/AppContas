@@ -28,9 +28,9 @@ class AppRouter {
     refreshListenable: GoRouterAuthRefreshStream(
       FirebaseAuth.instance.authStateChanges(),
     ),
-    redirect: (BuildContext context, GoRouterState state) {
-      final bool autenticado = FirebaseAuth.instance.currentUser != null;
-      final bool estaNoLogin = state.matchedLocation == '/login';
+    redirect: (context, state) {
+      final autenticado = FirebaseAuth.instance.currentUser != null;
+      final estaNoLogin = state.matchedLocation == '/login';
 
       if (!autenticado && !estaNoLogin) {
         return '/login';
@@ -46,14 +46,14 @@ class AppRouter {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return const LoginScreen();
         },
       ),
       GoRoute(
         path: AppRoutes.inicioPath,
         name: AppRoutes.inicioName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return HomeShellScreen(
             db: _db,
             currentTab: HomeTab.inicio,
@@ -64,14 +64,14 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.gastosPath,
         name: AppRoutes.gastosName,
-        builder: (BuildContext context, GoRouterState state) {
-          final DashboardDrillDownFilter? filtroViaQuery =
+        builder: (context, state) {
+          final filtroViaQuery =
               AppRoutes.gastosFilterFromQuery(state.uri.queryParameters);
-          final DashboardDrillDownFilter? filtroViaExtra =
+          final filtroViaExtra =
               state.extra is DashboardDrillDownFilter
-              ? state.extra as DashboardDrillDownFilter
+              ? state.extra! as DashboardDrillDownFilter
               : null;
-          final DashboardDrillDownFilter? filtro =
+          final filtro =
               filtroViaQuery ?? filtroViaExtra;
 
           return HomeShellScreen(
@@ -92,7 +92,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.receberPath,
         name: AppRoutes.receberName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return HomeShellScreen(
             db: _db,
             currentTab: HomeTab.receber,
@@ -103,7 +103,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.guardadoPath,
         name: AppRoutes.guardadoName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return HomeShellScreen(
             db: _db,
             currentTab: HomeTab.guardado,
@@ -114,7 +114,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.perfilPath,
         name: AppRoutes.perfilName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return HomeShellScreen(
             db: _db,
             currentTab: HomeTab.perfil,
@@ -125,42 +125,42 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.recorrenciasPath,
         name: AppRoutes.recorrenciasName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return ComprasRecorrentesScreen(db: _db);
         },
       ),
       GoRoute(
         path: AppRoutes.novoGastoPath,
         name: AppRoutes.novoGastoName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return NovoGastoScreen(db: _db);
         },
       ),
       GoRoute(
         path: AppRoutes.orcamentosPath,
         name: AppRoutes.orcamentosName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return OrcamentosScreen(db: _db);
         },
       ),
       GoRoute(
         path: AppRoutes.cartoesPath,
         name: AppRoutes.cartoesName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return CartoesScreen(db: _db);
         },
       ),
       GoRoute(
         path: AppRoutes.importarPath,
         name: AppRoutes.importarName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return ImportacaoScreen(db: _db);
         },
       ),
       GoRoute(
         path: AppRoutes.novoRecebivelPath,
         name: AppRoutes.novoRecebivelName,
-        builder: (BuildContext context, GoRouterState state) {
+        builder: (context, state) {
           return NovoRecebivelScreen(db: _db);
         },
       ),

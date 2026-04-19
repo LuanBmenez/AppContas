@@ -1,47 +1,43 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/cartao_credito.dart';
-import '../models/categoria_personalizada.dart';
-import '../models/conta.dart';
-import '../models/gasto.dart';
-import '../models/guardado.dart';
-import '../models/preferencias_novo_gasto.dart';
-import '../models/regra_categoria_importacao.dart';
+import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
+import 'package:paga_o_que_me_deve/domain/models/categoria_personalizada.dart';
+import 'package:paga_o_que_me_deve/domain/models/conta.dart';
+import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
+import 'package:paga_o_que_me_deve/domain/models/guardado.dart';
+import 'package:paga_o_que_me_deve/domain/models/preferencias_novo_gasto.dart';
+import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
 
 class DashboardResumo {
-  final List<Gasto> gastos;
-  final List<Conta> contas;
 
   const DashboardResumo(this.gastos, this.contas);
+  final List<Gasto> gastos;
+  final List<Conta> contas;
 }
 
 class ResultadoImportacaoGastos {
-  final int importados;
-  final int duplicados;
 
   const ResultadoImportacaoGastos({
     required this.importados,
     required this.duplicados,
   });
+  final int importados;
+  final int duplicados;
 }
 
 class PaginaGastosResultado {
-  final List<Gasto> gastos;
-  final DocumentSnapshot<Map<String, dynamic>>? cursor;
-  final bool temMais;
 
   const PaginaGastosResultado({
     required this.gastos,
     required this.cursor,
     required this.temMais,
   });
+  final List<Gasto> gastos;
+  final DocumentSnapshot<Map<String, dynamic>>? cursor;
+  final bool temMais;
 }
 
 class RelatorioMensalFinanceiro {
-  final DateTime mesReferencia;
-  final List<Gasto> gastosMes;
-  final List<Conta> contasPendentes;
-  final Map<CategoriaGasto, double> totalPorCategoria;
 
   const RelatorioMensalFinanceiro({
     required this.mesReferencia,
@@ -49,6 +45,10 @@ class RelatorioMensalFinanceiro {
     required this.contasPendentes,
     required this.totalPorCategoria,
   });
+  final DateTime mesReferencia;
+  final List<Gasto> gastosMes;
+  final List<Conta> contasPendentes;
+  final Map<CategoriaGasto, double> totalPorCategoria;
 
   double get totalGastos =>
       gastosMes.fold<double>(0, (total, gasto) => total + gasto.valor);
@@ -58,11 +58,6 @@ class RelatorioMensalFinanceiro {
 }
 
 class SugestaoRecorrenciaDespesa {
-  final String periodicidade;
-  final int ocorrencias;
-  final int diaPreferencial;
-  final double valorMedio;
-  final double confianca;
 
   const SugestaoRecorrenciaDespesa({
     required this.periodicidade,
@@ -71,6 +66,11 @@ class SugestaoRecorrenciaDespesa {
     required this.valorMedio,
     required this.confianca,
   });
+  final String periodicidade;
+  final int ocorrencias;
+  final int diaPreferencial;
+  final double valorMedio;
+  final double confianca;
 }
 
 abstract class FinanceRepository {
@@ -123,9 +123,8 @@ abstract class FinanceRepository {
 
   Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto();
   Future<void> registrarUsoNovoGasto({
-    CategoriaGasto? categoriaPadrao,
+    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
     String? categoriaPersonalizadaId,
-    required TipoGasto tipo,
   });
 
   Future<void> salvarRegraCategoriaImportacao({

@@ -10,17 +10,10 @@ class RecorrenciaConfiguracao {
     required this.diasAntesNotificacao,
   });
 
-  final String recorrenciaId;
-  final bool confirmada;
-  final bool pausada;
-  final bool ignorada;
-  final bool notificacaoAtiva;
-  final int diasAntesNotificacao;
-
   factory RecorrenciaConfiguracao.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
-    final Map<String, dynamic> data = doc.data() ?? <String, dynamic>{};
+    final data = doc.data() ?? <String, dynamic>{};
 
     return RecorrenciaConfiguracao(
       recorrenciaId: data['recorrenciaId'] as String? ?? doc.id,
@@ -31,6 +24,13 @@ class RecorrenciaConfiguracao {
       diasAntesNotificacao: data['diasAntesNotificacao'] as int? ?? 2,
     );
   }
+
+  final String recorrenciaId;
+  final bool confirmada;
+  final bool pausada;
+  final bool ignorada;
+  final bool notificacaoAtiva;
+  final int diasAntesNotificacao;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

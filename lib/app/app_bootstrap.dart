@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/app/app.dart';
+import 'package:paga_o_que_me_deve/core/theme/app_theme_controller.dart';
 import 'package:provider/provider.dart';
-
-import '../core/theme/app_theme_controller.dart';
-import 'app.dart';
 
 class AppBootstrap extends StatelessWidget {
   const AppBootstrap({super.key});

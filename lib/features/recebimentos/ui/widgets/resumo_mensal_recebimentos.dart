@@ -2,28 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/domain/models/recebimento.dart';
 
 class ResumoMensalRecebimentos extends StatelessWidget {
-  const ResumoMensalRecebimentos({super.key, required this.recebimentos});
+  const ResumoMensalRecebimentos({required this.recebimentos, super.key});
 
   final List<Recebimento> recebimentos;
 
   @override
   Widget build(BuildContext context) {
-    final double totalPrevisto = recebimentos.fold<double>(
+    final totalPrevisto = recebimentos.fold<double>(
       0,
-      (double soma, Recebimento r) => soma + r.valor,
+      (soma, r) => soma + r.valor,
     );
 
-    final double totalRecebido = recebimentos
-        .where((Recebimento r) => r.status == StatusRecebimento.recebido)
-        .fold<double>(0, (double soma, Recebimento r) => soma + r.valor);
+    final totalRecebido = recebimentos
+        .where((r) => r.status == StatusRecebimento.recebido)
+        .fold<double>(0, (soma, r) => soma + r.valor);
 
-    final double totalPendente = recebimentos
-        .where((Recebimento r) => r.status == StatusRecebimento.pendente)
-        .fold<double>(0, (double soma, Recebimento r) => soma + r.valor);
+    final totalPendente = recebimentos
+        .where((r) => r.status == StatusRecebimento.pendente)
+        .fold<double>(0, (soma, r) => soma + r.valor);
 
-    final double totalAtrasado = recebimentos
-        .where((Recebimento r) => r.status == StatusRecebimento.atrasado)
-        .fold<double>(0, (double soma, Recebimento r) => soma + r.valor);
+    final totalAtrasado = recebimentos
+        .where((r) => r.status == StatusRecebimento.atrasado)
+        .fold<double>(0, (soma, r) => soma + r.valor);
 
     return Card(
       margin: const EdgeInsets.all(8),

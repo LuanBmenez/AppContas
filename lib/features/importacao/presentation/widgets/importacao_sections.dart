@@ -5,11 +5,7 @@ import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv
 
 class CartaoStepSection extends StatelessWidget {
   const CartaoStepSection({
-    super.key,
-    required this.cartoes,
-    required this.cartaoSelecionado,
-    required this.onCartaoChanged,
-    required this.onGerenciarCartoes,
+    required this.cartoes, required this.cartaoSelecionado, required this.onCartaoChanged, required this.onGerenciarCartoes, super.key,
   });
 
   final List<CartaoCredito> cartoes;
@@ -61,10 +57,7 @@ class CartaoStepSection extends StatelessWidget {
 
 class ArquivoCsvStepSection extends StatelessWidget {
   const ArquivoCsvStepSection({
-    super.key,
-    required this.carregandoArquivo,
-    required this.nomeArquivo,
-    required this.onSelecionarArquivo,
+    required this.carregandoArquivo, required this.nomeArquivo, required this.onSelecionarArquivo, super.key,
   });
 
   final bool carregandoArquivo;
@@ -104,12 +97,7 @@ class ArquivoCsvStepSection extends StatelessWidget {
 
 class MapeamentoColunasSection extends StatelessWidget {
   const MapeamentoColunasSection({
-    super.key,
-    required this.campoDataLancamento,
-    required this.campoDescricao,
-    required this.campoValor,
-    required this.campoDataCompra,
-    required this.campoParcela,
+    required this.campoDataLancamento, required this.campoDescricao, required this.campoValor, required this.campoDataCompra, required this.campoParcela, super.key,
   });
 
   final Widget campoDataLancamento;
@@ -149,13 +137,7 @@ class MapeamentoColunasSection extends StatelessWidget {
 
 class PreviewImportacaoSection extends StatelessWidget {
   const PreviewImportacaoSection({
-    super.key,
-    required this.preview,
-    required this.duplicadosFuture,
-    required this.salvando,
-    required this.podeImportar,
-    required this.onImportar,
-    required this.itensPreview,
+    required this.preview, required this.duplicadosFuture, required this.salvando, required this.podeImportar, required this.onImportar, required this.itensPreview, super.key,
   });
 
   final ResultadoMapeamentoExtrato preview;
@@ -173,8 +155,8 @@ class PreviewImportacaoSection extends StatelessWidget {
         child: FutureBuilder<int>(
           future: duplicadosFuture,
           builder: (context, duplicadosSnapshot) {
-            final int duplicadosDetectados = duplicadosSnapshot.data ?? 0;
-            final int importaveis =
+            final duplicadosDetectados = duplicadosSnapshot.data ?? 0;
+            final importaveis =
                 preview.gastos.length - duplicadosDetectados;
 
             return Column(

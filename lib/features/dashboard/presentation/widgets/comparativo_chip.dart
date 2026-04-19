@@ -3,10 +3,7 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class ComparativoChip extends StatelessWidget {
   const ComparativoChip({
-    super.key,
-    required this.titulo,
-    required this.percentual,
-    required this.positivoEhBom,
+    required this.titulo, required this.percentual, required this.positivoEhBom, super.key,
   });
 
   final String titulo;
@@ -15,8 +12,8 @@ class ComparativoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    const AppSemanticColors fallbackSemantic = AppSemanticColors(
+    final theme = Theme.of(context);
+    const fallbackSemantic = AppSemanticColors(
       success: Color(0xFF0F9D7A),
       successContainer: Color(0xFFE5F6F2),
       warning: Color(0xFFC26A00),
@@ -24,13 +21,13 @@ class ComparativoChip extends StatelessWidget {
       error: Color(0xFFD64545),
       errorContainer: Color(0xFFFDE8E8),
     );
-    final AppSemanticColors semantic =
+    final semantic =
         theme.extension<AppSemanticColors>() ?? fallbackSemantic;
 
-    final bool subiu = percentual >= 0;
-    final bool bom = positivoEhBom ? subiu : !subiu;
-    final Color cor = bom ? semantic.success : semantic.error;
-    final IconData icone = subiu
+    final subiu = percentual >= 0;
+    final bom = positivoEhBom ? subiu : !subiu;
+    final cor = bom ? semantic.success : semantic.error;
+    final icone = subiu
         ? Icons.trending_up_rounded
         : Icons.trending_down_rounded;
 

@@ -14,6 +14,29 @@ class PerfilUsuario {
     required this.displayNameSyncPending,
   });
 
+  factory PerfilUsuario.fromSources({
+    required User user,
+    required Map<String, dynamic>? data,
+  }) {
+    final safeData = data ?? <String, dynamic>{};
+    final preferencias =
+        (safeData['preferencias'] as Map?)?.cast<String, dynamic>() ??
+        <String, dynamic>{};
+
+    return PerfilUsuario(
+      uid: user.uid,
+      nome: (safeData['nome'] ?? '').toString().trim(),
+      email: _resolveEmail(user: user, data: safeData),
+      workspaceId: (safeData['workspaceId'] ?? user.uid).toString(),
+      mostrarValoresDashboard: preferencias['mostrarValoresDashboard'] is! bool || preferencias['mostrarValoresDashboard'] as bool,
+      confirmarAcoesDestrutivas:
+          preferencias['confirmarAcoesDestrutivas'] is! bool || preferencias['confirmarAcoesDestrutivas'] as bool,
+      receberResumoMensal: preferencias['receberResumoMensal'] is bool && preferencias['receberResumoMensal'] as bool,
+      preferenciaTema: AppThemePreference.fromValue(preferencias['tema']),
+      displayNameSyncPending: safeData['displayNameSyncPending'] == true,
+    );
+  }
+
   final String uid;
   final String nome;
   final String email;
@@ -23,35 +46,6 @@ class PerfilUsuario {
   final bool receberResumoMensal;
   final AppThemePreference preferenciaTema;
   final bool displayNameSyncPending;
-
-  factory PerfilUsuario.fromSources({
-    required User user,
-    required Map<String, dynamic>? data,
-  }) {
-    final Map<String, dynamic> safeData = data ?? <String, dynamic>{};
-    final Map<String, dynamic> preferencias =
-        (safeData['preferencias'] as Map?)?.cast<String, dynamic>() ??
-        <String, dynamic>{};
-
-    return PerfilUsuario(
-      uid: user.uid,
-      nome: (safeData['nome'] ?? '').toString().trim(),
-      email: _resolveEmail(user: user, data: safeData),
-      workspaceId: (safeData['workspaceId'] ?? user.uid).toString(),
-      mostrarValoresDashboard: preferencias['mostrarValoresDashboard'] is bool
-          ? preferencias['mostrarValoresDashboard'] as bool
-          : true,
-      confirmarAcoesDestrutivas:
-          preferencias['confirmarAcoesDestrutivas'] is bool
-          ? preferencias['confirmarAcoesDestrutivas'] as bool
-          : true,
-      receberResumoMensal: preferencias['receberResumoMensal'] is bool
-          ? preferencias['receberResumoMensal'] as bool
-          : false,
-      preferenciaTema: AppThemePreference.fromValue(preferencias['tema']),
-      displayNameSyncPending: safeData['displayNameSyncPending'] == true,
-    );
-  }
 
   String get nomeExibicao {
     if (nome.isNotEmpty) {
@@ -68,7 +62,7 @@ class PerfilUsuario {
   String get emailExibicao => email.isEmpty ? 'Sem e-mail' : email;
 
   String get iniciais {
-    final List<String> partes = nomeExibicao
+    final partes = nomeExibicao
         .split(' ')
         .map((parte) => parte.trim())
         .where((parte) => parte.isNotEmpty)
@@ -82,8 +76,8 @@ class PerfilUsuario {
       return partes.first.substring(0, 1).toUpperCase();
     }
 
-    final String primeira = partes.first.substring(0, 1).toUpperCase();
-    final String ultima = partes.last.substring(0, 1).toUpperCase();
+    final primeira = partes.first.substring(0, 1).toUpperCase();
+    final ultima = partes.last.substring(0, 1).toUpperCase();
 
     return '$primeira$ultima';
   }
@@ -101,7 +95,7 @@ class PerfilUsuario {
     required User user,
     required Map<String, dynamic> data,
   }) {
-    final String emailDoc = (data['email'] ?? '').toString().trim();
+    final emailDoc = (data['email'] ?? '').toString().trim();
     if (emailDoc.isNotEmpty) {
       return emailDoc;
     }

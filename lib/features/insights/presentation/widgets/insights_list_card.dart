@@ -3,13 +3,13 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/features/insights/domain/models/insight_item.dart';
 
 class InsightsListCard extends StatelessWidget {
-  const InsightsListCard({super.key, required this.insights});
+  const InsightsListCard({required this.insights, super.key});
 
   final List<InsightItem> insights;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Card(
       elevation: 0,
@@ -48,7 +48,7 @@ class InsightsListCard extends StatelessWidget {
               )
             else
               Column(
-                children: insights.map((InsightItem item) {
+                children: insights.map((item) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.s10),
                     child: _InsightRow(item: item),
@@ -69,8 +69,8 @@ class _InsightRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final Color cor = switch (item.nivel) {
+    final theme = Theme.of(context);
+    final cor = switch (item.nivel) {
       InsightNivel.alerta => theme.colorScheme.error,
       InsightNivel.atencao => const Color(0xFFC26A00),
       InsightNivel.info => theme.colorScheme.primary,

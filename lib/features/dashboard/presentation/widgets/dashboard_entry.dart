@@ -3,9 +3,7 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class DashboardEntry extends StatelessWidget {
   const DashboardEntry({
-    super.key,
-    required this.child,
-    required this.delayMs,
+    required this.child, required this.delayMs, super.key,
   });
 
   final Widget child;
@@ -13,8 +11,8 @@ class DashboardEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final MediaQueryData? mediaQuery = MediaQuery.maybeOf(context);
-    final bool reduzirAnimacoes =
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final reduzirAnimacoes =
         (mediaQuery?.disableAnimations ?? false) ||
         (mediaQuery?.accessibleNavigation ?? false);
 
@@ -27,7 +25,7 @@ class DashboardEntry extends StatelessWidget {
       duration: Duration(milliseconds: AppMotion.fast.inMilliseconds + delayMs),
       curve: AppMotion.curve,
       builder: (context, value, _) {
-        final double slide = (1 - value) * 0.04;
+        final slide = (1 - value) * 0.04;
         return Opacity(
           opacity: value,
           child: Transform.translate(

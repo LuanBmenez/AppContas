@@ -34,7 +34,7 @@ class NovoGastoCategoriaController {
     List<RegraCategoriaImportacao> regrasAprendidas =
         const <RegraCategoriaImportacao>[],
   }) {
-    final String normalizado = TextNormalizer.normalizeForSearch(
+    final normalizado = TextNormalizer.normalizeForSearch(
       titulo,
     ).toLowerCase();
 
@@ -46,8 +46,8 @@ class NovoGastoCategoriaController {
     }
 
     String? customId;
-    for (final CategoriaPersonalizada categoria in categoriasAtivas) {
-      final String nome = TextNormalizer.normalizeForSearch(
+    for (final categoria in categoriasAtivas) {
+      final nome = TextNormalizer.normalizeForSearch(
         categoria.nome,
       ).toLowerCase();
       if (nome.isNotEmpty && normalizado.contains(nome)) {
@@ -63,11 +63,11 @@ class NovoGastoCategoriaController {
       );
     }
 
-    final List<RegraCategoriaImportacao> regrasOrdenadas =
+    final regrasOrdenadas =
         List<RegraCategoriaImportacao>.from(regrasAprendidas)
           ..sort((a, b) => b.termo.length.compareTo(a.termo.length));
-    for (final RegraCategoriaImportacao regra in regrasOrdenadas) {
-      final String termo = TextNormalizer.normalizeForSearch(
+    for (final regra in regrasOrdenadas) {
+      final termo = TextNormalizer.normalizeForSearch(
         regra.termo,
       ).toLowerCase();
       if (termo.isNotEmpty && normalizado.contains(termo)) {
@@ -79,7 +79,7 @@ class NovoGastoCategoriaController {
     }
 
     CategoriaGasto? sugerida;
-    for (final MapEntry<String, CategoriaGasto> entry
+    for (final entry
         in _sugestoesPadrao.entries) {
       if (normalizado.contains(entry.key)) {
         sugerida = entry.value;
@@ -94,7 +94,7 @@ class NovoGastoCategoriaController {
   }
 
   static List<CategoriaGasto> filtrarCategoriasPadrao(String textoBusca) {
-    final String busca = TextNormalizer.normalizeForSearch(
+    final busca = TextNormalizer.normalizeForSearch(
       textoBusca,
     ).toLowerCase();
     if (busca.isEmpty) {
@@ -102,7 +102,7 @@ class NovoGastoCategoriaController {
     }
 
     return CategoriaGasto.values.where((categoria) {
-      final String nome = TextNormalizer.normalizeForSearch(
+      final nome = TextNormalizer.normalizeForSearch(
         categoria.label,
       ).toLowerCase();
       return nome.contains(busca);
@@ -113,10 +113,10 @@ class NovoGastoCategoriaController {
     String textoBusca,
     List<CategoriaPersonalizada> categoriasAtivas,
   ) {
-    final String busca = TextNormalizer.normalizeForSearch(
+    final busca = TextNormalizer.normalizeForSearch(
       textoBusca,
     ).toLowerCase();
-    final List<CategoriaPersonalizada> base = <CategoriaPersonalizada>[
+    final base = <CategoriaPersonalizada>[
       ...categoriasAtivas,
     ];
 
@@ -131,7 +131,7 @@ class NovoGastoCategoriaController {
     }
 
     return base.where((categoria) {
-      final String nome = TextNormalizer.normalizeForSearch(
+      final nome = TextNormalizer.normalizeForSearch(
         categoria.nome,
       ).toLowerCase();
       return nome.contains(busca);
@@ -142,7 +142,7 @@ class NovoGastoCategoriaController {
     List<CategoriaPersonalizada> categoriasAtivas,
     String id,
   ) {
-    for (final CategoriaPersonalizada categoria in categoriasAtivas) {
+    for (final categoria in categoriasAtivas) {
       if (categoria.id == id) {
         return categoria;
       }
@@ -155,7 +155,7 @@ class NovoGastoCategoriaController {
     required List<CategoriaPersonalizada> categoriasAtivas,
     String? ignorarId,
   }) {
-    final String normalizado = TextNormalizer.normalizeForSearch(
+    final normalizado = TextNormalizer.normalizeForSearch(
       nome,
     ).trim().toLowerCase();
 
@@ -163,8 +163,8 @@ class NovoGastoCategoriaController {
       return false;
     }
 
-    for (final CategoriaGasto item in CategoriaGasto.values) {
-      final String padrao = TextNormalizer.normalizeForSearch(
+    for (final item in CategoriaGasto.values) {
+      final padrao = TextNormalizer.normalizeForSearch(
         item.label,
       ).toLowerCase();
       if (padrao == normalizado) {
@@ -172,11 +172,11 @@ class NovoGastoCategoriaController {
       }
     }
 
-    for (final CategoriaPersonalizada item in categoriasAtivas) {
+    for (final item in categoriasAtivas) {
       if (item.id == ignorarId) {
         continue;
       }
-      final String existente = TextNormalizer.normalizeForSearch(
+      final existente = TextNormalizer.normalizeForSearch(
         item.nome,
       ).toLowerCase();
       if (existente == normalizado) {

@@ -41,11 +41,11 @@ class AppRoutes {
   static Map<String, String> gastosQueryFromFilter(
     DashboardDrillDownFilter filter,
   ) {
-    final Map<String, String> query = <String, String>{};
+    final query = <String, String>{};
 
     if (filter.mesReferencia != null) {
-      final String ano = filter.mesReferencia!.year.toString();
-      final String mes = filter.mesReferencia!.month.toString().padLeft(2, '0');
+      final ano = filter.mesReferencia!.year.toString();
+      final mes = filter.mesReferencia!.month.toString().padLeft(2, '0');
       query['mes'] = '$ano-$mes';
     }
 
@@ -67,12 +67,12 @@ class AppRoutes {
   static DashboardDrillDownFilter? gastosFilterFromQuery(
     Map<String, String> query,
   ) {
-    final DateTime? mesReferencia = _parseMes(query['mes']);
-    final CategoriaGasto? categoriaPadrao = _parseCategoria(query['categoria']);
-    final String? categoriaCustomId = _parseNonEmpty(
+    final mesReferencia = _parseMes(query['mes']);
+    final categoriaPadrao = _parseCategoria(query['categoria']);
+    final categoriaCustomId = _parseNonEmpty(
       query['categoriaCustomId'],
     );
-    final TipoGasto? tipo = _parseTipo(query['tipo']);
+    final tipo = _parseTipo(query['tipo']);
 
     if (mesReferencia == null &&
         categoriaPadrao == null &&
@@ -107,23 +107,23 @@ class AppRoutes {
     if (value == null || value.length != 7) {
       return null;
     }
-    final List<String> partes = value.split('-');
+    final partes = value.split('-');
     if (partes.length != 2) {
       return null;
     }
-    final int? ano = int.tryParse(partes[0]);
-    final int? mes = int.tryParse(partes[1]);
+    final ano = int.tryParse(partes[0]);
+    final mes = int.tryParse(partes[1]);
     if (ano == null || mes == null || mes < 1 || mes > 12) {
       return null;
     }
-    return DateTime(ano, mes, 1);
+    return DateTime(ano, mes);
   }
 
   static CategoriaGasto? _parseCategoria(String? value) {
     if (value == null || value.isEmpty) {
       return null;
     }
-    for (final CategoriaGasto categoria in CategoriaGasto.values) {
+    for (final categoria in CategoriaGasto.values) {
       if (categoria.name == value) {
         return categoria;
       }
@@ -135,7 +135,7 @@ class AppRoutes {
     if (value == null || value.isEmpty) {
       return null;
     }
-    for (final TipoGasto tipo in TipoGasto.values) {
+    for (final tipo in TipoGasto.values) {
       if (tipo.name == value) {
         return tipo;
       }
