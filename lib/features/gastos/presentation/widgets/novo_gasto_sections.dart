@@ -6,16 +6,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 
 class NovoGastoPreviewCard extends StatelessWidget {
   const NovoGastoPreviewCard({
-    super.key,
-    required this.titulo,
-    required this.categoriaNome,
-    required this.categoriaPersonalizadaAtiva,
-    required this.categoriaIcone,
-    required this.valorPreview,
-    required this.tipoSelecionado,
-    required this.dataFormatada,
-    required this.previewAccent,
-    required this.previewSurface,
+    required this.titulo, required this.categoriaNome, required this.categoriaPersonalizadaAtiva, required this.categoriaIcone, required this.valorPreview, required this.tipoSelecionado, required this.dataFormatada, required this.previewAccent, required this.previewSurface, super.key,
   });
 
   final String titulo;
@@ -228,19 +219,7 @@ class NovoGastoPreviewCard extends StatelessWidget {
 
 class NovoGastoCategoriaSection extends StatelessWidget {
   const NovoGastoCategoriaSection({
-    super.key,
-    required this.categoriaPersonalizadaAtiva,
-    required this.buscaCategoriaController,
-    required this.recentes,
-    required this.categoriasPadrao,
-    required this.categoriasPersonalizadas,
-    required this.categoriaPersonalizadaSelecionadaId,
-    required this.categoriaSelecionada,
-    required this.onSelecionarCategoriaPadrao,
-    required this.onSelecionarCategoriaPersonalizada,
-    required this.onNovaCategoria,
-    required this.onAbrirAcoesCategoria,
-    required this.colunas,
+    required this.categoriaPersonalizadaAtiva, required this.buscaCategoriaController, required this.recentes, required this.categoriasPadrao, required this.categoriasPersonalizadas, required this.categoriaPersonalizadaSelecionadaId, required this.categoriaSelecionada, required this.onSelecionarCategoriaPadrao, required this.onSelecionarCategoriaPersonalizada, required this.onNovaCategoria, required this.onAbrirAcoesCategoria, required this.colunas, super.key,
   });
 
   final bool categoriaPersonalizadaAtiva;
@@ -335,7 +314,7 @@ class NovoGastoCategoriaSection extends StatelessWidget {
             crossAxisSpacing: AppSpacing.s8,
             childAspectRatio: 2.3,
             children: categoriasPadrao.map((categoria) {
-              final bool selecionada =
+              final selecionada =
                   categoriaPersonalizadaSelecionadaId == null &&
                   categoria == categoriaSelecionada;
               return _CategoriaOptionTile(
@@ -368,7 +347,7 @@ class NovoGastoCategoriaSection extends StatelessWidget {
             children: <Widget>[
               _NovaCategoriaTile(onTap: onNovaCategoria),
               ...categoriasPersonalizadas.map((categoria) {
-                final bool selecionada =
+                final selecionada =
                     categoria.id == categoriaPersonalizadaSelecionadaId;
                 return _CategoriaOptionTile(
                   label: categoria.nome,
@@ -390,9 +369,7 @@ class NovoGastoCategoriaSection extends StatelessWidget {
 
 class NovoGastoTipoSection extends StatelessWidget {
   const NovoGastoTipoSection({
-    super.key,
-    required this.tipoSelecionado,
-    required this.onChanged,
+    required this.tipoSelecionado, required this.onChanged, super.key,
   });
 
   final TipoGasto tipoSelecionado;
@@ -459,14 +436,7 @@ class NovoGastoTipoSection extends StatelessWidget {
 
 class NovoGastoRecorrenciaSection extends StatelessWidget {
   const NovoGastoRecorrenciaSection({
-    super.key,
-    required this.ativo,
-    required this.mesesFuturos,
-    required this.carregandoSugestao,
-    required this.sugestao,
-    required this.onAlterarAtivo,
-    required this.onAlterarMeses,
-    required this.onAplicarSugestao,
+    required this.ativo, required this.mesesFuturos, required this.carregandoSugestao, required this.sugestao, required this.onAlterarAtivo, required this.onAlterarMeses, required this.onAplicarSugestao, super.key,
   });
 
   final bool ativo;
@@ -570,9 +540,7 @@ class NovoGastoRecorrenciaSection extends StatelessWidget {
 
 class NovoGastoDataSection extends StatelessWidget {
   const NovoGastoDataSection({
-    super.key,
-    required this.dataFormatada,
-    required this.onSelecionarData,
+    required this.dataFormatada, required this.onSelecionarData, super.key,
   });
 
   final String dataFormatada;
@@ -613,11 +581,7 @@ class NovoGastoDataSection extends StatelessWidget {
 
 class NovoGastoCategoriaQuickChip extends StatelessWidget {
   const NovoGastoCategoriaQuickChip({
-    super.key,
-    required this.label,
-    required this.color,
-    required this.icon,
-    required this.onTap,
+    required this.label, required this.color, required this.icon, required this.onTap, super.key,
   });
 
   final String label;
@@ -659,11 +623,7 @@ class NovoGastoCategoriaQuickChip extends StatelessWidget {
 
 class _ResumoMiniItem extends StatelessWidget {
   const _ResumoMiniItem({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.accent,
+    required this.icon, required this.label, required this.value, required this.accent, super.key,
   });
 
   final IconData icon;

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../theme/theme.dart';
+import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class AppSkeletonBox extends StatelessWidget {
   const AppSkeletonBox({
-    super.key,
-    required this.height,
+    required this.height, super.key,
     this.width = double.infinity,
     this.radius = 12,
   });
@@ -16,7 +15,7 @@ class AppSkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color base = Theme.of(context).colorScheme.surfaceContainerHighest;
+    final base = Theme.of(context).colorScheme.surfaceContainerHighest;
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.45, end: 0.9),
@@ -56,7 +55,7 @@ class ListSkeleton extends StatelessWidget {
           Expanded(
             child: ListView.separated(
               itemBuilder: (context, index) =>
-                  const AppSkeletonBox(height: 80, radius: 12),
+                  const AppSkeletonBox(height: 80),
               separatorBuilder: (context, index) =>
                   const SizedBox(height: AppSpacing.s12),
               itemCount: 4,

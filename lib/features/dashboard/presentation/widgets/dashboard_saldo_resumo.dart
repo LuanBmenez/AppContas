@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../data/services/dashboard_saldo_service.dart';
+import 'package:paga_o_que_me_deve/features/dashboard/data/services/dashboard_saldo_service.dart';
 
 class DashboardSaldoResumo extends StatelessWidget {
   const DashboardSaldoResumo({
-    super.key,
-    required this.resumo,
+    required this.resumo, super.key,
     this.mostrarValores = true,
   });
 

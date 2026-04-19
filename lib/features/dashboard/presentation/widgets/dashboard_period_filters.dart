@@ -4,12 +4,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 
 class DashboardPeriodFilters extends StatelessWidget {
   const DashboardPeriodFilters({
-    super.key,
-    required this.periodoSelecionado,
-    required this.mesEspecifico,
-    required this.onPeriodoChanged,
-    required this.onSelecionarMes,
-    required this.onLimparMes,
+    required this.periodoSelecionado, required this.mesEspecifico, required this.onPeriodoChanged, required this.onSelecionarMes, required this.onLimparMes, super.key,
   });
 
   final DashboardPeriodoRapido periodoSelecionado;
@@ -33,7 +28,7 @@ class DashboardPeriodFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,7 +37,7 @@ class DashboardPeriodFilters extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: DashboardPeriodoRapido.values.map((periodo) {
-            final bool selecionado =
+            final selecionado =
                 periodoSelecionado == periodo && mesEspecifico == null;
 
             return ChoiceChip(
@@ -109,7 +104,7 @@ class _ActionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return InkWell(
       borderRadius: BorderRadius.circular(999),

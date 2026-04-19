@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:paga_o_que_me_deve/main.dart';
 
 void main() {
-  testWidgets('App carrega tela inicial', (WidgetTester tester) async {
+  testWidgets('App carrega tela inicial', (tester) async {
     await tester.pumpWidget(
       const PagaOQueMeDeveApp(home: Scaffold(body: Text('Tela Inicial'))),
     );

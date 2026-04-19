@@ -19,7 +19,7 @@ class OrcamentosService {
   final FirebaseFirestore _firestore;
 
   String get _uid {
-    final User? user = _auth.currentUser;
+    final user = _auth.currentUser;
     if (user == null) {
       throw StateError('Usuario nao autenticado.');
     }
@@ -47,7 +47,7 @@ class OrcamentosService {
           .collection('orcamentos_categoria')
           .snapshots()
           .map((snapshot) {
-            final List<OrcamentoCategoria> itens = snapshot.docs
+            final itens = snapshot.docs
                 .map((doc) => OrcamentoCategoria.fromMap(doc.data(), doc.id))
                 .toList();
 
@@ -65,15 +65,13 @@ class OrcamentosService {
     required CategoriaGasto categoriaPadrao,
     required double valorLimite,
   }) async {
-    final QuerySnapshot<Map<String, dynamic>> existente =
-        await _orcamentosCollection
-            .where('categoriaPadrao', isEqualTo: categoriaPadrao.name)
-            .limit(1)
-            .get();
+    final existente = await _orcamentosCollection
+        .where('categoriaPadrao', isEqualTo: categoriaPadrao.name)
+        .limit(1)
+        .get();
 
     if (existente.docs.isNotEmpty) {
-      final DocumentReference<Map<String, dynamic>> ref =
-          existente.docs.first.reference;
+      final ref = existente.docs.first.reference;
       await ref.set({
         'categoriaPadrao': categoriaPadrao.name,
         'valorLimite': valorLimite,
@@ -110,20 +108,19 @@ class OrcamentosService {
     DateTime mesReferencia, {
     int? limite,
   }) {
-    final DateTime inicio = DateTime(
+    final inicio = DateTime(
       mesReferencia.year,
       mesReferencia.month,
-      1,
     );
-    final DateTime fimExclusivo = DateTime(
+    final fimExclusivo = DateTime(
       mesReferencia.year,
       mesReferencia.month + 1,
-      1,
     );
 
-    final Stream<List<OrcamentoCategoria>> orcamentosStream = listarOrcamentos()
-        .startWith(const <OrcamentoCategoria>[]);
-    final Stream<List<Gasto>> gastosStream = _repository
+    final orcamentosStream = listarOrcamentos().startWith(
+      const <OrcamentoCategoria>[],
+    );
+    final gastosStream = _repository
         .streamGastosPorPeriodo(inicio: inicio, fimExclusivo: fimExclusivo)
         .startWith(const <Gasto>[]);
 
@@ -132,9 +129,9 @@ class OrcamentosService {
           List<Gasto>,
           List<OrcamentoCategoriaResumo>
         >(orcamentosStream, gastosStream, (orcamentos, gastosMes) {
-          final Map<CategoriaGasto, double> totais = <CategoriaGasto, double>{};
+          final totais = <CategoriaGasto, double>{};
 
-          for (final Gasto gasto in gastosMes) {
+          for (final gasto in gastosMes) {
             if (gasto.usaCategoriaPersonalizada) {
               continue;
             }
@@ -142,14 +139,14 @@ class OrcamentosService {
                 (totais[gasto.categoria] ?? 0) + gasto.valor;
           }
 
-          final List<OrcamentoCategoriaResumo> resumos =
+          final resumos =
               orcamentos.map((orc) {
-                final double valorGasto = totais[orc.categoriaPadrao] ?? 0;
-                final double limiteCategoria = orc.valorLimite;
-                final double percentual = limiteCategoria <= 0
-                    ? 0
+                final valorGasto = totais[orc.categoriaPadrao] ?? 0;
+                final limiteCategoria = orc.valorLimite;
+                final percentual = limiteCategoria <= 0
+                    ? 0.00
                     : valorGasto / limiteCategoria;
-                final double restante = limiteCategoria - valorGasto;
+                final restante = limiteCategoria - valorGasto;
 
                 final OrcamentoCategoriaStatus status;
                 if (percentual >= 1) {

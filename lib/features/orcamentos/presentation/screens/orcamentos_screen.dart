@@ -11,7 +11,7 @@ import 'package:paga_o_que_me_deve/features/orcamentos/domain/models/orcamento_c
 import 'package:paga_o_que_me_deve/features/orcamentos/presentation/widgets/orcamento_categoria_progress_item.dart';
 
 class OrcamentosScreen extends StatefulWidget {
-  const OrcamentosScreen({super.key, required this.db});
+  const OrcamentosScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -51,19 +51,18 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
   }
 
   Future<void> _abrirFormularioOrcamento({
-    OrcamentoCategoria? existente,
-    required List<OrcamentoCategoriaResumo> resumos,
+    required List<OrcamentoCategoriaResumo> resumos, OrcamentoCategoria? existente,
   }) async {
-    final BuildContext screenContext = context;
-    CategoriaGasto categoriaSelecionada =
+    final screenContext = context;
+    var categoriaSelecionada =
         existente?.categoriaPadrao ?? CategoriaGasto.outros;
-    final TextEditingController limiteController = TextEditingController(
+    final limiteController = TextEditingController(
       text: existente == null
           ? ''
-          : AppFormatters.moeda(existente.valorLimite).replaceFirst('R\$ ', ''),
+          : AppFormatters.moeda(existente.valorLimite).replaceFirst(r'R$ ', ''),
     );
 
-    final bool? confirmar = await showDialog<bool>(
+    final confirmar = await showDialog<bool>(
       context: screenContext,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -131,7 +130,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
     if (confirmar != true) return;
     if (!screenContext.mounted) return;
 
-    final String limiteRaw = limiteController.text.trim();
+    final limiteRaw = limiteController.text.trim();
     final double limite;
     try {
       limite = AppFormatters.parseMoedaInput(limiteRaw);
@@ -145,7 +144,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
       return;
     }
 
-    final bool categoriaDuplicada = resumos.any(
+    final categoriaDuplicada = resumos.any(
       (resumo) =>
           resumo.orcamento.categoriaPadrao == categoriaSelecionada &&
           resumo.orcamento.id != existente?.id,
@@ -182,8 +181,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
   }
 
   Future<void> _excluirOrcamento(OrcamentoCategoria orcamento) async {
-    final BuildContext screenContext = context;
-    final bool confirmar = await AppConfirmDialog.show(
+    final screenContext = context;
+    final confirmar = await AppConfirmDialog.show(
       screenContext,
       title: 'Excluir orçamento',
       message:
@@ -205,7 +204,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
 
   // Widget para navegar entre os meses
   Widget _buildSeletorMes() {
-    final String mesFormatado = DateFormat(
+    final mesFormatado = DateFormat(
       'MMMM yyyy',
       'pt_BR',
     ).format(_mesSelecionado).toUpperCase();
@@ -267,7 +266,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
                   );
                 }
 
-                final List<OrcamentoCategoriaResumo> resumos =
+                final resumos =
                     snapshot.data ?? <OrcamentoCategoriaResumo>[];
 
                 if (resumos.isEmpty) {
@@ -292,7 +291,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: AppSpacing.s12),
                   itemBuilder: (context, index) {
-                    final OrcamentoCategoriaResumo resumo = resumos[index];
+                    final resumo = resumos[index];
 
                     return OrcamentoCategoriaProgressItem(
                       resumo: resumo,

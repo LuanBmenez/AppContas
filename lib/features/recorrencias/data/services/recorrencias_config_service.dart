@@ -18,7 +18,7 @@ class RecorrenciasConfigService {
   }
 
   Stream<List<RecorrenciaConfiguracao>> streamConfiguracoes() {
-    return _auth.authStateChanges().switchMap((User? user) {
+    return _auth.authStateChanges().switchMap((user) {
       if (user == null) {
         return Stream.value(const <RecorrenciaConfiguracao>[]);
       }
@@ -29,7 +29,7 @@ class RecorrenciasConfigService {
   }
 
   Future<RecorrenciaConfiguracao?> buscarConfiguracao(String recorrenciaId) async {
-    final String? uid = _auth.currentUser?.uid;
+    final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
     final doc = await _collection(uid).doc(recorrenciaId).get();
     if (!doc.exists) return null;
@@ -37,7 +37,7 @@ class RecorrenciasConfigService {
   }
 
   Future<void> salvarConfiguracao(RecorrenciaConfiguracao configuracao) async {
-    final String? uid = _auth.currentUser?.uid;
+    final uid = _auth.currentUser?.uid;
     if (uid == null) throw StateError('Usuário não autenticado.');
     await _collection(uid).doc(configuracao.recorrenciaId).set(configuracao.toMap(), SetOptions(merge: true));
   }

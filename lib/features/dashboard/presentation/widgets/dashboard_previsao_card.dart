@@ -3,7 +3,6 @@ import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/data/services/previsao_fechamento_service.dart';
-import 'package:paga_o_que_me_deve/features/dashboard/domain/models/previsao_fechamento_mes.dart';
 import 'package:paga_o_que_me_deve/features/dashboard/presentation/widgets/previsao_categoria_risco_item.dart';
 import 'package:paga_o_que_me_deve/features/insights/insights.dart';
 import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
@@ -12,17 +11,7 @@ import 'package:paga_o_que_me_deve/features/recorrencias/domain/models/recorrenc
 
 class DashboardPrevisaoCard extends StatelessWidget {
   const DashboardPrevisaoCard({
-    super.key,
-    required this.resumoBruto,
-    required this.resumo,
-    required this.agora,
-    required this.mostrarValores,
-    required this.orcamentosMesStream,
-    required this.recorrenciasService,
-    required this.previsaoFechamentoService,
-    required this.insightsService,
-    required this.referenciaMesRecorrencias,
-    required this.calcularRecorrenciasRestantesMes,
+    required this.resumoBruto, required this.resumo, required this.agora, required this.mostrarValores, required this.orcamentosMesStream, required this.recorrenciasService, required this.previsaoFechamentoService, required this.insightsService, required this.referenciaMesRecorrencias, required this.calcularRecorrenciasRestantesMes, super.key,
   });
 
   final DashboardResumo resumoBruto;
@@ -39,32 +28,32 @@ class DashboardPrevisaoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return StreamBuilder<List<OrcamentoCategoriaResumo>>(
       stream: orcamentosMesStream,
       builder: (context, snapshotOrcamentos) {
-        final List<OrcamentoCategoriaResumo> orcamentos =
+        final orcamentos =
             snapshotOrcamentos.data ?? <OrcamentoCategoriaResumo>[];
 
-        final PrevisaoFechamentoMes previsao = previsaoFechamentoService
+        final previsao = previsaoFechamentoService
             .calcular(
               resumo: resumoBruto,
               orcamentosCategoria: orcamentos,
               agora: agora,
             );
 
-        final List<PrevisaoCategoriaRisco> riscos = previsao.categoriasComRisco
+        final riscos = previsao.categoriasComRisco
             .take(3)
             .toList();
 
         return StreamBuilder<List<RecorrenciaAtiva>>(
           stream: recorrenciasService.streamRecorrenciasAtivas(),
           builder: (context, snapshotRecorrencias) {
-            final List<RecorrenciaAtiva> recorrencias =
+            final recorrencias =
                 snapshotRecorrencias.data ?? <RecorrenciaAtiva>[];
 
-            final double recorrenciasRestantesCorrigidas =
+            final recorrenciasRestantesCorrigidas =
                 calcularRecorrenciasRestantesMes(
                   recorrencias,
                   referenciaMesRecorrencias,
@@ -75,12 +64,11 @@ class DashboardPrevisaoCard extends StatelessWidget {
             //     previsao.recorrenciasRestantes +
             //     recorrenciasRestantesCorrigidas;
 
-            final List<InsightItem> insights = insightsService.gerarInsights(
+            final insights = insightsService.gerarInsights(
               resumo: resumo,
               previsao: previsao,
               orcamentos: orcamentos,
               agora: agora,
-              limite: 5,
             );
 
             return Column(
@@ -229,7 +217,7 @@ class DashboardPrevisaoCard extends StatelessWidget {
                         else
                           Column(
                             children: riscos.map((
-                              PrevisaoCategoriaRisco risco,
+                              risco,
                             ) {
                               return Padding(
                                 padding: const EdgeInsets.only(

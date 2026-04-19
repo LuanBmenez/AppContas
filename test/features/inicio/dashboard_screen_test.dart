@@ -10,11 +10,11 @@ import 'package:paga_o_que_me_deve/features/dashboard/presentation/screens/dashb
 void main() {
   group('DashboardScreen', () {
     testWidgets('exibe loading enquanto stream nao emite', (tester) async {
-      final StreamController<DashboardResumo> controller =
+      final controller =
           StreamController<DashboardResumo>();
       addTearDown(controller.close);
 
-      final _TestFinanceRepository repo = _TestFinanceRepository(
+      final repo = _TestFinanceRepository(
         dashboardResumoStream: controller.stream,
       );
 
@@ -24,7 +24,7 @@ void main() {
     });
 
     testWidgets('exibe estado de erro quando stream falha', (tester) async {
-      final _TestFinanceRepository repo = _TestFinanceRepository(
+      final repo = _TestFinanceRepository(
         dashboardResumoStream: Stream<DashboardResumo>.error(
           Exception('falha de teste'),
         ),
@@ -40,7 +40,7 @@ void main() {
     testWidgets('exibe estado vazio para categorias sem gastos', (
       tester,
     ) async {
-      final _TestFinanceRepository repo = _TestFinanceRepository(
+      final repo = _TestFinanceRepository(
         dashboardResumoStream: Stream<DashboardResumo>.value(
           const DashboardResumo(<Gasto>[], <Conta>[]),
         ),
@@ -64,16 +64,15 @@ void main() {
     testWidgets('exibe dados completos e abre drill-down de categoria', (
       tester,
     ) async {
-      final DateTime agora = DateTime.now();
-      final Gasto gasto = Gasto(
+      final agora = DateTime.now();
+      final gasto = Gasto(
         id: 'g1',
         titulo: 'Mercado',
         valor: 250,
         data: DateTime(agora.year, agora.month, 10),
         categoria: CategoriaGasto.comida,
-        tipo: TipoGasto.variavel,
       );
-      final Conta conta = Conta(
+      final conta = Conta(
         id: 'c1',
         nome: 'Cliente A',
         descricao: 'Servico',
@@ -82,7 +81,7 @@ void main() {
         foiPago: true,
       );
 
-      final _TestFinanceRepository repo = _TestFinanceRepository(
+      final repo = _TestFinanceRepository(
         dashboardResumoStream: Stream<DashboardResumo>.value(
           DashboardResumo(<Gasto>[gasto], <Conta>[conta]),
         ),
@@ -98,23 +97,23 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Categorias de gastos'), findsOneWidget);
-      final Finder categoriasCard = find.ancestor(
+      final categoriasCard = find.ancestor(
         of: find.text('Categorias de gastos'),
         matching: find.byType(Card),
       );
-      final Finder comidaNoCard = find.descendant(
+      final comidaNoCard = find.descendant(
         of: categoriasCard,
         matching: find.text('Comida'),
       );
       expect(comidaNoCard, findsWidgets);
-      expect(find.text('R\$ 250,00'), findsWidgets);
+      expect(find.text(r'R$ 250,00'), findsWidgets);
     });
 
     testWidgets('desabilita exportacao durante processamento', (tester) async {
-      final Completer<void> completer = Completer<void>();
-      int chamadas = 0;
+      final completer = Completer<void>();
+      var chamadas = 0;
 
-      final _TestFinanceRepository repo = _TestFinanceRepository(
+      final repo = _TestFinanceRepository(
         dashboardResumoStream: Stream<DashboardResumo>.value(
           const DashboardResumo(<Gasto>[], <Conta>[]),
         ),
@@ -141,7 +140,7 @@ void main() {
         find.text('Gerando e compartilhando relatório...'),
         findsOneWidget,
       );
-      final FilledButton botao = tester.widget<FilledButton>(
+      final botao = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Gerando...'),
       );
       expect(botao.onPressed, isNull);
@@ -277,9 +276,8 @@ class _TestFinanceRepository implements FinanceRepository {
 
   @override
   Future<void> registrarUsoNovoGasto({
-    CategoriaGasto? categoriaPadrao,
+    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
     String? categoriaPersonalizadaId,
-    required TipoGasto tipo,
   }) => throw UnimplementedError();
 
   @override

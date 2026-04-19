@@ -18,14 +18,13 @@ class PrevisaoFechamentoService {
     required List<OrcamentoCategoriaResumo> orcamentosCategoria,
     DateTime? agora,
   }) {
-    final DateTime referencia = agora ?? DateTime.now();
-    final DateTime inicioMes = DateTime(referencia.year, referencia.month, 1);
-    final DateTime fimMesExclusivo = DateTime(
+    final referencia = agora ?? DateTime.now();
+    final inicioMes = DateTime(referencia.year, referencia.month);
+    final fimMesExclusivo = DateTime(
       referencia.year,
       referencia.month + 1,
-      1,
     );
-    final DateTime fimDiaAtual = DateTime(
+    final fimDiaAtual = DateTime(
       referencia.year,
       referencia.month,
       referencia.day,
@@ -35,36 +34,34 @@ class PrevisaoFechamentoService {
       999,
     );
 
-    final int diasNoMes = DateTime(
+    final diasNoMes = DateTime(
       referencia.year,
       referencia.month + 1,
       0,
     ).day;
-    final int diasPassados = referencia.day.clamp(1, diasNoMes);
+    final diasPassados = referencia.day.clamp(1, diasNoMes);
 
-    final List<Gasto> gastosMes = resumo.gastos.where((Gasto gasto) {
+    final gastosMes = resumo.gastos.where((gasto) {
       return !gasto.data.isBefore(inicioMes) &&
           gasto.data.isBefore(fimMesExclusivo);
     }).toList();
 
-    final List<Gasto> gastosAteAgora = gastosMes.where((Gasto gasto) {
+    final gastosAteAgora = gastosMes.where((gasto) {
       return !gasto.data.isAfter(fimDiaAtual);
     }).toList();
 
-    final double gastoAtual = gastosAteAgora.fold<double>(
+    final gastoAtual = gastosAteAgora.fold<double>(
       0,
-      (double total, Gasto gasto) => total + gasto.valor,
+      (total, gasto) => total + gasto.valor,
     );
 
-    final double gastoVariavelAtual = gastosAteAgora
-        .where((Gasto gasto) => gasto.tipo == TipoGasto.variavel)
-        .fold<double>(0, (double total, Gasto gasto) => total + gasto.valor);
+    final gastoVariavelAtual = gastosAteAgora
+        .where((gasto) => gasto.tipo == TipoGasto.variavel)
+        .fold<double>(0, (total, gasto) => total + gasto.valor);
 
-    final double mediaDiaria = diasPassados <= 0
-        ? 0
-        : gastoAtual / diasPassados;
+    final mediaDiaria = diasPassados <= 0 ? 0.0 : gastoAtual / diasPassados;
 
-    final double recorrenciasRestantes = _calcularRecorrenciasRestantes(
+    final recorrenciasRestantes = _calcularRecorrenciasRestantes(
       gastos: resumo.gastos,
       referencia: referencia,
       fimDiaAtual: fimDiaAtual,
@@ -72,26 +69,25 @@ class PrevisaoFechamentoService {
       fimMesExclusivo: fimMesExclusivo,
     );
 
-    final double projecaoVariavel = _calcularProjecaoVariavelConservadora(
+    final projecaoVariavel = _calcularProjecaoVariavelConservadora(
       gastoAtual: gastoAtual,
       gastoVariavelAtual: gastoVariavelAtual,
       diasPassados: diasPassados,
       diasNoMes: diasNoMes,
     );
-    final double projecaoTotal = _aplicarLimiteRazoavel(
+    final projecaoTotal = _aplicarLimiteRazoavel(
       projecaoVariavel: projecaoVariavel,
       gastoAtual: gastoAtual,
       recorrenciasRestantes: recorrenciasRestantes,
       diasPassados: diasPassados,
     );
 
-    final List<PrevisaoCategoriaRisco> categoriasComRisco =
-        _calcularCategoriasComRisco(
-          gastosAteAgora: gastosAteAgora,
-          orcamentosCategoria: orcamentosCategoria,
-          diasPassados: diasPassados,
-          diasNoMes: diasNoMes,
-        );
+    final categoriasComRisco = _calcularCategoriasComRisco(
+      gastosAteAgora: gastosAteAgora,
+      orcamentosCategoria: orcamentosCategoria,
+      diasPassados: diasPassados,
+      diasNoMes: diasNoMes,
+    );
 
     return PrevisaoFechamentoMes(
       gastoAtual: gastoAtual,
@@ -111,20 +107,20 @@ class PrevisaoFechamentoService {
     required DateTime inicioMes,
     required DateTime fimMesExclusivo,
   }) {
-    final double recorrenciasFixasAgendadasNoMes = gastos
+    final recorrenciasFixasAgendadasNoMes = gastos
         .where(
-          (Gasto gasto) =>
+          (gasto) =>
               gasto.tipo == TipoGasto.fixo &&
               gasto.data.isAfter(fimDiaAtual) &&
               !gasto.data.isBefore(inicioMes) &&
               gasto.data.isBefore(fimMesExclusivo),
         )
-        .fold<double>(0, (double total, Gasto gasto) => total + gasto.valor);
+        .fold<double>(0, (total, gasto) => total + gasto.valor);
 
-    final Map<String, List<Gasto>> gruposPorTitulo = <String, List<Gasto>>{};
+    final gruposPorTitulo = <String, List<Gasto>>{};
 
-    for (final Gasto gasto in gastos) {
-      final String tituloNormalizado = TextNormalizer.normalizeForSearch(
+    for (final gasto in gastos) {
+      final tituloNormalizado = TextNormalizer.normalizeForSearch(
         gasto.titulo,
       );
       if (tituloNormalizado.length < 3) {
@@ -136,32 +132,31 @@ class PrevisaoFechamentoService {
           .add(gasto);
     }
 
-    double totalRestante = recorrenciasFixasAgendadasNoMes;
-    for (final List<Gasto> grupo in gruposPorTitulo.values) {
-      final SugestaoRecorrenciaDespesa? sugestao = _recorrenciaDespesaService
-          .detectarMensal(grupo);
+    var totalRestante = recorrenciasFixasAgendadasNoMes;
+    for (final grupo in gruposPorTitulo.values) {
+      final sugestao = _recorrenciaDespesaService.detectarMensal(grupo);
       if (sugestao == null) {
         continue;
       }
 
-      final List<Gasto> lancamentosMes = grupo.where((Gasto gasto) {
+      final lancamentosMes = grupo.where((gasto) {
         return !gasto.data.isBefore(inicioMes) &&
             gasto.data.isBefore(fimMesExclusivo);
       }).toList();
 
-      final double futurosNoMesNaoFixos = lancamentosMes
+      final futurosNoMesNaoFixos = lancamentosMes
           .where(
-            (Gasto gasto) =>
+            (gasto) =>
                 gasto.tipo != TipoGasto.fixo && gasto.data.isAfter(fimDiaAtual),
           )
-          .fold<double>(0, (double total, Gasto gasto) => total + gasto.valor);
+          .fold<double>(0, (total, gasto) => total + gasto.valor);
 
       if (futurosNoMesNaoFixos > 0) {
         totalRestante += futurosNoMesNaoFixos;
         continue;
       }
 
-      final bool jaOcorreuNoMes = lancamentosMes.any((Gasto gasto) {
+      final jaOcorreuNoMes = lancamentosMes.any((gasto) {
         return !gasto.data.isAfter(fimDiaAtual);
       });
 
@@ -185,12 +180,12 @@ class PrevisaoFechamentoService {
       return 0;
     }
 
-    final int diasRestantes = (diasNoMes - diasPassados).clamp(0, diasNoMes);
+    final diasRestantes = (diasNoMes - diasPassados).clamp(0, diasNoMes);
     if (diasRestantes <= 0 || gastoVariavelAtual <= 0) {
       return gastoAtual;
     }
 
-    final double mediaVariavelDiaria = gastoVariavelAtual / diasPassados;
+    final mediaVariavelDiaria = gastoVariavelAtual / diasPassados;
     final double fatorSuavizacao;
     if (diasPassados < 7) {
       fatorSuavizacao = 0.30;
@@ -200,9 +195,9 @@ class PrevisaoFechamentoService {
       fatorSuavizacao = 0.65;
     }
 
-    final double adicionalProjetado =
+    final adicionalProjetado =
         mediaVariavelDiaria * diasRestantes * fatorSuavizacao;
-    final double projetado = gastoAtual + adicionalProjetado;
+    final projetado = gastoAtual + adicionalProjetado;
     return projetado < gastoAtual ? gastoAtual : projetado;
   }
 
@@ -212,7 +207,7 @@ class PrevisaoFechamentoService {
     required double recorrenciasRestantes,
     required int diasPassados,
   }) {
-    final double base =
+    final base =
         (projecaoVariavel < gastoAtual ? gastoAtual : projecaoVariavel) +
         recorrenciasRestantes;
 
@@ -229,8 +224,7 @@ class PrevisaoFechamentoService {
       multiplicadorMaximo = 3.0;
     }
 
-    final double limite =
-        (gastoAtual * multiplicadorMaximo) + recorrenciasRestantes;
+    final limite = (gastoAtual * multiplicadorMaximo) + recorrenciasRestantes;
     return base > limite ? limite : base;
   }
 
@@ -240,10 +234,9 @@ class PrevisaoFechamentoService {
     required int diasPassados,
     required int diasNoMes,
   }) {
-    final Map<CategoriaGasto, double> gastoAtualPorCategoria =
-        <CategoriaGasto, double>{};
+    final gastoAtualPorCategoria = <CategoriaGasto, double>{};
 
-    for (final Gasto gasto in gastosAteAgora) {
+    for (final gasto in gastosAteAgora) {
       if (gasto.usaCategoriaPersonalizada) {
         continue;
       }
@@ -251,16 +244,14 @@ class PrevisaoFechamentoService {
           (gastoAtualPorCategoria[gasto.categoria] ?? 0) + gasto.valor;
     }
 
-    final List<PrevisaoCategoriaRisco> riscos = <PrevisaoCategoriaRisco>[];
-    for (final OrcamentoCategoriaResumo resumoOrcamento
-        in orcamentosCategoria) {
-      final CategoriaGasto categoria =
-          resumoOrcamento.orcamento.categoriaPadrao;
-      final double limite = resumoOrcamento.orcamento.valorLimite;
-      final double gastoAtual = gastoAtualPorCategoria[categoria] ?? 0;
+    final riscos = <PrevisaoCategoriaRisco>[];
+    for (final resumoOrcamento in orcamentosCategoria) {
+      final categoria = resumoOrcamento.orcamento.categoriaPadrao;
+      final limite = resumoOrcamento.orcamento.valorLimite;
+      final gastoAtual = gastoAtualPorCategoria[categoria] ?? 0;
 
-      final double projecao = diasPassados <= 0
-          ? 0
+      final projecao = diasPassados <= 0
+          ? 0.0
           : (gastoAtual / diasPassados) * diasNoMes;
 
       if (limite > 0 && projecao > limite) {

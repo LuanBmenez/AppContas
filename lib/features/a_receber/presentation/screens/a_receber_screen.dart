@@ -4,13 +4,12 @@ import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/a_receber/data/services/recebiveis_service.dart';
-
-import 'novo_recebivel_screen.dart';
+import 'package:paga_o_que_me_deve/features/a_receber/presentation/screens/novo_recebivel_screen.dart';
 
 class AReceberScreen extends StatefulWidget {
   const AReceberScreen({
-    super.key,
     required this.db,
+    super.key,
     this.somentePendentes = false,
   });
 
@@ -46,10 +45,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
   );
 
   DateTime get _inicioMes =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month, 1);
+      DateTime(_mesSelecionado.year, _mesSelecionado.month);
 
   DateTime get _fimMesExclusivo =>
-      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 1);
+      DateTime(_mesSelecionado.year, _mesSelecionado.month + 1);
 
   @override
   void initState() {
@@ -87,11 +86,11 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   Future<void> _selecionarMes() async {
-    final DateTime hoje = DateTime.now();
-    int anoSelecionado = _mesSelecionado.year;
-    int mesSelecionado = _mesSelecionado.month;
+    final hoje = DateTime.now();
+    var anoSelecionado = _mesSelecionado.year;
+    var mesSelecionado = _mesSelecionado.month;
 
-    final DateTime? selecionado = await showModalBottomSheet<DateTime>(
+    final selecionado = await showModalBottomSheet<DateTime>(
       context: context,
       showDragHandle: true,
       builder: (context) {
@@ -122,7 +121,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
                           items: List<DropdownMenuItem<int>>.generate(12, (
                             index,
                           ) {
-                            final int month = index + 1;
+                            final month = index + 1;
                             return DropdownMenuItem<int>(
                               value: month,
                               child: Text(AppFormatters.nomeMes(month)),
@@ -143,7 +142,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
                           items: List<DropdownMenuItem<int>>.generate(81, (
                             index,
                           ) {
-                            final int year = 2020 + index;
+                            final year = 2020 + index;
                             return DropdownMenuItem<int>(
                               value: year,
                               child: Text(year.toString()),
@@ -162,7 +161,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
                   Row(
                     children: [
                       TextButton(
-                        onPressed: () => Navigator.pop(context, null),
+                        onPressed: () => Navigator.pop(context),
                         child: const Text('Cancelar'),
                       ),
                       const Spacer(),
@@ -198,8 +197,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   void _setStatePreservandoScroll(VoidCallback fn) {
-    final bool tinhaClientes = _listController.hasClients;
-    final double offsetAntes = tinhaClientes ? _listController.offset : 0;
+    final tinhaClientes = _listController.hasClients;
+    final offsetAntes = tinhaClientes ? _listController.offset : 0;
 
     setState(fn);
 
@@ -207,8 +206,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
       if (!_listController.hasClients) {
         return;
       }
-      final double max = _listController.position.maxScrollExtent;
-      final double destino = offsetAntes.clamp(0, max).toDouble();
+      final max = _listController.position.maxScrollExtent;
+      final destino = offsetAntes.clamp(0, max).toDouble();
       if ((_listController.offset - destino).abs() > 0.5) {
         _listController.jumpTo(destino);
       }
@@ -216,7 +215,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   void _onBuscaAlterada() {
-    final String novoTermo = _buscaController.text;
+    final novoTermo = _buscaController.text;
     if (novoTermo == _termoBusca) {
       return;
     }
@@ -227,7 +226,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   String _mensagemErroFirestore(Object? error) {
-    final String erro = (error ?? '').toString().toLowerCase();
+    final erro = (error ?? '').toString().toLowerCase();
     if (erro.contains('firestore.googleapis.com') ||
         erro.contains('permission_denied')) {
       return 'Firestore sem permissão ou desativado no projeto.\n'
@@ -291,11 +290,10 @@ class _AReceberScreenState extends State<AReceberScreen> {
       return;
     }
 
-    final bool confirmar = await AppConfirmDialog.show(
+    final confirmar = await AppConfirmDialog.show(
       context,
       title: 'Excluir em lote',
       message: 'Deseja excluir ${selecionados.length} cobranças selecionadas?',
-      confirmText: 'Excluir',
     );
     if (!confirmar) {
       return;
@@ -303,7 +301,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
     setState(() => _processandoLote = true);
     try {
-      for (final Conta conta in selecionados) {
+      for (final conta in selecionados) {
         await _recebiveisService.deletarRecebivel(conta.id);
       }
       if (!mounted) return;
@@ -333,7 +331,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
     setState(() => _processandoLote = true);
     try {
-      for (final Conta conta in selecionados) {
+      for (final conta in selecionados) {
         if (conta.foiPago != pago) {
           await _recebiveisService.alternarStatusRecebivel(
             conta.id,
@@ -361,9 +359,11 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   void _abrirNovaCobranca() {
-    Navigator.push(
+    Navigator.push<void>(
       context,
-      MaterialPageRoute(builder: (_) => NovoRecebivelScreen(db: widget.db)),
+      MaterialPageRoute<void>(
+        builder: (_) => NovoRecebivelScreen(db: widget.db),
+      ),
     );
   }
 
@@ -492,9 +492,9 @@ class _AReceberScreenState extends State<AReceberScreen> {
     required double totalPendenteMes,
     required double progresso,
   }) {
-    final AppSemanticColors semantic = _semanticColors(theme);
-    final Color base = theme.colorScheme.primaryContainer;
-    final Color accent = theme.colorScheme.surfaceContainerHighest;
+    final semantic = _semanticColors(theme);
+    final base = theme.colorScheme.primaryContainer;
+    final accent = theme.colorScheme.surfaceContainerHighest;
 
     return Container(
       width: double.infinity,
@@ -630,7 +630,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
               ? null
               : IconButton(
                   tooltip: 'Limpar busca',
-                  onPressed: () => _buscaController.clear(),
+                  onPressed: _buscaController.clear,
                   icon: const Icon(Icons.close_rounded),
                 ),
           filled: true,
@@ -758,7 +758,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   Widget _buildStatusChip({required ThemeData theme, required bool foiPago}) {
-    final Color cor = foiPago ? Colors.green.shade700 : Colors.red.shade700;
+    final cor = foiPago ? Colors.green.shade700 : Colors.red.shade700;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -778,7 +778,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
   }
 
   String _dataContaLabel(Conta conta) {
-    final DateTime dataBase = _dataReferenciaConta(conta);
+    final dataBase = _dataReferenciaConta(conta);
     return AppFormatters.dataCurta(dataBase);
   }
 
@@ -787,10 +787,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
     required Conta conta,
     required bool selecionado,
   }) {
-    final bool pago = conta.foiPago;
-    final Color statusColor = pago
-        ? Colors.green.shade700
-        : Colors.red.shade700;
+    final pago = conta.foiPago;
+    final statusColor = pago ? Colors.green.shade700 : Colors.red.shade700;
 
     final Widget tile = Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -1097,7 +1095,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return StreamBuilder<List<Conta>>(
       stream: _obterContasStream(),
@@ -1118,26 +1116,24 @@ class _AReceberScreenState extends State<AReceberScreen> {
           );
         }
 
-        final List<Conta> todasAsContas = snapshot.data ?? <Conta>[];
+        final todasAsContas = snapshot.data ?? <Conta>[];
 
-        final List<Conta> contasDoMes = todasAsContas.where((conta) {
+        final contasDoMes = todasAsContas.where((conta) {
           return _estaNoMes(_dataReferenciaConta(conta));
         }).toList();
 
-        final List<Conta> listaContas = widget.somentePendentes
+        final listaContas = widget.somentePendentes
             ? contasDoMes.where((conta) => !conta.foiPago).toList()
             : contasDoMes;
 
-        final List<Conta> contasFiltradas = listaContas
-            .where(_filtrarPorNome)
-            .toList();
+        final contasFiltradas = listaContas.where(_filtrarPorNome).toList();
 
-        final List<Conta> selecionados = _selecionadosDe(contasFiltradas);
+        final selecionados = _selecionadosDe(contasFiltradas);
 
         double totalRecebidoMes = 0;
         double totalPendenteMes = 0;
 
-        for (final Conta conta in contasDoMes) {
+        for (final conta in contasDoMes) {
           if (conta.foiPago) {
             totalRecebidoMes += conta.valor;
           } else {
@@ -1145,13 +1141,13 @@ class _AReceberScreenState extends State<AReceberScreen> {
           }
         }
 
-        final double totalGeralMes = totalRecebidoMes + totalPendenteMes;
-        final double progresso = totalGeralMes == 0
-            ? 0
+        final totalGeralMes = totalRecebidoMes + totalPendenteMes;
+        final progresso = totalGeralMes == 0
+            ? 0.0
             : totalRecebidoMes / totalGeralMes;
-        final bool buscando = _termoBusca.trim().isNotEmpty;
+        final buscando = _termoBusca.trim().isNotEmpty;
 
-        return Container(
+        return ColoredBox(
           color: theme.colorScheme.surface,
           child: SafeArea(
             bottom: false,
@@ -1177,8 +1173,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
                       padding: const EdgeInsets.only(bottom: 16),
                       itemCount: contasFiltradas.length,
                       itemBuilder: (context, index) {
-                        final Conta conta = contasFiltradas[index];
-                        final bool selecionado = _idsSelecionados.contains(
+                        final conta = contasFiltradas[index];
+                        final selecionado = _idsSelecionados.contains(
                           conta.id,
                         );
 

@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../theme/theme.dart';
+import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class AppEmptyStateCta extends StatelessWidget {
   const AppEmptyStateCta({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.buttonLabel,
-    required this.onPressed,
+    required this.icon, required this.title, required this.description, required this.buttonLabel, required this.onPressed, super.key,
   });
 
   final IconData icon;

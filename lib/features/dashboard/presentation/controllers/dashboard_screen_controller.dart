@@ -23,7 +23,7 @@ class DashboardScreenController {
   }
 
   void selecionarMes(DateTime data) {
-    mesEspecifico = DateTime(data.year, data.month, 1);
+    mesEspecifico = DateTime(data.year, data.month);
   }
 
   void limparMesEspecifico() {
@@ -53,15 +53,13 @@ class DashboardScreenController {
 
   ({DateTime inicio, DateTime fimExclusivo}) faixaSelecionada(DateTime agora) {
     if (mesEspecifico != null) {
-      final DateTime inicio = DateTime(
+      final inicio = DateTime(
         mesEspecifico!.year,
         mesEspecifico!.month,
-        1,
       );
-      final DateTime fimExclusivo = DateTime(
+      final fimExclusivo = DateTime(
         mesEspecifico!.year,
         mesEspecifico!.month + 1,
-        1,
       );
       return (inicio: inicio, fimExclusivo: fimExclusivo);
     }
@@ -70,23 +68,23 @@ class DashboardScreenController {
   }
 
   DateTime mesReferenciaExportacao(DateTime agora) {
-    final ({DateTime inicio, DateTime fimExclusivo}) faixa = faixaSelecionada(
+    final faixa = faixaSelecionada(
       agora,
     );
-    return DateTime(faixa.inicio.year, faixa.inicio.month, 1);
+    return DateTime(faixa.inicio.year, faixa.inicio.month);
   }
 
   DateTime mesReferenciaRecorrencias(DateTime agora) {
     return mesEspecifico == null
-        ? DateTime(agora.year, agora.month, 1)
-        : DateTime(mesEspecifico!.year, mesEspecifico!.month, 1);
+        ? DateTime(agora.year, agora.month)
+        : DateTime(mesEspecifico!.year, mesEspecifico!.month);
   }
 
   DateTime mesReferenciaGuardadoCard(DateTime agora) {
     if (mesEspecifico != null) {
-      return DateTime(mesEspecifico!.year, mesEspecifico!.month, 1);
+      return DateTime(mesEspecifico!.year, mesEspecifico!.month);
     }
-    return DateTime(agora.year, agora.month, 1);
+    return DateTime(agora.year, agora.month);
   }
 
   int contarOcorrenciasRestantesNoMes(
@@ -105,8 +103,8 @@ class DashboardScreenController {
   ) {
     double total = 0;
 
-    for (final RecorrenciaAtiva recorrencia in recorrencias) {
-      final int ocorrencias = contarOcorrenciasRestantesNoMes(
+    for (final recorrencia in recorrencias) {
+      final ocorrencias = contarOcorrenciasRestantesNoMes(
         recorrencia,
         referenciaMes,
       );
@@ -120,10 +118,10 @@ class DashboardScreenController {
     List<Guardado> guardados,
     DateTime referenciaMes,
   ) {
-    final String competencia = Guardado.competenciaFromDate(referenciaMes);
+    final competencia = Guardado.competenciaFromDate(referenciaMes);
     double total = 0;
 
-    for (final Guardado item in guardados) {
+    for (final item in guardados) {
       if (item.competencia != competencia) {
         continue;
       }
@@ -137,12 +135,12 @@ class DashboardScreenController {
   }
 
   String insightPrincipal(DashboardResumoCalculado resumo) {
-    final DashboardCategoriaResumo? lider = resumo.categoriaMaisGasta;
+    final lider = resumo.categoriaMaisGasta;
     if (lider == null) {
       return 'Sem gastos no período. Registre uma saída para gerar insights.';
     }
 
-    final double participacao = resumo.totalGastosPeriodo <= 0
+    final participacao = resumo.totalGastosPeriodo <= 0
         ? 0
         : (lider.valor / resumo.totalGastosPeriodo) * 100;
 
@@ -153,11 +151,11 @@ class DashboardScreenController {
     DashboardResumo bruto,
     DateTime agora,
   ) {
-    final ({DateTime inicio, DateTime fimExclusivo}) faixa = faixaSelecionada(
+    final faixa = faixaSelecionada(
       agora,
     );
 
-    final String chave = [
+    final chave = [
       bruto.gastos.length,
       bruto.contas.length,
       faixa.inicio.millisecondsSinceEpoch,
@@ -170,7 +168,7 @@ class DashboardScreenController {
       return _memoResumo!;
     }
 
-    final DashboardResumoCalculado resumo = _summaryService.calcularResumo(
+    final resumo = _summaryService.calcularResumo(
       resumo: bruto,
       periodo: periodo,
       inicioOverride: faixa.inicio,

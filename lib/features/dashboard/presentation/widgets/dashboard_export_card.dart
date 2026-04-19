@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 class DashboardExportCard extends StatelessWidget {
   const DashboardExportCard({
-    super.key,
-    required this.exportandoRelatorio,
-    required this.onExportar,
+    required this.exportandoRelatorio, required this.onExportar, super.key,
   });
 
   final bool exportandoRelatorio;
@@ -12,7 +10,7 @@ class DashboardExportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       width: double.infinity,

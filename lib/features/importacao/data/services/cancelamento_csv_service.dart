@@ -2,15 +2,15 @@ import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
 
 class TransacaoCanceladaDetectada {
-  final Gasto gasto;
-  final RecebimentoDetectado recebimento;
-  final double scoreMatch;
 
   const TransacaoCanceladaDetectada({
     required this.gasto,
     required this.recebimento,
     required this.scoreMatch,
   });
+  final Gasto gasto;
+  final RecebimentoDetectado recebimento;
+  final double scoreMatch;
 }
 
 class CancelamentoCsvService {
@@ -23,8 +23,8 @@ class CancelamentoCsvService {
     required List<Gasto> gastos,
     required List<RecebimentoDetectado> recebimentos,
   }) {
-    final List<TransacaoCanceladaDetectada> cancelados = [];
-    final Set<String> gastosUsados = {};
+    final cancelados = <TransacaoCanceladaDetectada>[];
+    final gastosUsados = <String>{};
 
     for (final receb in recebimentos) {
       Gasto? melhorGasto;
@@ -33,20 +33,20 @@ class CancelamentoCsvService {
       for (final gasto in gastos) {
         if (gastosUsados.contains(gasto.id)) continue;
 
-        final double diffValor = (gasto.valor.abs() - receb.valor.abs()).abs();
+        final diffValor = (gasto.valor.abs() - receb.valor.abs()).abs();
         if (diffValor > 1.0) continue;
 
-        final int diffDias = (gasto.data.difference(receb.data).inDays).abs();
+        final diffDias = gasto.data.difference(receb.data).inDays.abs();
         if (diffDias > 2) continue;
 
-        final double scoreDesc = _similaridadeDescricao(
+        final scoreDesc = _similaridadeDescricao(
           gasto.titulo,
           receb.descricaoOriginal,
         );
 
         if (scoreDesc < 0.7) continue;
 
-        final double score =
+        final score =
             0.5 * (1 - (diffValor / (gasto.valor.abs() + 1))) +
             0.2 * (1 - diffDias / 3) +
             0.3 * scoreDesc;
@@ -87,13 +87,13 @@ class CancelamentoCsvService {
   String _normalizar(String s) {
     return s
         .toLowerCase()
-        .replaceAll(RegExp(r'[áàâãä]'), 'a')
-        .replaceAll(RegExp(r'[éèêë]'), 'e')
-        .replaceAll(RegExp(r'[íìîï]'), 'i')
-        .replaceAll(RegExp(r'[óòôõö]'), 'o')
-        .replaceAll(RegExp(r'[úùûü]'), 'u')
-        .replaceAll(RegExp(r'[ç]'), 'c')
-        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp('[áàâãä]'), 'a')
+        .replaceAll(RegExp('[éèêë]'), 'e')
+        .replaceAll(RegExp('[íìîï]'), 'i')
+        .replaceAll(RegExp('[óòôõö]'), 'o')
+        .replaceAll(RegExp('[úùûü]'), 'u')
+        .replaceAll(RegExp('[ç]'), 'c')
+        .replaceAll(RegExp('[^a-z0-9 ]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }

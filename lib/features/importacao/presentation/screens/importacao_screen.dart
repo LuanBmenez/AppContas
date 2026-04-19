@@ -11,13 +11,13 @@ import 'package:paga_o_que_me_deve/features/importacao/data/services/cancelament
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/importacao_service.dart';
 
-import '../widgets/cancelamento_section.dart';
-import '../widgets/importacao_sections.dart';
+import 'package:paga_o_que_me_deve/features/importacao/presentation/widgets/cancelamento_section.dart';
+import 'package:paga_o_que_me_deve/features/importacao/presentation/widgets/importacao_sections.dart';
 
 enum AcaoRecebimentoImportacao { vincular, criar, ignorar }
 
 class ImportacaoScreen extends StatefulWidget {
-  const ImportacaoScreen({super.key, required this.db});
+  const ImportacaoScreen({required this.db, super.key});
 
   final FinanceRepository db;
 
@@ -72,13 +72,13 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   }
 
   CartaoCredito _resolverCartaoSelecionado(List<CartaoCredito> cartoes) {
-    final String? cartaoSelecionadoId = _cartaoSelecionado?.id;
+    final cartaoSelecionadoId = _cartaoSelecionado?.id;
 
     if (cartaoSelecionadoId == null) {
       return cartoes.first;
     }
 
-    for (final CartaoCredito cartao in cartoes) {
+    for (final cartao in cartoes) {
       if (cartao.id == cartaoSelecionadoId) {
         return cartao;
       }
@@ -91,7 +91,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     List<Gasto> gastos,
     List<TransacaoCanceladaDetectada> cancelados,
   ) {
-    final Set<String> idsIgnorar = cancelados
+    final idsIgnorar = cancelados
         .where((c) => _acoesCancelamento[c] == true)
         .map((c) => c.gasto.id)
         .toSet();
@@ -103,7 +103,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     List<RecebimentoDetectado> recebimentos,
     List<TransacaoCanceladaDetectada> cancelados,
   ) {
-    final Set<String> idsIgnorar = cancelados
+    final idsIgnorar = cancelados
         .where((c) => _acoesCancelamento[c] == true)
         .map((c) => c.recebimento.id)
         .toSet();
@@ -115,7 +115,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     setState(() => _carregandoArquivo = true);
 
     try {
-      final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: <String>['csv', 'txt'],
         withData: true,
@@ -125,14 +125,14 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         return;
       }
 
-      final PlatformFile file = result.files.single;
-      final Uint8List? bytes = file.bytes;
+      final file = result.files.single;
+      final bytes = file.bytes;
       if (bytes == null) {
         throw Exception('Não foi possível ler o arquivo selecionado.');
       }
 
-      final String conteudo = _decodificarTexto(bytes);
-      final ResultadoLeituraCsv csv = _extratoService.lerCsv(conteudo);
+      final conteudo = _decodificarTexto(bytes);
+      final csv = _extratoService.lerCsv(conteudo);
 
       if (csv.cabecalhos.isEmpty) {
         throw Exception('CSV sem cabeçalho válido.');
@@ -198,19 +198,19 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         );
       }
 
-      int vinculados = 0;
-      int criados = 0;
-      int ignorados = 0;
-      int duplicadosRecebimentos = 0;
+      var vinculados = 0;
+      var criados = 0;
+      var ignorados = 0;
+      var duplicadosRecebimentos = 0;
 
-      final Map<String, Conta> contasPorId = <String, Conta>{
+      final contasPorId = <String, Conta>{
         for (final Conta conta in contasPendentes) conta.id: conta,
       };
 
-      final List<Conta> contasConhecidas = List<Conta>.from(todasAsContas);
+      final contasConhecidas = List<Conta>.from(todasAsContas);
 
-      for (final RecebimentoDetectado recebimento in recebimentos) {
-        final bool jaImportado = _importacaoService.recebimentoJaImportado(
+      for (final recebimento in recebimentos) {
+        final jaImportado = _importacaoService.recebimentoJaImportado(
           contas: contasConhecidas,
           referenciaImportacao: recebimento.referenciaImportacao,
         );
@@ -220,11 +220,11 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
           continue;
         }
 
-        final List<SugestaoVinculoRecebimento> sugestoes =
+        final sugestoes =
             sugestoesVinculo[recebimento.id] ??
             const <SugestaoVinculoRecebimento>[];
 
-        final AcaoRecebimentoImportacao acao =
+        final acao =
             _acoesRecebimentos[recebimento.id] ??
             _acaoPadraoRecebimento(recebimento, sugestoes);
 
@@ -234,7 +234,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         }
 
         if (acao == AcaoRecebimentoImportacao.vincular) {
-          final String? contaIdEscolhida =
+          final contaIdEscolhida =
               _vinculosRecebimentos[recebimento.id] ??
               (sugestoes.isEmpty ? null : sugestoes.first.conta.id);
 
@@ -243,7 +243,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
             continue;
           }
 
-          final Conta? contaSelecionada =
+          final contaSelecionada =
               contasPorId[contaIdEscolhida] ??
               _buscarContaNasSugestoes(contaIdEscolhida, sugestoes);
 
@@ -302,8 +302,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
       if (!mounted) return;
 
-      final int importados = resultado?.importados ?? 0;
-      final int duplicados = resultado?.duplicados ?? 0;
+      final importados = resultado?.importados ?? 0;
+      final duplicados = resultado?.duplicados ?? 0;
 
       AppFeedback.showSuccess(
         context,
@@ -341,54 +341,53 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final List<CartaoCredito> cartoes =
+          final cartoes =
               snapshot.data ?? <CartaoCredito>[];
 
           if (cartoes.isEmpty) {
             return _buildSemCartoes();
           }
 
-          final CartaoCredito cartaoSelecionadoAtual =
+          final cartaoSelecionadoAtual =
               _resolverCartaoSelecionado(cartoes);
 
           return StreamBuilder<List<RegraCategoriaImportacao>>(
             stream: _importacaoService.regrasCategoriaImportacao,
             builder: (context, regrasSnapshot) {
-              final List<RegraCategoriaImportacao> regrasAprendidas =
+              final regrasAprendidas =
                   regrasSnapshot.data ?? <RegraCategoriaImportacao>[];
 
-              final ResultadoMapeamentoExtrato preview = _gerarPreview(
+              final preview = _gerarPreview(
                 regrasAprendidas,
                 cartaoSelecionadoAtual,
               );
 
-              final List<TransacaoCanceladaDetectada> cancelamentosDetectados =
+              final cancelamentosDetectados =
                   _cancelamentoService.detectarCancelamentos(
                     gastos: preview.gastos,
                     recebimentos: preview.recebimentosDetectados,
                   );
 
-              final List<SugestaoRegraCategoria> sugestoesRegras =
+              final sugestoesRegras =
                   _extratoService.sugerirRegrasParaGastos(
                     gastos: preview.gastos,
                     regrasExistentes: regrasAprendidas,
                   );
 
-              final Future<int> duplicadosFuture = _obterDuplicadosFuture(
+              final duplicadosFuture = _obterDuplicadosFuture(
                 preview.gastos,
               );
 
               return StreamBuilder<List<Conta>>(
                 stream: _importacaoService.contasAReceber,
                 builder: (context, contasSnapshot) {
-                  final List<Conta> todasAsContas =
+                  final todasAsContas =
                       contasSnapshot.data ?? <Conta>[];
-                  final List<Conta> contasPendentes = todasAsContas
+                  final contasPendentes = todasAsContas
                       .where((conta) => !conta.foiPago)
                       .toList();
 
-                  final Map<String, List<SugestaoVinculoRecebimento>>
-                  sugestoesVinculo = _extratoService
+                  final sugestoesVinculo = _extratoService
                       .sugerirVinculosRecebimentos(
                         recebimentos: preview.recebimentosDetectados,
                         contasPendentes: contasPendentes,
@@ -491,7 +490,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                           ),
                           itensPreview: preview.gastos
                               .take(8)
-                              .map((gasto) => _buildItemPreview(gasto))
+                              .map(_buildItemPreview)
                               .toList(),
                         ),
                       ],
@@ -516,13 +515,12 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     List<RegraCategoriaImportacao> regrasAprendidas,
     CartaoCredito cartao,
   ) {
-    final ResultadoLeituraCsv? csv = _csv;
+    final csv = _csv;
 
     if (csv == null || !_mapeamentoObrigatorioOk) {
       return const ResultadoMapeamentoExtrato(
         gastos: <Gasto>[],
         ignorados: 0,
-        ignoradosPorMotivo: <String, int>{},
       );
     }
 
@@ -535,7 +533,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   }
 
   Future<int> _obterDuplicadosFuture(List<Gasto> gastos) {
-    final List<String> hashes =
+    final hashes =
         gastos
             .map((g) => g.hashImportacao ?? '')
             .where((h) => h.isNotEmpty)
@@ -547,7 +545,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       return Future<int>.value(0);
     }
 
-    final String chave = hashes.join('|');
+    final chave = hashes.join('|');
     if (_duplicadosCache != null && _chaveDuplicadosCache == chave) {
       return _duplicadosCache!;
     }
@@ -564,7 +562,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
 
     setState(() => _salvandoSugestoes = true);
     try {
-      for (final SugestaoRegraCategoria sugestao in sugestoes) {
+      for (final sugestao in sugestoes) {
         await _importacaoService.salvarRegraCategoriaImportacao(
           termo: sugestao.termo,
           categoria: sugestao.categoria,
@@ -649,7 +647,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     required List<RecebimentoDetectado> recebimentos,
     required Map<String, List<SugestaoVinculoRecebimento>> sugestoesVinculo,
   }) {
-    final double total = recebimentos.fold<double>(
+    final total = recebimentos.fold<double>(
       0,
       (sum, item) => sum + item.valor,
     );
@@ -687,22 +685,20 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     required RecebimentoDetectado recebimento,
     required List<SugestaoVinculoRecebimento> sugestoes,
   }) {
-    final AcaoRecebimentoImportacao acaoSelecionada =
+    final acaoSelecionada =
         _acoesRecebimentos[recebimento.id] ??
         _acaoPadraoRecebimento(recebimento, sugestoes);
 
-    final String? sugestaoPadraoId = sugestoes.isEmpty
+    final sugestaoPadraoId = sugestoes.isEmpty
         ? null
         : sugestoes.first.conta.id;
 
-    final String? contaSelecionadaIdAtual =
+    final contaSelecionadaIdAtual =
         _vinculosRecebimentos[recebimento.id] ?? sugestaoPadraoId;
 
-    final bool contaSelecionadaExiste = contaSelecionadaIdAtual == null
-        ? false
-        : sugestoes.any((s) => s.conta.id == contaSelecionadaIdAtual);
+    final contaSelecionadaExiste = !(contaSelecionadaIdAtual == null) && sugestoes.any((s) => s.conta.id == contaSelecionadaIdAtual);
 
-    final String? contaSelecionadaId = contaSelecionadaExiste
+    final contaSelecionadaId = contaSelecionadaExiste
         ? contaSelecionadaIdAtual
         : sugestaoPadraoId;
 
@@ -803,10 +799,10 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: sugestoes.map((sugestao) {
-                      final String valorConta = AppFormatters.moeda(
+                      final valorConta = AppFormatters.moeda(
                         sugestao.conta.valor,
                       );
-                      final String statusValor = sugestao.valorCompativel
+                      final statusValor = sugestao.valorCompativel
                           ? 'valor compatível'
                           : 'dif. ${AppFormatters.moeda(sugestao.diferencaValorAbsoluta)}';
 
@@ -844,7 +840,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     }
 
     if (sugestoes.isNotEmpty) {
-      final SugestaoVinculoRecebimento melhor = sugestoes.first;
+      final melhor = sugestoes.first;
       if (melhor.valorCompativel && melhor.score >= 0.8) {
         return AcaoRecebimentoImportacao.vincular;
       }
@@ -857,7 +853,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     String contaId,
     List<SugestaoVinculoRecebimento> sugestoes,
   ) {
-    for (final SugestaoVinculoRecebimento sugestao in sugestoes) {
+    for (final sugestao in sugestoes) {
       if (sugestao.conta.id == contaId) {
         return sugestao.conta;
       }
@@ -901,7 +897,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     required String label,
     required CampoExtrato campo,
   }) {
-    final ResultadoLeituraCsv? csv = _csv;
+    final csv = _csv;
     if (csv == null) {
       return const SizedBox.shrink();
     }
@@ -916,7 +912,6 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       ),
       items: <DropdownMenuItem<String?>>[
         const DropdownMenuItem<String?>(
-          value: null,
           child: Text(
             'Não usar esta coluna',
             maxLines: 1,
@@ -940,10 +935,10 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   }
 
   Widget _buildItemPreview(Gasto gasto) {
-    final String parcela = gasto.parcelaLabel == null
+    final parcela = gasto.parcelaLabel == null
         ? ''
         : ' • ${gasto.parcelaLabel}';
-    final String compra = gasto.dataCompra == null
+    final compra = gasto.dataCompra == null
         ? ''
         : ' • compra ${AppFormatters.dataCurta(gasto.dataCompra!)}';
 
@@ -964,13 +959,13 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
   }
 
   String? _sugerirCabecalho(List<String> cabecalhos, List<String> possiveis) {
-    final Map<String, String> normalizados = <String, String>{
+    final normalizados = <String, String>{
       for (final String cabecalho in cabecalhos)
         _normalizar(cabecalho): cabecalho,
     };
 
-    for (final String campo in possiveis) {
-      final String? match = normalizados[_normalizar(campo)];
+    for (final campo in possiveis) {
+      final match = normalizados[_normalizar(campo)];
       if (match != null) {
         return match;
       }

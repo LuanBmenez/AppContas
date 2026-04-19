@@ -19,40 +19,36 @@ class AppTelemetryEvents {
       'dashboard_export_pdf_unsupported_platform';
 }
 
-abstract class TelemetryProvider {
-  Future<void> send(String event, Map<String, Object?> params);
-}
+typedef TelemetrySender =
+    Future<void> Function(String event, Map<String, Object?> params);
 
-class DeveloperLogTelemetryProvider implements TelemetryProvider {
+class DeveloperLogTelemetryProvider {
   const DeveloperLogTelemetryProvider();
 
-  @override
-  Future<void> send(String event, Map<String, Object?> params) async {
-    final Map<String, Object?> payload = <String, Object?>{
+  Future<void> call(String event, Map<String, Object?> params) async {
+    final payload = <String, Object?>{
       'event': event,
       'timestamp': DateTime.now().toIso8601String(),
       ...params,
     };
-
     developer.log(jsonEncode(payload), name: 'app.telemetry', level: 800);
   }
 }
 
-class FirebaseAnalyticsTelemetryProvider implements TelemetryProvider {
+class FirebaseAnalyticsTelemetryProvider {
   FirebaseAnalyticsTelemetryProvider({FirebaseAnalytics? analytics})
     : _analytics = analytics ?? FirebaseAnalytics.instance;
 
   final FirebaseAnalytics _analytics;
 
-  @override
-  Future<void> send(String event, Map<String, Object?> params) async {
+  Future<void> call(String event, Map<String, Object?> params) async {
     await _analytics.logEvent(name: event, parameters: _toAnalytics(params));
   }
 
   Map<String, Object> _toAnalytics(Map<String, Object?> params) {
-    final Map<String, Object> result = <String, Object>{};
+    final result = <String, Object>{};
 
-    params.forEach((String key, Object? value) {
+    params.forEach((key, value) {
       if (value == null) {
         return;
       }
@@ -68,10 +64,10 @@ class FirebaseAnalyticsTelemetryProvider implements TelemetryProvider {
 }
 
 class AppTelemetryService {
-  AppTelemetryService({List<TelemetryProvider>? providers})
+  AppTelemetryService({List<TelemetrySender>? providers})
     : _providers = providers ?? _defaultProviders();
 
-  final List<TelemetryProvider> _providers;
+  final List<TelemetrySender> _providers;
 
   static final Map<String, Set<String>> _allowedParams = <String, Set<String>>{
     AppTelemetryEvents.dashboardExportPdfStarted: <String>{
@@ -107,17 +103,17 @@ class AppTelemetryService {
       return;
     }
 
-    final Map<String, Object?> sanitized = _sanitize(event, params);
-    for (final TelemetryProvider provider in _providers) {
-      provider.send(event, sanitized);
+    final sanitized = _sanitize(event, params);
+    for (final provider in _providers) {
+      provider(event, sanitized);
     }
   }
 
   Map<String, Object?> _sanitize(String event, Map<String, Object?> params) {
-    final Set<String> allowed = _allowedParams[event] ?? const <String>{};
-    final Map<String, Object?> sanitized = <String, Object?>{};
+    final allowed = _allowedParams[event] ?? const <String>{};
+    final sanitized = <String, Object?>{};
 
-    params.forEach((String key, Object? value) {
+    params.forEach((key, value) {
       if (!allowed.contains(key)) {
         return;
       }
@@ -132,13 +128,13 @@ class AppTelemetryService {
       return null;
     }
 
-    final String lowerKey = key.toLowerCase();
+    final lowerKey = key.toLowerCase();
     if (lowerKey.contains('valor') || lowerKey.contains('montante')) {
       return _bucketMoney(value);
     }
 
     if (lowerKey.contains('erro') && value is String) {
-      final String clean = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final clean = value.replaceAll(RegExp(r'\s+'), ' ').trim();
       return clean.length > 120 ? clean.substring(0, 120) : clean;
     }
 
@@ -150,7 +146,7 @@ class AppTelemetryService {
   }
 
   String _bucketMoney(Object value) {
-    final double? parsed = value is num
+    final parsed = value is num
         ? value.toDouble()
         : double.tryParse(value.toString());
 
@@ -169,13 +165,13 @@ class AppTelemetryService {
     return '2000+';
   }
 
-  static List<TelemetryProvider> _defaultProviders() {
-    final List<TelemetryProvider> providers = <TelemetryProvider>[
-      FirebaseAnalyticsTelemetryProvider(),
+  static List<TelemetrySender> _defaultProviders() {
+    final providers = <TelemetrySender>[
+      FirebaseAnalyticsTelemetryProvider().call,
     ];
 
     if (!kReleaseMode) {
-      providers.add(const DeveloperLogTelemetryProvider());
+      providers.add(const DeveloperLogTelemetryProvider().call);
     }
 
     return providers;

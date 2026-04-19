@@ -20,28 +20,28 @@ class AppFormatters {
   ];
 
   static String moeda(double valor) {
-    final String numero = valor.toStringAsFixed(2).replaceAll('.', ',');
+    final numero = valor.toStringAsFixed(2).replaceAll('.', ',');
     return 'R\$ $numero';
   }
 
   static double parseMoedaInput(String input) {
-    final String limpo = input
-        .replaceAll('R\$', '')
+    final limpo = input
+        .replaceAll(r'R$', '')
         .replaceAll(' ', '')
-        .replaceAll(RegExp(r'[^0-9,.-]'), '');
+        .replaceAll(RegExp('[^0-9,.-]'), '');
 
     if (limpo.isEmpty) {
       throw const FormatException('Valor vazio.');
     }
 
     try {
-      final NumberFormat br = NumberFormat.decimalPattern('pt_BR');
-      final num parsed = br.parse(limpo);
+      final br = NumberFormat.decimalPattern('pt_BR');
+      final parsed = br.parse(limpo);
       return parsed.toDouble();
     } catch (_) {
       // Fallback para entradas parcialmente normalizadas.
-      final String normalizado = limpo.replaceAll('.', '').replaceAll(',', '.');
-      final double? valor = double.tryParse(normalizado);
+      final normalizado = limpo.replaceAll('.', '').replaceAll(',', '.');
+      final valor = double.tryParse(normalizado);
       if (valor == null) {
         throw FormatException('Valor invalido: $input');
       }
@@ -50,8 +50,8 @@ class AppFormatters {
   }
 
   static String dataCurta(DateTime data) {
-    final String dia = data.day.toString().padLeft(2, '0');
-    final String mes = data.month.toString().padLeft(2, '0');
+    final dia = data.day.toString().padLeft(2, '0');
+    final mes = data.month.toString().padLeft(2, '0');
     return '$dia/$mes/${data.year}';
   }
 
@@ -79,17 +79,14 @@ class MoedaInputFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final String digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final digits = newValue.text.replaceAll(RegExp('[^0-9]'), '');
 
     if (digits.isEmpty) {
-      return const TextEditingValue(text: '');
+      return TextEditingValue.empty;
     }
 
-    final double value = double.parse(digits) / 100;
-    final String formatted = _formatter
-        .format(value)
-        .replaceAll('\u00A0', ' ')
-        .trim();
+    final value = double.parse(digits) / 100;
+    final formatted = _formatter.format(value).replaceAll('\u00A0', ' ').trim();
 
     return TextEditingValue(
       text: formatted,

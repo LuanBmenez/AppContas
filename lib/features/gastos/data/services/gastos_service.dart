@@ -63,9 +63,8 @@ class GastosService {
   }
 
   Future<void> registrarUsoNovoGasto({
-    CategoriaGasto? categoriaPadrao,
+    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
     String? categoriaPersonalizadaId,
-    required TipoGasto tipo,
   }) {
     return _repository.registrarUsoNovoGasto(
       categoriaPadrao: categoriaPadrao,
@@ -85,7 +84,7 @@ class GastosService {
     required double valor,
     required DateTime data,
   }) async {
-    final String tituloNormalizado = TextNormalizer.normalizeForSearch(
+    final tituloNormalizado = TextNormalizer.normalizeForSearch(
       titulo,
     ).trim().toLowerCase();
 
@@ -93,13 +92,13 @@ class GastosService {
       return 0;
     }
 
-    final List<Gasto> gastos = await meusGastos.first;
-    final DateTime dataBase = DateTime(data.year, data.month, data.day);
+    final gastos = await meusGastos.first;
+    final dataBase = DateTime(data.year, data.month, data.day);
 
-    int duplicados = 0;
+    var duplicados = 0;
 
-    for (final Gasto gasto in gastos) {
-      final DateTime dataGasto = DateTime(
+    for (final gasto in gastos) {
+      final dataGasto = DateTime(
         gasto.data.year,
         gasto.data.month,
         gasto.data.day,
@@ -113,7 +112,7 @@ class GastosService {
         continue;
       }
 
-      final String tituloExistente = TextNormalizer.normalizeForSearch(
+      final tituloExistente = TextNormalizer.normalizeForSearch(
         gasto.titulo,
       ).trim().toLowerCase();
 
@@ -136,12 +135,12 @@ class GastosService {
       return 1;
     }
 
-    final List<Gasto> futuros = gerarRecorrenciasFuturas(
+    final futuros = gerarRecorrenciasFuturas(
       base: gastoBase,
       mesesFuturos: mesesFuturos,
     );
 
-    for (final Gasto gasto in futuros) {
+    for (final gasto in futuros) {
       await adicionarGasto(gasto);
     }
 
@@ -152,9 +151,9 @@ class GastosService {
     required Gasto base,
     required int mesesFuturos,
   }) {
-    final List<Gasto> futuros = <Gasto>[];
+    final futuros = <Gasto>[];
 
-    for (int i = 1; i <= mesesFuturos; i++) {
+    for (var i = 1; i <= mesesFuturos; i++) {
       futuros.add(
         base.copyWith(
           id: '',
@@ -165,7 +164,6 @@ class GastosService {
           dataLancamento: base.dataLancamento == null
               ? null
               : _adicionarMesesPreservandoDia(base.dataLancamento!, i),
-          hashImportacao: null,
         ),
       );
     }
@@ -174,7 +172,7 @@ class GastosService {
   }
 
   Future<void> deletarGastosEmLote(Iterable<Gasto> gastos) async {
-    for (final Gasto gasto in gastos) {
+    for (final gasto in gastos) {
       if (gasto.id.trim().isEmpty) {
         continue;
       }
@@ -186,14 +184,10 @@ class GastosService {
     required Iterable<Gasto> gastos,
     required CategoriaGasto categoria,
   }) async {
-    for (final Gasto gasto in gastos) {
+    for (final gasto in gastos) {
       await atualizarGasto(
         gasto.copyWith(
           categoria: categoria,
-          categoriaPersonalizadaId: null,
-          categoriaPersonalizadaNome: null,
-          categoriaPersonalizadaCorValue: null,
-          categoriaPersonalizadaIconeCodePoint: null,
         ),
       );
     }
@@ -203,16 +197,16 @@ class GastosService {
     required Iterable<Gasto> gastos,
     required TipoGasto tipo,
   }) async {
-    for (final Gasto gasto in gastos) {
+    for (final gasto in gastos) {
       await atualizarGasto(gasto.copyWith(tipo: tipo));
     }
   }
 
   DateTime _adicionarMesesPreservandoDia(DateTime dataBase, int meses) {
-    final int ano = dataBase.year + ((dataBase.month - 1 + meses) ~/ 12);
-    final int mes = ((dataBase.month - 1 + meses) % 12) + 1;
-    final int ultimoDiaMes = DateTime(ano, mes + 1, 0).day;
-    final int dia = dataBase.day > ultimoDiaMes ? ultimoDiaMes : dataBase.day;
+    final ano = dataBase.year + ((dataBase.month - 1 + meses) ~/ 12);
+    final mes = ((dataBase.month - 1 + meses) % 12) + 1;
+    final ultimoDiaMes = DateTime(ano, mes + 1, 0).day;
+    final dia = dataBase.day > ultimoDiaMes ? ultimoDiaMes : dataBase.day;
 
     return DateTime(ano, mes, dia);
   }

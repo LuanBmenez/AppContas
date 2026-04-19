@@ -5,10 +5,10 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 
 class BarraCategoriaLinha extends StatelessWidget {
   const BarraCategoriaLinha({
-    super.key,
     required this.categoria,
     required this.total,
     required this.mostrarValores,
+    super.key,
     this.onTap,
   });
 
@@ -19,9 +19,9 @@ class BarraCategoriaLinha extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final double percentual = total <= 0 ? 0 : categoria.valor / total;
-    final String percentualTexto = '${(percentual * 100).toStringAsFixed(1)}%';
+    final theme = Theme.of(context);
+    final percentual = total <= 0 ? 0.00 : categoria.valor / total;
+    final percentualTexto = '${(percentual * 100).toStringAsFixed(1)}%';
 
     return Material(
       color: Colors.transparent,

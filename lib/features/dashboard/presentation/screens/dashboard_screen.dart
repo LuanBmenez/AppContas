@@ -32,8 +32,8 @@ import 'package:share_plus/share_plus.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
-    super.key,
     required this.db,
+    super.key,
     this.exportadorRelatorio,
     this.orcamentosMesStreamOverride,
     this.onTapSaidas,
@@ -75,8 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _dashboardDataService = DashboardDataService(widget.db);
     _recorrenciasService = RecorrenciasService(repository: widget.db);
 
-    final Stream<List<OrcamentoCategoriaResumo>>? streamOverride =
-        widget.orcamentosMesStreamOverride;
+    final streamOverride = widget.orcamentosMesStreamOverride;
 
     if (streamOverride != null) {
       _orcamentosMesStream = streamOverride.isBroadcast
@@ -86,11 +85,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     try {
-      final OrcamentosService orcamentosService = OrcamentosService(
+      final orcamentosService = OrcamentosService(
         repository: widget.db,
       );
-      final Stream<List<OrcamentoCategoriaResumo>> stream = orcamentosService
-          .calcularResumoPorCategoria(DateTime.now(), limite: 5);
+      final stream = orcamentosService.calcularResumoPorCategoria(
+        DateTime.now(),
+        limite: 5,
+      );
 
       _orcamentosMesStream = stream.isBroadcast
           ? stream
@@ -103,25 +104,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Stream<bool> _mostrarValoresDashboardStream() {
-    final User? user = _auth.currentUser;
+    final user = _auth.currentUser;
 
     if (user == null) {
       return Stream<bool>.value(true);
     }
 
     return _firestore.collection('users').doc(user.uid).snapshots().map((doc) {
-      final Map<String, dynamic> data = doc.data() ?? <String, dynamic>{};
-      final Map<String, dynamic> preferencias =
+      final data = doc.data() ?? <String, dynamic>{};
+      final preferencias =
           (data['preferencias'] as Map?)?.cast<String, dynamic>() ??
           <String, dynamic>{};
 
       final Object? value = preferencias['mostrarValoresDashboard'];
-      return value is bool ? value : true;
+      return value is! bool || value;
     });
   }
 
   String _mensagemErroDashboard(Object? error) {
-    final String erro = (error ?? '').toString().toLowerCase();
+    final erro = (error ?? '').toString().toLowerCase();
     if (erro.contains('firestore.googleapis.com') ||
         erro.contains('permission_denied')) {
       return 'Firestore sem permissão ou desativado no projeto.\n'
@@ -131,8 +132,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _selecionarMesEspecifico() async {
-    final DateTime base = _controller.mesEspecifico ?? DateTime.now();
-    final DateTime? data = await showDatePicker(
+    final base = _controller.mesEspecifico ?? DateTime.now();
+    final data = await showDatePicker(
       context: context,
       initialDate: base,
       firstDate: DateTime(2020),
@@ -164,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     setState(() => _exportandoRelatorio = true);
     try {
-      final DateTime referencia = _controller.mesReferenciaExportacao(
+      final referencia = _controller.mesReferenciaExportacao(
         DateTime.now(),
       );
 
@@ -176,13 +177,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
 
-      final RelatorioMensalFinanceiro relatorio = await widget.db
-          .buscarRelatorioMensal(referencia);
-      final RelatorioExportado exportado = await _reportExportService
-          .gerarRelatorioMensal(relatorio);
+      final relatorio = await widget.db.buscarRelatorioMensal(referencia);
+      final exportado = await _reportExportService.gerarRelatorioMensal(
+        relatorio,
+      );
 
-      final Directory tempDir = await getTemporaryDirectory();
-      final File arquivo = File(
+      final tempDir = await getTemporaryDirectory();
+      final arquivo = File(
         '${tempDir.path}/${exportado.nomeArquivoBase}.pdf',
       );
 
@@ -236,9 +237,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
-    const AppSemanticColors fallbackSemantic = AppSemanticColors(
+    const fallbackSemantic = AppSemanticColors(
       success: Color(0xFF0F9D7A),
       successContainer: Color(0xFFE5F6F2),
       warning: Color(0xFFC26A00),
@@ -247,14 +248,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       errorContainer: Color(0xFFFDE8E8),
     );
 
-    final AppSemanticColors semantic =
-        theme.extension<AppSemanticColors>() ?? fallbackSemantic;
+    final semantic = theme.extension<AppSemanticColors>() ?? fallbackSemantic;
 
     return StreamBuilder<bool>(
       stream: _mostrarValoresDashboardStream(),
       initialData: true,
       builder: (context, mostrarValoresSnapshot) {
-        final bool mostrarValores = mostrarValoresSnapshot.data ?? true;
+        final mostrarValores = mostrarValoresSnapshot.data ?? true;
 
         return StreamBuilder<DashboardResumo>(
           key: ValueKey<int>(_controller.retryTick),
@@ -294,23 +294,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             }
 
-            final DateTime agora = DateTime.now();
-            final DashboardResumo resumoBruto =
+            final agora = DateTime.now();
+            final resumoBruto =
                 snapshot.data ?? const DashboardResumo(<Gasto>[], <Conta>[]);
-            final DashboardResumoCalculado resumo = _controller
-                .calcularResumoMemoizado(resumoBruto, agora);
+            final resumo = _controller.calcularResumoMemoizado(
+              resumoBruto,
+              agora,
+            );
 
-            return Container(
+            return ColoredBox(
               color: theme.colorScheme.surface,
               child: SafeArea(
                 bottom: false,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final bool isWide = constraints.maxWidth >= 1100;
-                    final bool isMedium = constraints.maxWidth >= 840;
-                    final double horizontalPadding = isWide
-                        ? 28
-                        : (isMedium ? 20 : 16);
+                    final isWide = constraints.maxWidth >= 1100;
+                    final isMedium = constraints.maxWidth >= 840;
+                    final horizontalPadding = isWide
+                        ? 28.0
+                        : (isMedium ? 20.0 : 16.0);
 
                     return Align(
                       alignment: Alignment.topCenter,
@@ -319,9 +321,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: ListView(
                           padding: EdgeInsets.fromLTRB(
                             horizontalPadding,
-                            20,
+                            20.0,
                             horizontalPadding,
-                            28,
+                            28.0,
                           ),
                           children: [
                             DashboardHeaderSection(
@@ -363,11 +365,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             StreamBuilder<List<Guardado>>(
                               stream: widget.db.guardados,
                               builder: (context, guardadosSnapshot) {
-                                final List<Guardado> guardados =
+                                final guardados =
                                     guardadosSnapshot.data ?? <Guardado>[];
-                                final DateTime referenciaGuardado = _controller
+                                final referenciaGuardado = _controller
                                     .mesReferenciaGuardadoCard(agora);
-                                final double jaGuardadoMes = _controller
+                                final jaGuardadoMes = _controller
                                     .calcularJaGuardadoNoMes(
                                       guardados,
                                       referenciaGuardado,

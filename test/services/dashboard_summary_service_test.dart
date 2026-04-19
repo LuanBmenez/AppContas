@@ -4,10 +4,10 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 void main() {
   group('DashboardSummaryService', () {
     test('calcula saldo e categoria lider corretamente', () {
-      final DashboardSummaryService service = DashboardSummaryService();
-      final DateTime agora = DateTime(2026, 4, 15);
+      final service = DashboardSummaryService();
+      final agora = DateTime(2026, 4, 15);
 
-      final DashboardResumo resumo = DashboardResumo(
+      final resumo = DashboardResumo(
         <Gasto>[
           Gasto(
             id: 'g1',
@@ -36,7 +36,7 @@ void main() {
         ],
       );
 
-      final DashboardResumoCalculado calculado = service.calcularResumo(
+      final calculado = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
         agora: agora,
@@ -48,9 +48,9 @@ void main() {
     });
 
     test('reutiliza cache para mesma instancia e mesmo filtro', () {
-      final DashboardSummaryService service = DashboardSummaryService();
-      final DateTime agora = DateTime(2026, 4, 20);
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final service = DashboardSummaryService();
+      final agora = DateTime(2026, 4, 20);
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Internet',
@@ -60,12 +60,12 @@ void main() {
         ),
       ], const <Conta>[]);
 
-      final DashboardResumoCalculado primeiro = service.calcularResumo(
+      final primeiro = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
         agora: agora,
       );
-      final DashboardResumoCalculado segundo = service.calcularResumo(
+      final segundo = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
         agora: agora,
@@ -75,10 +75,10 @@ void main() {
     });
 
     test('expira cache por TTL configurado', () {
-      final DashboardSummaryService service = DashboardSummaryService(
+      final service = DashboardSummaryService(
         cacheTtl: const Duration(minutes: 1),
       );
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Academia',
@@ -88,12 +88,12 @@ void main() {
         ),
       ], const <Conta>[]);
 
-      final DashboardResumoCalculado primeiro = service.calcularResumo(
+      final primeiro = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
-        agora: DateTime(2026, 4, 15, 10, 0),
+        agora: DateTime(2026, 4, 15, 10),
       );
-      final DashboardResumoCalculado aposTtl = service.calcularResumo(
+      final aposTtl = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
         agora: DateTime(2026, 4, 15, 10, 2),
@@ -103,12 +103,12 @@ void main() {
     });
 
     test('aplica LRU quando excede limite de entradas', () {
-      final DashboardSummaryService service = DashboardSummaryService(
+      final service = DashboardSummaryService(
         maxCacheEntries: 2,
         cacheTtl: const Duration(hours: 1),
       );
-      final DateTime agora = DateTime(2026, 4, 20);
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final agora = DateTime(2026, 4, 20);
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Internet',
@@ -118,7 +118,7 @@ void main() {
         ),
       ], const <Conta>[]);
 
-      final DashboardResumoCalculado entrada1 = service.calcularResumo(
+      final entrada1 = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.hoje,
         agora: agora,
@@ -134,7 +134,7 @@ void main() {
         agora: agora,
       );
 
-      final DashboardResumoCalculado entrada1Recalculada = service
+      final entrada1Recalculada = service
           .calcularResumo(
             resumo: resumo,
             periodo: DashboardPeriodoRapido.hoje,
@@ -146,9 +146,9 @@ void main() {
     });
 
     test('limpa cache manualmente', () {
-      final DashboardSummaryService service = DashboardSummaryService();
-      final DateTime agora = DateTime(2026, 4, 20);
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final service = DashboardSummaryService();
+      final agora = DateTime(2026, 4, 20);
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Conta de luz',
@@ -158,13 +158,13 @@ void main() {
         ),
       ], const <Conta>[]);
 
-      final DashboardResumoCalculado primeiro = service.calcularResumo(
+      final primeiro = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
         agora: agora,
       );
       service.clearCache();
-      final DashboardResumoCalculado segundo = service.calcularResumo(
+      final segundo = service.calcularResumo(
         resumo: resumo,
         periodo: DashboardPeriodoRapido.mes,
         agora: agora,

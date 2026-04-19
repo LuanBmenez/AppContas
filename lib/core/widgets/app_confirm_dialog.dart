@@ -10,7 +10,7 @@ class AppConfirmDialog {
     String cancelText = 'Cancelar',
     String confirmText = 'Excluir',
   }) async {
-    final bool? confirmed = await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -33,4 +33,3 @@ class AppConfirmDialog {
     return confirmed ?? false;
   }
 }
-

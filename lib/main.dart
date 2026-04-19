@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
-import 'app/app_bootstrap.dart';
-import 'firebase_options.dart';
+import 'package:paga_o_que_me_deve/app/app_bootstrap.dart';
+import 'package:paga_o_que_me_deve/firebase_options.dart';
 
 export 'app/app.dart';
 
@@ -25,7 +25,7 @@ Future<void> main() async {
 Future<void> _activateAppCheck() async {
   try {
     if (kIsWeb) {
-      const String siteKey = String.fromEnvironment(
+      const siteKey = String.fromEnvironment(
         'FIREBASE_RECAPTCHA_SITE_KEY',
       );
 
@@ -45,7 +45,6 @@ Future<void> _activateAppCheck() async {
     }
 
     await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
       appleProvider: AppleProvider.appAttest,
     );
   } catch (e, st) {

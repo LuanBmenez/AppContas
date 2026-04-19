@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:paga_o_que_me_deve/domain/models/recebimento.dart';
 
-import '../data/recebimentos_service.dart';
-import 'widgets/recebimento_status_chip.dart';
-import 'widgets/resumo_mensal_recebimentos.dart';
+import 'package:paga_o_que_me_deve/features/recebimentos/data/recebimentos_service.dart';
+import 'package:paga_o_que_me_deve/features/recebimentos/ui/widgets/recebimento_status_chip.dart';
+import 'package:paga_o_que_me_deve/features/recebimentos/ui/widgets/resumo_mensal_recebimentos.dart';
 
 class RecebimentosPage extends StatefulWidget {
   const RecebimentosPage({super.key});
@@ -20,44 +20,44 @@ class _RecebimentosPageState extends State<RecebimentosPage> {
   @override
   void initState() {
     super.initState();
-    final DateTime now = DateTime.now();
+    final now = DateTime.now();
     competenciaSelecionada =
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}';
     service = RecebimentosService();
   }
 
   List<String> _competenciasDisponiveis() {
-    final DateTime now = DateTime.now();
+    final now = DateTime.now();
 
-    return List<String>.generate(12, (int index) {
-      final DateTime date = DateTime(now.year, index + 1, 1);
+    return List<String>.generate(12, (index) {
+      final date = DateTime(now.year, index + 1);
       return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
     });
   }
 
   String _formatarCompetencia(String competencia) {
-    final List<String> partes = competencia.split('-');
+    final partes = competencia.split('-');
     if (partes.length != 2) {
       return competencia;
     }
 
-    final int? ano = int.tryParse(partes[0]);
-    final int? mes = int.tryParse(partes[1]);
+    final ano = int.tryParse(partes[0]);
+    final mes = int.tryParse(partes[1]);
 
     if (ano == null || mes == null || mes < 1 || mes > 12) {
       return competencia;
     }
 
-    return DateFormat.yMMM('pt_BR').format(DateTime(ano, mes, 1));
+    return DateFormat.yMMM('pt_BR').format(DateTime(ano, mes));
   }
 
   String _formatarMoeda(double valor) {
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(valor);
+    return NumberFormat.currency(locale: 'pt_BR', symbol: r'R$').format(valor);
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<String> competencias = _competenciasDisponiveis();
+    final competencias = _competenciasDisponiveis();
 
     if (!competencias.contains(competenciaSelecionada) &&
         competencias.isNotEmpty) {
@@ -75,13 +75,13 @@ class _RecebimentosPageState extends State<RecebimentosPage> {
                 child: DropdownButton<String>(
                   value: competenciaSelecionada,
                   borderRadius: BorderRadius.circular(12),
-                  items: competencias.map((String competencia) {
+                  items: competencias.map((competencia) {
                     return DropdownMenuItem<String>(
                       value: competencia,
                       child: Text(_formatarCompetencia(competencia)),
                     );
                   }).toList(),
-                  onChanged: (String? value) {
+                  onChanged: (value) {
                     if (value == null) return;
 
                     setState(() {
@@ -113,7 +113,7 @@ class _RecebimentosPageState extends State<RecebimentosPage> {
             );
           }
 
-          final List<Recebimento> recebimentos =
+          final recebimentos =
               snapshot.data ?? <Recebimento>[];
 
           return Column(
@@ -133,7 +133,7 @@ class _RecebimentosPageState extends State<RecebimentosPage> {
                     : ListView.builder(
                         itemCount: recebimentos.length,
                         itemBuilder: (context, index) {
-                          final Recebimento r = recebimentos[index];
+                          final r = recebimentos[index];
 
                           return ListTile(
                             title: Text(_formatarMoeda(r.valor)),

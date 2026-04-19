@@ -29,7 +29,7 @@ class PerfilService {
 
   Stream<PerfilUsuario?> perfilUsuarioStream(String uid) {
     return _perfilRef(uid).snapshots().map((snapshot) {
-      final User? user = _auth.currentUser;
+      final user = _auth.currentUser;
 
       if (user == null || user.uid != uid) {
         return null;
@@ -40,10 +40,10 @@ class PerfilService {
   }
 
   Future<void> garantirDocumentoPerfil({required User user}) async {
-    final DocumentReference<Map<String, dynamic>> ref = _perfilRef(user.uid);
-    final DocumentSnapshot<Map<String, dynamic>> snapshot = await ref.get();
+    final ref = _perfilRef(user.uid);
+    final snapshot = await ref.get();
 
-    final Map<String, dynamic> baseData = <String, dynamic>{
+    final baseData = <String, dynamic>{
       'uid': user.uid,
       'workspaceId': user.uid,
       if ((user.email ?? '').trim().isNotEmpty) 'email': user.email!.trim(),
@@ -71,10 +71,10 @@ class PerfilService {
     required String nome,
     String? email,
   }) async {
-    final User user = _requireAuthenticatedUser(uid);
+    final user = _requireAuthenticatedUser(uid);
     await garantirDocumentoPerfil(user: user);
 
-    final String nomeTrim = nome.trim();
+    final nomeTrim = nome.trim();
     if (nomeTrim.length < 2) {
       throw ArgumentError('Informe um nome com ao menos 2 letras.');
     }
@@ -109,17 +109,17 @@ class PerfilService {
   }
 
   Future<void> sincronizarNomeAuthComPerfil({required String uid}) async {
-    final User user = _requireAuthenticatedUser(uid);
+    final user = _requireAuthenticatedUser(uid);
 
-    final DocumentSnapshot<Map<String, dynamic>> snapshot = await _perfilRef(
+    final snapshot = await _perfilRef(
       uid,
     ).get();
 
-    final Map<String, dynamic> data = snapshot.data() ?? <String, dynamic>{};
+    final data = snapshot.data() ?? <String, dynamic>{};
 
-    final String nomePerfil = (data['nome'] ?? '').toString().trim();
-    final String nomeAuth = (user.displayName ?? '').trim();
-    final bool syncPendente = data['displayNameSyncPending'] == true;
+    final nomePerfil = (data['nome'] ?? '').toString().trim();
+    final nomeAuth = (user.displayName ?? '').trim();
+    final syncPendente = data['displayNameSyncPending'] == true;
 
     if (nomePerfil.isEmpty) {
       if (nomeAuth.isNotEmpty) {
@@ -162,7 +162,7 @@ class PerfilService {
     required String uid,
     required bool value,
   }) async {
-    final User user = _requireAuthenticatedUser(uid);
+    final user = _requireAuthenticatedUser(uid);
     await garantirDocumentoPerfil(user: user);
 
     await _perfilRef(uid).set(<String, dynamic>{
@@ -175,7 +175,7 @@ class PerfilService {
     required String uid,
     required bool value,
   }) async {
-    final User user = _requireAuthenticatedUser(uid);
+    final user = _requireAuthenticatedUser(uid);
     await garantirDocumentoPerfil(user: user);
 
     await _perfilRef(uid).set(<String, dynamic>{
@@ -188,7 +188,7 @@ class PerfilService {
     required String uid,
     required bool value,
   }) async {
-    final User user = _requireAuthenticatedUser(uid);
+    final user = _requireAuthenticatedUser(uid);
     await garantirDocumentoPerfil(user: user);
 
     await _perfilRef(uid).set(<String, dynamic>{
@@ -201,7 +201,7 @@ class PerfilService {
     required String uid,
     required AppThemePreference value,
   }) async {
-    final User user = _requireAuthenticatedUser(uid);
+    final user = _requireAuthenticatedUser(uid);
     await garantirDocumentoPerfil(user: user);
 
     await _perfilRef(uid).set(<String, dynamic>{
@@ -215,7 +215,7 @@ class PerfilService {
   }
 
   User _requireAuthenticatedUser(String uid) {
-    final User? user = _auth.currentUser;
+    final user = _auth.currentUser;
 
     if (user == null || user.uid != uid) {
       throw StateError('Usuário não autenticado.');

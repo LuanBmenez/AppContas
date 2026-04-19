@@ -15,17 +15,17 @@ class InsightsService {
     DateTime? agora,
     int limite = 5,
   }) {
-    final DateTime referencia = agora ?? DateTime.now();
-    final List<InsightItem> itens = <InsightItem>[];
+    final referencia = agora ?? DateTime.now();
+    final itens = <InsightItem>[];
 
-    final List<OrcamentoCategoriaResumo> orcamentosOrdenados =
+    final orcamentosOrdenados =
         List<OrcamentoCategoriaResumo>.from(orcamentos)..sort(
           (a, b) => b.percentualUtilizado.compareTo(a.percentualUtilizado),
         );
 
-    for (final OrcamentoCategoriaResumo item in orcamentosOrdenados) {
-      final double percentual = item.percentualUtilizado * 100;
-      final String categoria = item.orcamento.categoriaPadrao.label;
+    for (final item in orcamentosOrdenados) {
+      final percentual = item.percentualUtilizado * 100;
+      final categoria = item.orcamento.categoriaPadrao.label;
 
       if (percentual >= 100) {
         itens.add(
@@ -57,9 +57,9 @@ class InsightsService {
       );
     }
 
-    final double orcamentoTotal = orcamentos.fold<double>(
+    final orcamentoTotal = orcamentos.fold<double>(
       0,
-      (double total, OrcamentoCategoriaResumo item) =>
+      (total, item) =>
           total + item.orcamento.valorLimite,
     );
 
@@ -86,7 +86,7 @@ class InsightsService {
 
     if (resumo.variacaoGastos > 0.1) {
       itens.add(
-        InsightItem(
+        const InsightItem(
           nivel: InsightNivel.info,
           mensagem: 'Você está gastando mais que no mês passado.',
           icone: Icons.compare_arrows_rounded,
@@ -94,9 +94,9 @@ class InsightsService {
       );
     }
 
-    final List<InsightItem> unicos = <InsightItem>[];
-    final Set<String> mensagens = <String>{};
-    for (final InsightItem item in itens) {
+    final unicos = <InsightItem>[];
+    final mensagens = <String>{};
+    for (final item in itens) {
       if (mensagens.add(item.mensagem)) {
         unicos.add(item);
       }
@@ -113,7 +113,7 @@ class InsightsService {
       return false;
     }
 
-    final double razao = previsao.projecaoTotal <= 0
+    final razao = previsao.projecaoTotal <= 0
         ? 0
         : previsao.projecaoTotal / previsao.gastoAtual;
 

@@ -5,11 +5,8 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 
 class InsightResumoCard extends StatelessWidget {
   const InsightResumoCard({
-    super.key,
-    required this.titulo,
+    required this.titulo, required this.valor, required this.mostrarValores, super.key,
     this.categoria,
-    required this.valor,
-    required this.mostrarValores,
     this.labelUnico = false,
   });
 
@@ -21,8 +18,8 @@ class InsightResumoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final Color cor = categoria?.color ?? theme.colorScheme.primary;
+    final theme = Theme.of(context);
+    final cor = categoria?.color ?? theme.colorScheme.primary;
 
     return Container(
       width: double.infinity,

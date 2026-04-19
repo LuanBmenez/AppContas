@@ -8,19 +8,15 @@ class OrcamentoCategoria {
     required this.valorLimite,
   });
 
-  final String id;
-  final CategoriaGasto categoriaPadrao;
-  final double valorLimite;
-
   factory OrcamentoCategoria.fromMap(Map<String, dynamic> map, String id) {
-    final String categoriaRaw = (map['categoriaPadrao'] ?? 'outros').toString();
-    final CategoriaGasto categoria = CategoriaGasto.values.firstWhere(
+    final categoriaRaw = (map['categoriaPadrao'] ?? 'outros').toString();
+    final categoria = CategoriaGasto.values.firstWhere(
       (item) => item.name == categoriaRaw,
       orElse: () => CategoriaGasto.outros,
     );
 
     final dynamic limiteRaw = map['valorLimite'];
-    final double limite = limiteRaw is num
+    final limite = limiteRaw is num
         ? limiteRaw.toDouble()
         : double.tryParse(limiteRaw?.toString() ?? '') ?? 0;
 
@@ -30,6 +26,10 @@ class OrcamentoCategoria {
       valorLimite: limite,
     );
   }
+
+  final String id;
+  final CategoriaGasto categoriaPadrao;
+  final double valorLimite;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{

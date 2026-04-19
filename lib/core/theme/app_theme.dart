@@ -69,20 +69,20 @@ class AppTheme {
   static ThemeData get dark => _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
-    final bool isDark = brightness == Brightness.dark;
+    final isDark = brightness == Brightness.dark;
 
-    final ColorScheme colorScheme = ColorScheme.fromSeed(
+    final colorScheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFF0F766E),
       brightness: brightness,
     );
 
-    final TextTheme baseTextTheme = ThemeData(
+    final baseTextTheme = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: brightness,
     ).textTheme;
 
-    final TextTheme textTheme = baseTextTheme.copyWith(
+    final textTheme = baseTextTheme.copyWith(
       headlineSmall: baseTextTheme.headlineSmall?.copyWith(
         fontSize: 30,
         fontWeight: FontWeight.w800,
@@ -111,7 +111,7 @@ class AppTheme {
       ),
     );
 
-    final AppSemanticColors semanticColors = AppSemanticColors(
+    final semanticColors = AppSemanticColors(
       success: isDark ? const Color(0xFF4ADE80) : const Color(0xFF0F9D7A),
       successContainer: isDark
           ? const Color(0xFF123524)
@@ -189,7 +189,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         indicatorColor: colorScheme.secondaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final bool selected = states.contains(WidgetState.selected);
+          final selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           );

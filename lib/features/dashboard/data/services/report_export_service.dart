@@ -7,13 +7,13 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 class RelatorioExportado {
-  final String nomeArquivoBase;
-  final Uint8List pdfBytes;
 
   const RelatorioExportado({
     required this.nomeArquivoBase,
     required this.pdfBytes,
   });
+  final String nomeArquivoBase;
+  final Uint8List pdfBytes;
 }
 
 class ReportExportService {
@@ -22,27 +22,27 @@ class ReportExportService {
   Future<RelatorioExportado> gerarRelatorioMensal(
     RelatorioMensalFinanceiro relatorio,
   ) async {
-    final String mes = relatorio.mesReferencia.month.toString().padLeft(2, '0');
-    final String nomeBase = 'relatorio_${relatorio.mesReferencia.year}_$mes';
+    final mes = relatorio.mesReferencia.month.toString().padLeft(2, '0');
+    final nomeBase = 'relatorio_${relatorio.mesReferencia.year}_$mes';
 
-    final Uint8List pdf = await _gerarPdf(relatorio);
+    final pdf = await _gerarPdf(relatorio);
 
     return RelatorioExportado(nomeArquivoBase: nomeBase, pdfBytes: pdf);
   }
 
   Future<Uint8List> _gerarPdf(RelatorioMensalFinanceiro relatorio) async {
-    final pw.Document doc = pw.Document();
-    final pw.Font baseFont = await PdfGoogleFonts.notoSansRegular();
-    final pw.Font boldFont = await PdfGoogleFonts.notoSansBold();
+    final doc = pw.Document();
+    final baseFont = await PdfGoogleFonts.notoSansRegular();
+    final boldFont = await PdfGoogleFonts.notoSansBold();
 
-    final List<MapEntry<CategoriaGasto, double>> categorias =
+    final categorias =
         relatorio.totalPorCategoria.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
 
     doc.addPage(
       pw.MultiPage(
         theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
-        build: (pw.Context context) {
+        build: (context) {
           return <pw.Widget>[
             pw.Header(level: 0, child: pw.Text('Relatorio Mensal')),
             pw.Text(

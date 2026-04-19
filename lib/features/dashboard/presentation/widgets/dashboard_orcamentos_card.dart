@@ -7,15 +7,14 @@ import 'package:paga_o_que_me_deve/features/orcamentos/orcamentos.dart';
 
 class DashboardOrcamentosCard extends StatelessWidget {
   const DashboardOrcamentosCard({
-    super.key,
-    required this.orcamentosMesStream,
+    required this.orcamentosMesStream, super.key,
   });
 
   final Stream<List<OrcamentoCategoriaResumo>> orcamentosMesStream;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Card(
       elevation: 0,
@@ -77,7 +76,7 @@ class DashboardOrcamentosCard extends StatelessWidget {
                   );
                 }
 
-                final List<OrcamentoCategoriaResumo> resumos =
+                final resumos =
                     snapshot.data ?? <OrcamentoCategoriaResumo>[];
 
                 if (resumos.isEmpty) {

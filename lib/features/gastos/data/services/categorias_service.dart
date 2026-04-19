@@ -59,7 +59,7 @@ class CategoriasService {
     required String titulo,
     required CategoriaGasto categoria,
   }) async {
-    final String termo = titulo.trim();
+    final termo = titulo.trim();
     if (termo.isEmpty) {
       return;
     }
@@ -76,14 +76,14 @@ class CategoriasService {
   List<CategoriaPersonalizada> ordenarCategoriasAtivas(
     List<CategoriaPersonalizada> categorias,
   ) {
-    final List<CategoriaPersonalizada> lista = categoriasAtivas(categorias);
+    final lista = categoriasAtivas(categorias);
 
     lista.sort((a, b) {
       if (a.favorita != b.favorita) {
         return a.favorita ? -1 : 1;
       }
 
-      final int uso = b.usoCount.compareTo(a.usoCount);
+      final uso = b.usoCount.compareTo(a.usoCount);
       if (uso != 0) {
         return uso;
       }
@@ -98,11 +98,11 @@ class CategoriasService {
     required String textoBusca,
     required List<CategoriaPersonalizada> categorias,
   }) {
-    final String busca = TextNormalizer.normalizeForSearch(
+    final busca = TextNormalizer.normalizeForSearch(
       textoBusca,
     ).trim().toLowerCase();
 
-    final List<CategoriaPersonalizada> base = ordenarCategoriasAtivas(
+    final base = ordenarCategoriasAtivas(
       categorias,
     );
 
@@ -111,7 +111,7 @@ class CategoriasService {
     }
 
     return base.where((categoria) {
-      final String nome = TextNormalizer.normalizeForSearch(
+      final nome = TextNormalizer.normalizeForSearch(
         categoria.nome,
       ).trim().toLowerCase();
 
@@ -127,7 +127,7 @@ class CategoriasService {
       return null;
     }
 
-    for (final CategoriaPersonalizada categoria in categoriasAtivas(
+    for (final categoria in categoriasAtivas(
       categorias,
     )) {
       if (categoria.id == id) {
@@ -143,7 +143,7 @@ class CategoriasService {
     required List<CategoriaPersonalizada> categorias,
     String? ignorarId,
   }) {
-    final String normalizado = TextNormalizer.normalizeForSearch(
+    final normalizado = TextNormalizer.normalizeForSearch(
       nome,
     ).trim().toLowerCase();
 
@@ -151,8 +151,8 @@ class CategoriasService {
       return false;
     }
 
-    for (final CategoriaGasto categoriaPadrao in CategoriaGasto.values) {
-      final String nomePadrao = TextNormalizer.normalizeForSearch(
+    for (final categoriaPadrao in CategoriaGasto.values) {
+      final nomePadrao = TextNormalizer.normalizeForSearch(
         categoriaPadrao.label,
       ).trim().toLowerCase();
 
@@ -161,14 +161,14 @@ class CategoriasService {
       }
     }
 
-    for (final CategoriaPersonalizada categoria in categoriasAtivas(
+    for (final categoria in categoriasAtivas(
       categorias,
     )) {
       if (categoria.id == ignorarId) {
         continue;
       }
 
-      final String nomeExistente = TextNormalizer.normalizeForSearch(
+      final nomeExistente = TextNormalizer.normalizeForSearch(
         categoria.nome,
       ).trim().toLowerCase();
 

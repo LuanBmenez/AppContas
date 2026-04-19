@@ -7,10 +7,10 @@ import 'package:paga_o_que_me_deve/features/orcamentos/domain/models/orcamento_c
 
 void main() {
   group('PrevisaoFechamentoService', () {
-    const PrevisaoFechamentoService service = PrevisaoFechamentoService();
+    const service = PrevisaoFechamentoService();
 
     test('calcula projecao total com base no ritmo diario do mes', () {
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Mercado',
@@ -41,7 +41,7 @@ void main() {
     });
 
     test('evita explosao no inicio do mes com poucos dados', () {
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Compra alta',
@@ -63,7 +63,7 @@ void main() {
     });
 
     test('nao duplica recorrencia ja lancada no mes atual', () {
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Netflix assinatura',
@@ -108,7 +108,7 @@ void main() {
     });
 
     test('estima recorrencia restante quando nao ha lancamento no mes', () {
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Academia',
@@ -147,7 +147,7 @@ void main() {
     test(
       'considera lancamentos fixos futuros do mes como recorrencias restantes',
       () {
-        final DashboardResumo resumo = DashboardResumo(<Gasto>[
+        final resumo = DashboardResumo(<Gasto>[
           Gasto(
             id: 'g1',
             titulo: 'Internet',
@@ -171,14 +171,13 @@ void main() {
     test(
       'considera lancamentos futuros do mes mesmo sem tipo fixo quando padrao mensal existe',
       () {
-        final DashboardResumo resumo = DashboardResumo(<Gasto>[
+        final resumo = DashboardResumo(<Gasto>[
           Gasto(
             id: 'g1',
             titulo: 'Plano celular',
             valor: 60,
             data: DateTime(2026, 1, 15),
             categoria: CategoriaGasto.outros,
-            tipo: TipoGasto.variavel,
           ),
           Gasto(
             id: 'g2',
@@ -186,7 +185,6 @@ void main() {
             valor: 60,
             data: DateTime(2026, 2, 15),
             categoria: CategoriaGasto.outros,
-            tipo: TipoGasto.variavel,
           ),
           Gasto(
             id: 'g3',
@@ -194,7 +192,6 @@ void main() {
             valor: 60,
             data: DateTime(2026, 3, 15),
             categoria: CategoriaGasto.outros,
-            tipo: TipoGasto.variavel,
           ),
           Gasto(
             id: 'g4',
@@ -202,7 +199,6 @@ void main() {
             valor: 60,
             data: DateTime(2026, 4, 15),
             categoria: CategoriaGasto.outros,
-            tipo: TipoGasto.variavel,
           ),
         ], const <Conta>[]);
 
@@ -217,7 +213,7 @@ void main() {
     );
 
     test('lista categorias com risco de estouro do orcamento', () {
-      final DashboardResumo resumo = DashboardResumo(<Gasto>[
+      final resumo = DashboardResumo(<Gasto>[
         Gasto(
           id: 'g1',
           titulo: 'Mercado',
@@ -241,10 +237,10 @@ void main() {
         ),
       ], const <Conta>[]);
 
-      final List<OrcamentoCategoriaResumo> orcamentos =
+      final orcamentos =
           <OrcamentoCategoriaResumo>[
-            OrcamentoCategoriaResumo(
-              orcamento: const OrcamentoCategoria(
+            const OrcamentoCategoriaResumo(
+              orcamento: OrcamentoCategoria(
                 id: 'o1',
                 categoriaPadrao: CategoriaGasto.comida,
                 valorLimite: 600,
@@ -254,8 +250,8 @@ void main() {
               percentualUtilizado: 0,
               status: OrcamentoCategoriaStatus.normal,
             ),
-            OrcamentoCategoriaResumo(
-              orcamento: const OrcamentoCategoria(
+            const OrcamentoCategoriaResumo(
+              orcamento: OrcamentoCategoria(
                 id: 'o2',
                 categoriaPadrao: CategoriaGasto.entretenimento,
                 valorLimite: 400,

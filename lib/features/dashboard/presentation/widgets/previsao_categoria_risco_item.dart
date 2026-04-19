@@ -7,9 +7,7 @@ import 'package:paga_o_que_me_deve/features/dashboard/domain/models/previsao_fec
 
 class PrevisaoCategoriaRiscoItem extends StatelessWidget {
   const PrevisaoCategoriaRiscoItem({
-    super.key,
-    required this.risco,
-    required this.mostrarValores,
+    required this.risco, required this.mostrarValores, super.key,
   });
 
   final PrevisaoCategoriaRisco risco;
@@ -17,8 +15,8 @@ class PrevisaoCategoriaRiscoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final double percentual = risco.percentualPrevistoOrcamento;
+    final theme = Theme.of(context);
+    final percentual = risco.percentualPrevistoOrcamento;
 
     return Container(
       width: double.infinity,

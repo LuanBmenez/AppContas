@@ -3,9 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum ContaHistoricoTipo { criada, atualizada, recebida, reaberta }
 
 class ContaHistoricoEvento {
-  final ContaHistoricoTipo tipo;
-  final String descricao;
-  final DateTime data;
 
   const ContaHistoricoEvento({
     required this.tipo,
@@ -20,14 +17,17 @@ class ContaHistoricoEvento {
       data: _parseDate(map['data']),
     );
   }
+  final ContaHistoricoTipo tipo;
+  final String descricao;
+  final DateTime data;
 
   Map<String, dynamic> toMap() {
     return {'tipo': tipo.name, 'descricao': descricao, 'data': data};
   }
 
   static ContaHistoricoTipo _parseTipo(dynamic raw) {
-    final String valor = raw?.toString() ?? '';
-    for (final ContaHistoricoTipo tipo in ContaHistoricoTipo.values) {
+    final valor = raw?.toString() ?? '';
+    for (final tipo in ContaHistoricoTipo.values) {
       if (tipo.name == valor) {
         return tipo;
       }
@@ -57,16 +57,6 @@ class ContaHistoricoEvento {
 }
 
 class Conta {
-  final String id;
-  final String nome;
-  final String descricao;
-  final double valor;
-  final DateTime data;
-  final DateTime? vencimento;
-  final DateTime? recebidaEm;
-  final DateTime? atualizadaEm;
-  final bool foiPago;
-  final List<ContaHistoricoEvento> historico;
 
   Conta({
     required this.id,
@@ -87,13 +77,13 @@ class Conta {
     final dynamic vencimentoRaw = map['vencimento'];
     final dynamic recebidaEmRaw = map['recebidaEm'];
     final dynamic atualizadaEmRaw = map['atualizadaEm'];
-    final List<dynamic> historicoRaw =
-        (map['historico'] as List<dynamic>? ?? <dynamic>[]);
-    final List<ContaHistoricoEvento> historico = historicoRaw
+    final historicoRaw =
+        map['historico'] as List<dynamic>? ?? <dynamic>[];
+    final historico = historicoRaw
         .whereType<Map<String, dynamic>>()
         .map(ContaHistoricoEvento.fromMap)
         .toList();
-    final DateTime criadaEm = _parseDate(dataRaw);
+    final criadaEm = _parseDate(dataRaw);
 
     return Conta(
       id: id,
@@ -118,6 +108,16 @@ class Conta {
           : historico,
     );
   }
+  final String id;
+  final String nome;
+  final String descricao;
+  final double valor;
+  final DateTime data;
+  final DateTime? vencimento;
+  final DateTime? recebidaEm;
+  final DateTime? atualizadaEm;
+  final bool foiPago;
+  final List<ContaHistoricoEvento> historico;
 
   Map<String, dynamic> toMap() {
     return {

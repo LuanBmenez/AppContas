@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import 'app_theme_preference.dart';
+import 'package:paga_o_que_me_deve/core/theme/app_theme_preference.dart';
 
 class AppThemeController extends ChangeNotifier {
   AppThemeController({FirebaseAuth? auth, FirebaseFirestore? firestore})
@@ -41,9 +41,9 @@ class AppThemeController extends ChangeNotifier {
         .doc(user.uid)
         .snapshots()
         .listen((snapshot) {
-          final Map<String, dynamic> data =
+          final data =
               snapshot.data() ?? <String, dynamic>{};
-          final Map<String, dynamic> preferencias =
+          final preferencias =
               (data['preferencias'] as Map?)?.cast<String, dynamic>() ??
               <String, dynamic>{};
 
@@ -52,8 +52,8 @@ class AppThemeController extends ChangeNotifier {
   }
 
   void _setPreference(AppThemePreference preference) {
-    final ThemeMode nextMode = preference.themeMode;
-    final bool changed = preference != _preference || nextMode != _themeMode;
+    final nextMode = preference.themeMode;
+    final changed = preference != _preference || nextMode != _themeMode;
 
     _preference = preference;
     _themeMode = nextMode;

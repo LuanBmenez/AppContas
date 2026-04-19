@@ -1,10 +1,4 @@
 class CartaoCredito {
-  final String id;
-  final String nome;
-  final String finalCartao;
-  final int diaFechamento;
-  final int diaVencimento;
-
   const CartaoCredito({
     required this.id,
     required this.nome,
@@ -22,6 +16,11 @@ class CartaoCredito {
       diaVencimento: _parseDia(map['diaVencimento']),
     );
   }
+  final String id;
+  final String nome;
+  final String finalCartao;
+  final int diaFechamento;
+  final int diaVencimento;
 
   Map<String, dynamic> toMap() {
     return {
@@ -60,4 +59,3 @@ class CartaoCredito {
     return int.tryParse(raw?.toString() ?? '') ?? 1;
   }
 }
-

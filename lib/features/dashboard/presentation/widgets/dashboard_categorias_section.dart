@@ -9,10 +9,7 @@ import 'package:paga_o_que_me_deve/features/dashboard/presentation/widgets/insig
 
 class DashboardCategoriasSection extends StatelessWidget {
   const DashboardCategoriasSection({
-    super.key,
-    required this.resumo,
-    required this.periodoTitulo,
-    required this.mostrarValores,
+    required this.resumo, required this.periodoTitulo, required this.mostrarValores, super.key,
     this.onTapCategoria,
     this.onTapSaidas,
   });
@@ -25,7 +22,7 @@ class DashboardCategoriasSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Card(
       elevation: 0,
@@ -135,7 +132,7 @@ class _CategoriasVazias extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       width: double.infinity,

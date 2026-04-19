@@ -2,16 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class CategoriaPersonalizada {
-  final String id;
-  final String nome;
-  final int corValue;
-  final int iconeCodePoint;
-  final bool favorita;
-  final bool arquivada;
-  final int usoCount;
-  final DateTime? criadaEm;
-  final DateTime? atualizadaEm;
-
   const CategoriaPersonalizada({
     required this.id,
     required this.nome,
@@ -23,10 +13,6 @@ class CategoriaPersonalizada {
     this.criadaEm,
     this.atualizadaEm,
   });
-
-  Color get cor => Color(corValue);
-
-  final icone = Icons.home_rounded;
 
   factory CategoriaPersonalizada.fromMap(Map<String, dynamic> map, String id) {
     return CategoriaPersonalizada(
@@ -42,6 +28,19 @@ class CategoriaPersonalizada {
       atualizadaEm: _parseDate(map['atualizadaEm']),
     );
   }
+  final String id;
+  final String nome;
+  final int corValue;
+  final int iconeCodePoint;
+  final bool favorita;
+  final bool arquivada;
+  final int usoCount;
+  final DateTime? criadaEm;
+  final DateTime? atualizadaEm;
+
+  Color get cor => Color(corValue);
+
+  IconData get icone => IconData(iconeCodePoint, fontFamily: 'MaterialIcons');
 
   Map<String, dynamic> toMap() {
     return {
