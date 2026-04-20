@@ -122,15 +122,13 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
-      final categoriasAtivas = _categoriasService
-          .categoriasAtivas(categorias);
+      final categoriasAtivas = _categoriasService.categoriasAtivas(categorias);
 
-      final sugestao =
-          NovoGastoCategoriaController.sugerirPorTitulo(
-            titulo: _tituloController?.text ?? '',
-            categoriasAtivas: categoriasAtivas,
-            regrasAprendidas: _regrasAprendidas,
-          );
+      final sugestao = NovoGastoCategoriaController.sugerirPorTitulo(
+        titulo: _tituloController?.text ?? '',
+        categoriasAtivas: categoriasAtivas,
+        regrasAprendidas: _regrasAprendidas,
+      );
 
       final categoriaPendenteChegou =
           _categoriaPendenteSelecionarId != null &&
@@ -175,12 +173,11 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
-      final sugestao =
-          NovoGastoCategoriaController.sugerirPorTitulo(
-            titulo: _tituloController?.text ?? '',
-            categoriasAtivas: _categoriasAtivas,
-            regrasAprendidas: regras,
-          );
+      final sugestao = NovoGastoCategoriaController.sugerirPorTitulo(
+        titulo: _tituloController?.text ?? '',
+        categoriasAtivas: _categoriasAtivas,
+        regrasAprendidas: regras,
+      );
 
       setState(() {
         _regrasAprendidas = regras;
@@ -332,8 +329,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     }
     setState(() => _carregandoSugestaoRecorrencia = true);
 
-    final sugestao = await _gastosService
-        .sugerirRecorrenciaPorTitulo(titulo);
+    final sugestao = await _gastosService.sugerirRecorrenciaPorTitulo(titulo);
 
     if (!mounted || _isDisposed) {
       return;
@@ -530,11 +526,10 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   Future<void> _abrirModalNovaCategoria() async {
     if (_salvandoCategoria) return;
 
-    final result =
-        await showDialog<_NovaCategoriaDialogResult>(
-          context: context,
-          builder: (dialogContext) => const _NovaCategoriaDialog(),
-        );
+    final result = await showDialog<_NovaCategoriaDialogResult>(
+      context: context,
+      builder: (dialogContext) => const _NovaCategoriaDialog(),
+    );
 
     if (!mounted || result == null) {
       return;
@@ -721,8 +716,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
 
   Widget _buildCategoriaSection(ThemeData theme) {
     final padrao = _categoriasPadraoFiltradas();
-    final personalizadas =
-        _categoriasPersonalizadasFiltradas();
+    final personalizadas = _categoriasPersonalizadasFiltradas();
 
     final categoriaPersonalizadaSelecionadaValida =
         _categoriaPersonalizadaSelecionadaId != null &&
@@ -1061,6 +1055,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
               label: Text(_salvando ? 'Salvando...' : 'Salvar gasto'),
             ),
           ),
+          const SizedBox(height: 32),
         ],
       ),
     );
