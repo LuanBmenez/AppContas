@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -7,9 +9,7 @@ import 'package:paga_o_que_me_deve/features/recorrencias/data/services/recorrenc
 import 'package:paga_o_que_me_deve/features/recorrencias/domain/models/recorrencia_ativa.dart';
 
 class ComprasRecorrentesScreen extends StatefulWidget {
-  const ComprasRecorrentesScreen({required this.db, super.key});
-
-  final FinanceRepository db;
+  const ComprasRecorrentesScreen({super.key});
 
   @override
   State<ComprasRecorrentesScreen> createState() =>
@@ -22,7 +22,8 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   @override
   void initState() {
     super.initState();
-    _service = RecorrenciasService(repository: widget.db);
+    final db = getIt<FinanceRepository>();
+    _service = RecorrenciasService(repository: db);
   }
 
   Future<void> _executar(
@@ -36,7 +37,8 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
       AppFeedback.showSuccess(context, sucesso);
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, '$erro: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, '$erro: ${exception.message}');
     }
   }
 
@@ -57,6 +59,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
       confirmText: 'Pausar',
     );
     if (!confirmar) return;
+
     await _executar(
       () => _service.pausarRecorrencia(item),
       'Recorrência pausada com sucesso.',
@@ -66,6 +69,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
 
   Future<void> _reativarRecorrencia(RecorrenciaAtiva item) async {
     var meses = 3;
+
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -106,7 +110,9 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
         );
       },
     );
+
     if (confirmar != true) return;
+
     await _executar(
       () => _service.reativarRecorrencia(item, mesesFuturos: meses),
       'Recorrência reativada com sucesso.',
@@ -117,6 +123,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   Future<void> _configurarNotificacao(RecorrenciaAtiva item) async {
     var ativa = item.notificacaoAtiva;
     var diasAntes = item.diasAntesNotificacao;
+
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -172,7 +179,9 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
         );
       },
     );
+
     if (confirmar != true) return;
+
     await _executar(
       () => _service.atualizarNotificacao(
         recorrencia: item,
@@ -193,6 +202,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
       confirmText: 'Remover',
     );
     if (!confirmar) return;
+
     await _executar(
       () => _service.removerProximosLancamentos(item),
       'Próximos lançamentos removidos com sucesso.',
@@ -209,6 +219,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
       confirmText: 'Remover',
     );
     if (!confirmar) return;
+
     await _executar(
       () => _service.removerRecorrenciaCompletamente(item),
       'Recorrência removida com sucesso.',
@@ -337,12 +348,14 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
           if (snapshot.hasError) {
+            final exception = AppException.from(snapshot.error);
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.s16),
                 child: Text(
-                  'Erro ao carregar recorrências: ${snapshot.error}',
+                  exception.message,
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -350,6 +363,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
           }
 
           final recorrencias = snapshot.data ?? <RecorrenciaAtiva>[];
+
           if (recorrencias.isEmpty) {
             return Center(
               child: Padding(
@@ -389,6 +403,7 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
             itemBuilder: (context, index) {
               final item = recorrencias[index];
               final statusColor = _statusColor(context, item);
+
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.s14),

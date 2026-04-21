@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
@@ -32,7 +34,6 @@ import 'package:share_plus/share_plus.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
-    required this.db,
     super.key,
     this.exportadorRelatorio,
     this.orcamentosMesStreamOverride,
@@ -41,7 +42,6 @@ class DashboardScreen extends StatefulWidget {
     this.onTapSaidasFiltradas,
   });
 
-  final FinanceRepository db;
   final Future<void> Function(DateTime referencia)? exportadorRelatorio;
   final Stream<List<OrcamentoCategoriaResumo>>? orcamentosMesStreamOverride;
   final VoidCallback? onTapSaidas;
@@ -53,6 +53,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  late final FinanceRepository _db;
   late final DashboardDataService _dashboardDataService;
   late final Stream<List<OrcamentoCategoriaResumo>> _orcamentosMesStream;
   late final RecorrenciasService _recorrenciasService;
@@ -71,9 +72,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _db = getIt<FinanceRepository>();
     _controller = DashboardScreenController(summaryService: _summaryService);
-    _dashboardDataService = DashboardDataService(widget.db);
-    _recorrenciasService = RecorrenciasService(repository: widget.db);
+    _dashboardDataService = DashboardDataService(_db);
+    _recorrenciasService = RecorrenciasService(repository: _db);
 
     final streamOverride = widget.orcamentosMesStreamOverride;
 
@@ -85,9 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     try {
-      final orcamentosService = OrcamentosService(
-        repository: widget.db,
-      );
+      final orcamentosService = OrcamentosService(repository: _db);
       final stream = orcamentosService.calcularResumoPorCategoria(
         DateTime.now(),
         limite: 5,
@@ -116,19 +116,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (data['preferencias'] as Map?)?.cast<String, dynamic>() ??
           <String, dynamic>{};
 
-      final Object? value = preferencias['mostrarValoresDashboard'];
+      final value = preferencias['mostrarValoresDashboard'];
       return value is! bool || value;
     });
-  }
-
-  String _mensagemErroDashboard(Object? error) {
-    final erro = (error ?? '').toString().toLowerCase();
-    if (erro.contains('firestore.googleapis.com') ||
-        erro.contains('permission_denied')) {
-      return 'Firestore sem permissão ou desativado no projeto.\n'
-          'Ative o Cloud Firestore no Firebase Console e tente novamente.';
-    }
-    return 'Erro ao carregar o painel.';
   }
 
   Future<void> _selecionarMesEspecifico() async {
@@ -165,9 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     setState(() => _exportandoRelatorio = true);
     try {
-      final referencia = _controller.mesReferenciaExportacao(
-        DateTime.now(),
-      );
+      final referencia = _controller.mesReferenciaExportacao(DateTime.now());
 
       if (widget.exportadorRelatorio != null) {
         await widget.exportadorRelatorio!(referencia);
@@ -177,15 +165,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
 
-      final relatorio = await widget.db.buscarRelatorioMensal(referencia);
+      final relatorio = await _db.buscarRelatorioMensal(referencia);
       final exportado = await _reportExportService.gerarRelatorioMensal(
         relatorio,
       );
 
       final tempDir = await getTemporaryDirectory();
-      final arquivo = File(
-        '${tempDir.path}/${exportado.nomeArquivoBase}.pdf',
-      );
+      final arquivo = File('${tempDir.path}/${exportado.nomeArquivoBase}.pdf');
 
       await arquivo.writeAsBytes(exportado.pdfBytes, flush: true);
 
@@ -212,7 +198,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.showError(context, 'Falha ao exportar relatório: $e');
+        final exception = AppException.from(e);
+        AppFeedback.showError(context, exception.message);
       }
     } finally {
       if (mounted) {
@@ -265,6 +252,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
 
             if (snapshot.hasError) {
+              final exception = AppException.from(snapshot.error);
+
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.s16),
@@ -272,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _mensagemErroDashboard(snapshot.error),
+                        exception.message,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.s8),
@@ -363,7 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(height: 12),
                             StreamBuilder<List<Guardado>>(
-                              stream: widget.db.guardados,
+                              stream: _db.guardados,
                               builder: (context, guardadosSnapshot) {
                                 final guardados =
                                     guardadosSnapshot.data ?? <Guardado>[];

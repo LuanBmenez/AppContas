@@ -5,14 +5,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
 import 'package:paga_o_que_me_deve/app/app_bootstrap.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
 import 'package:paga_o_que_me_deve/firebase_options.dart';
 
 export 'app/app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  setupDependencies();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -11,15 +13,14 @@ import 'package:paga_o_que_me_deve/features/orcamentos/domain/models/orcamento_c
 import 'package:paga_o_que_me_deve/features/orcamentos/presentation/widgets/orcamento_categoria_progress_item.dart';
 
 class OrcamentosScreen extends StatefulWidget {
-  const OrcamentosScreen({required this.db, super.key});
-
-  final FinanceRepository db;
+  const OrcamentosScreen({super.key});
 
   @override
   State<OrcamentosScreen> createState() => _OrcamentosScreenState();
 }
 
 class _OrcamentosScreenState extends State<OrcamentosScreen> {
+  late final FinanceRepository _db;
   late final OrcamentosService _orcamentosService;
   late Stream<List<OrcamentoCategoriaResumo>> _resumosOrcamentoStream;
 
@@ -29,7 +30,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
   @override
   void initState() {
     super.initState();
-    _orcamentosService = OrcamentosService(repository: widget.db);
+    _db = getIt<FinanceRepository>();
+    _orcamentosService = OrcamentosService(repository: _db);
     _carregarStreamDoMes();
   }
 
@@ -51,7 +53,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
   }
 
   Future<void> _abrirFormularioOrcamento({
-    required List<OrcamentoCategoriaResumo> resumos, OrcamentoCategoria? existente,
+    required List<OrcamentoCategoriaResumo> resumos,
+    OrcamentoCategoria? existente,
   }) async {
     final screenContext = context;
     var categoriaSelecionada =
@@ -176,7 +179,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
       AppFeedback.showSuccess(screenContext, 'Orçamento salvo com sucesso.');
     } catch (e) {
       if (!screenContext.mounted) return;
-      AppFeedback.showError(screenContext, 'Falha ao salvar orçamento: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(screenContext, exception.message);
     }
   }
 
@@ -198,7 +202,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
       AppFeedback.showSuccess(screenContext, 'Orçamento removido.');
     } catch (e) {
       if (!screenContext.mounted) return;
-      AppFeedback.showError(screenContext, 'Falha ao excluir orçamento: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(screenContext, exception.message);
     }
   }
 
@@ -266,8 +271,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
                   );
                 }
 
-                final resumos =
-                    snapshot.data ?? <OrcamentoCategoriaResumo>[];
+                final resumos = snapshot.data ?? <OrcamentoCategoriaResumo>[];
 
                 if (resumos.isEmpty) {
                   return AppEmptyStateCta(

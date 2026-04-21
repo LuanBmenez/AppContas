@@ -1,21 +1,22 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/guardado/data/services/guardado_service.dart';
 
 class GuardadoScreen extends StatefulWidget {
-  const GuardadoScreen({required this.db, super.key});
-
-  final FinanceRepository db;
+  const GuardadoScreen({super.key});
 
   @override
   State<GuardadoScreen> createState() => _GuardadoScreenState();
 }
 
 class _GuardadoScreenState extends State<GuardadoScreen> {
+  late final FinanceRepository _db;
   late final GuardadoService _guardadoService;
 
   DateTime _mesSelecionado = DateTime(
@@ -26,7 +27,8 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   @override
   void initState() {
     super.initState();
-    _guardadoService = GuardadoService(widget.db);
+    _db = getIt<FinanceRepository>();
+    _guardadoService = GuardadoService(_db);
   }
 
   DateTime get _inicioMes =>
@@ -172,8 +174,9 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   String _valorFormatadoComSinal(Guardado item) {
-    final sinal =
-        item.tipoMovimentacao == GuardadoTipoMovimentacao.aporte ? '+' : '-';
+    final sinal = item.tipoMovimentacao == GuardadoTipoMovimentacao.aporte
+        ? '+'
+        : '-';
     return '$sinal ${AppFormatters.moeda(item.valor)}';
   }
 
@@ -200,7 +203,12 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   Future<void> _abrirFormularioGuardado({
-    required GuardadoTipoMovimentacao tipoInicial, required double saldoMes, required double totalAportesMes, required double saldoGuardadoTotal, required List<String> metasExistentes, Guardado? existente,
+    required GuardadoTipoMovimentacao tipoInicial,
+    required double saldoMes,
+    required double totalAportesMes,
+    required double saldoGuardadoTotal,
+    required List<String> metasExistentes,
+    Guardado? existente,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -239,11 +247,12 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
         return;
       }
       AppFeedback.showSuccess(context, 'Movimentação excluída com sucesso.');
-    } on Exception catch (e) {
+    } catch (e) {
       if (!mounted) {
         return;
       }
-      AppFeedback.showError(context, 'Não foi possível excluir: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     }
   }
 
@@ -256,7 +265,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     required Color color,
     VoidCallback? onTap,
   }) {
-    final Widget child = Container(
+    final child = Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -366,9 +375,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
   Widget _buildMetaResumoCard(ThemeData theme, String meta, double valor) {
     final positivo = valor >= 0;
-    final color = positivo
-        ? const Color(0xFF2563EB)
-        : const Color(0xFFC26A00);
+    final color = positivo ? const Color(0xFF2563EB) : const Color(0xFFC26A00);
 
     return Container(
       width: double.infinity,
@@ -414,7 +421,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     final theme = Theme.of(context);
 
     return StreamBuilder<DashboardResumo>(
-      stream: widget.db.dashboardResumo,
+      stream: _db.dashboardResumo,
       builder: (context, dashboardSnapshot) {
         final dashboardResumo =
             dashboardSnapshot.data ??
@@ -423,8 +430,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
         return StreamBuilder<List<Guardado>>(
           stream: _guardadoService.guardados,
           builder: (context, guardadosSnapshot) {
-            final guardados =
-                guardadosSnapshot.data ?? <Guardado>[];
+            final guardados = guardadosSnapshot.data ?? <Guardado>[];
             final metasExistentes = _metasExistentes(guardados);
 
             final totalRecebidoMes = _somarRecebidoMes(
@@ -457,11 +463,8 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
               0,
               saldoMes - totalAportesMes,
             );
-            final totaisPorDestino =
-                _agruparPorDestino(guardados);
-            final totaisPorMeta = _agruparPorMeta(
-              guardados,
-            );
+            final totaisPorDestino = _agruparPorDestino(guardados);
+            final totaisPorMeta = _agruparPorMeta(guardados);
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -936,7 +939,8 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
       if (!mounted) {
         return;
       }
-      AppFeedback.showError(context, 'Não foi possível salvar: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() {
@@ -950,8 +954,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final editando = widget.existente != null;
-    final limiteAtual =
-        tipoSelecionado == GuardadoTipoMovimentacao.aporte
+    final limiteAtual = tipoSelecionado == GuardadoTipoMovimentacao.aporte
         ? _limiteAporte
         : _limiteResgate;
 

@@ -1,28 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
+import 'package:paga_o_que_me_deve/core/services/notificacao_local_service.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
 enum HomeTab { inicio, gastos, receber, guardado, perfil }
 
-class HomeShellScreen extends StatelessWidget {
+class HomeShellScreen extends StatefulWidget {
   const HomeShellScreen({
-    required this.db, required this.currentTab, required this.child, super.key,
+    required this.currentTab,
+    required this.child,
+    super.key,
   });
 
-  final FinanceRepository db;
   final HomeTab currentTab;
   final Widget child;
 
+  @override
+  State<HomeShellScreen> createState() => _HomeShellScreenState();
+}
+
+class _HomeShellScreenState extends State<HomeShellScreen> {
+  late final FinanceRepository _db;
+  late final NotificacaoLocalService _notificacaoLocalService;
+
+  @override
+  void initState() {
+    super.initState();
+    _db = getIt<FinanceRepository>();
+    _notificacaoLocalService = getIt<NotificacaoLocalService>();
+    _configurarLembretesInteligentes();
+  }
+
+  Future<void> _configurarLembretesInteligentes() async {
+    try {
+      final resumo = await _db.buscarResumoParaNotificacao(DateTime.now());
+
+      await _notificacaoLocalService.agendarResumoFinanceiroDiario(
+        totalGastos: resumo.gastos,
+        totalReceber: resumo.receber,
+        nomesReceber: resumo.nomesReceber,
+      );
+    } catch (e) {
+      final exception = AppException.from(e);
+      debugPrint(
+        'Falha ao configurar lembretes inteligentes: ${exception.message}',
+      );
+    }
+  }
+
   String get _titulo {
-    if (currentTab == HomeTab.inicio) return 'Visão Geral';
-    if (currentTab == HomeTab.gastos) return 'Meus Gastos';
-    if (currentTab == HomeTab.receber) return 'A Receber';
-    if (currentTab == HomeTab.guardado) return 'Guardado';
+    if (widget.currentTab == HomeTab.inicio) return 'Visão Geral';
+    if (widget.currentTab == HomeTab.gastos) return 'Meus Gastos';
+    if (widget.currentTab == HomeTab.receber) return 'A Receber';
+    if (widget.currentTab == HomeTab.guardado) return 'Guardado';
     return 'Perfil';
   }
 
-  int get _indiceAtual => switch (currentTab) {
+  int get _indiceAtual => switch (widget.currentTab) {
     HomeTab.inicio => 0,
     HomeTab.gastos => 1,
     HomeTab.receber => 2,
@@ -31,12 +68,12 @@ class HomeShellScreen extends StatelessWidget {
   };
 
   Future<void> _onAdicionar(BuildContext context) async {
-    if (currentTab == HomeTab.gastos) {
+    if (widget.currentTab == HomeTab.gastos) {
       context.push(AppRoutes.novoGastoPath);
       return;
     }
 
-    if (currentTab == HomeTab.receber) {
+    if (widget.currentTab == HomeTab.receber) {
       context.push(AppRoutes.novoRecebivelPath);
     }
   }
@@ -46,7 +83,7 @@ class HomeShellScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titulo),
-        actions: currentTab == HomeTab.gastos
+        actions: widget.currentTab == HomeTab.gastos
             ? <Widget>[
                 IconButton(
                   tooltip: 'Orçamentos',
@@ -54,7 +91,7 @@ class HomeShellScreen extends StatelessWidget {
                   icon: const Icon(Icons.savings_outlined),
                 ),
                 IconButton(
-                  tooltip: 'Cartoes',
+                  tooltip: 'Cartões',
                   onPressed: () => context.push(AppRoutes.cartoesPath),
                   icon: const Icon(Icons.credit_card_outlined),
                 ),
@@ -66,17 +103,17 @@ class HomeShellScreen extends StatelessWidget {
               ]
             : null,
       ),
-      body: child,
+      body: widget.child,
       floatingActionButton:
-          currentTab == HomeTab.inicio ||
-                  currentTab == HomeTab.guardado ||
-                  currentTab == HomeTab.perfil
-              ? null
-              : FloatingActionButton(
-                  heroTag: 'home_shell_add_fab',
-                  onPressed: () => _onAdicionar(context),
-                  child: const Icon(Icons.add),
-                ),
+          widget.currentTab == HomeTab.inicio ||
+              widget.currentTab == HomeTab.guardado ||
+              widget.currentTab == HomeTab.perfil
+          ? null
+          : FloatingActionButton(
+              heroTag: 'home_shell_add_fab',
+              onPressed: () => _onAdicionar(context),
+              child: const Icon(Icons.add),
+            ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           height: 70,
