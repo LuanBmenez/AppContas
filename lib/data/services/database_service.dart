@@ -13,6 +13,58 @@ import 'package:paga_o_que_me_deve/domain/services/recorrencia_despesa_service.d
 import 'package:rxdart/rxdart.dart';
 
 class DatabaseService implements FinanceRepository {
+  @override
+  Future<({double gastos, double receber, List<String> nomesReceber})>
+  buscarResumoParaNotificacao(DateTime data) async {
+    final inicioDia = DateTime(data.year, data.month, data.day);
+    final fimDia = inicioDia.add(const Duration(days: 1));
+
+    final gastosSnap = await _gastosCollection
+        .where('data', isGreaterThanOrEqualTo: inicioDia)
+        .where('data', isLessThan: fimDia)
+        .get();
+
+    final receberSnap = await _receberCollection
+        .where('data', isGreaterThanOrEqualTo: inicioDia)
+        .where('data', isLessThan: fimDia)
+        .where('foiPago', isEqualTo: false)
+        .get();
+
+    double totalGastos = 0;
+    for (final doc in gastosSnap.docs) {
+      totalGastos += (doc.data()['valor'] as num).toDouble();
+    }
+
+    double totalReceber = 0;
+    final nomes = <String>[];
+    for (final doc in receberSnap.docs) {
+      final valor = (doc.data()['valor'] as num).toDouble();
+      totalReceber += valor;
+      nomes.add("${doc.data()['nome']} (R\$ ${valor.toStringAsFixed(2)})");
+    }
+
+    return (gastos: totalGastos, receber: totalReceber, nomesReceber: nomes);
+  }
+
+  static bool _persistenciaConfigurada = false;
+  DatabaseService() {
+    _configurarPersistenciaOffline();
+  }
+
+  void _configurarPersistenciaOffline() {
+    if (!_persistenciaConfigurada) {
+      try {
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: true,
+          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+        );
+        _persistenciaConfigurada = true;
+      } catch (e) {
+        // Ignora o erro silenciosamente caso o Firestore já tenha sido
+      }
+    }
+  }
+
   final RecorrenciaDespesaService _recorrenciaDespesaService =
       const RecorrenciaDespesaService();
 
@@ -52,11 +104,9 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> adicionarRecebivel(Conta conta) async {
-    final docRef = _receberCollection
-        .doc();
+    final docRef = _receberCollection.doc();
     final agora = DateTime.now();
-    final dataRecebimento =
-        conta.recebidaEm ?? (conta.foiPago ? agora : null);
+    final dataRecebimento = conta.recebidaEm ?? (conta.foiPago ? agora : null);
 
     final contaComId = conta.copyWith(
       id: docRef.id,
@@ -96,22 +146,23 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Stream<List<Guardado>> get guardados {
-    return _guardadosCollection.orderBy('data', descending: true).snapshots().map(
-      (snapshot) {
-        return snapshot.docs
-            .map((doc) => Guardado.fromMap(doc.data(), doc.id))
-            .toList();
-      },
-    );
+    return _guardadosCollection
+        .orderBy('data', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) {
+            return snapshot.docs
+                .map((doc) => Guardado.fromMap(doc.data(), doc.id))
+                .toList();
+          },
+        );
   }
 
   @override
   Future<void> alternarStatusRecebivel(String id, bool statusAtual) async {
     await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final docRef = _receberCollection
-          .doc(id);
-      final snapshot = await transaction
-          .get(docRef);
+      final docRef = _receberCollection.doc(id);
+      final snapshot = await transaction.get(docRef);
 
       if (!snapshot.exists) {
         return;
@@ -159,10 +210,8 @@ class DatabaseService implements FinanceRepository {
   @override
   Future<void> atualizarRecebivel(Conta conta) async {
     await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final docRef = _receberCollection
-          .doc(conta.id);
-      final snapshot = await transaction
-          .get(docRef);
+      final docRef = _receberCollection.doc(conta.id);
+      final snapshot = await transaction.get(docRef);
 
       final atual = snapshot.exists
           ? Conta.fromMap(snapshot.data() ?? <String, dynamic>{}, conta.id)
@@ -227,10 +276,9 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> salvarGuardado(Guardado guardado) async {
-    final docRef =
-        guardado.id.isEmpty
-            ? _guardadosCollection.doc()
-            : _guardadosCollection.doc(guardado.id);
+    final docRef = guardado.id.isEmpty
+        ? _guardadosCollection.doc()
+        : _guardadosCollection.doc(guardado.id);
 
     final guardadoComId = guardado.copyWith(
       id: docRef.id,
@@ -256,8 +304,7 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> adicionarGasto(Gasto gasto) async {
-    final docRef = _gastosCollection
-        .doc();
+    final docRef = _gastosCollection.doc();
     final gastoComId = gasto.copyWith(id: docRef.id);
 
     await docRef.set(gastoComId.toMap());
@@ -298,8 +345,7 @@ class DatabaseService implements FinanceRepository {
       porHash.keys,
     );
 
-    final paraInserir =
-        <MapEntry<String, Gasto>>[];
+    final paraInserir = <MapEntry<String, Gasto>>[];
     for (final entry in porHash.entries) {
       if (hashesExistentes.contains(entry.key)) {
         duplicados++;
@@ -317,53 +363,51 @@ class DatabaseService implements FinanceRepository {
             : paraInserir.length;
         final lote = paraInserir.sublist(i, fim);
 
-        final parcial = await FirebaseFirestore
-            .instance
-            .runTransaction((transaction) async {
-              var importadosLote = 0;
-              var duplicadosLote = 0;
-              final verificacoes =
-                  <
-                    ({
-                      DocumentReference<Map<String, dynamic>> ref,
-                      Gasto gasto,
-                      DocumentSnapshot<Map<String, dynamic>> snap,
-                    })
-                  >[];
+        final parcial = await FirebaseFirestore.instance.runTransaction((
+          transaction,
+        ) async {
+          var importadosLote = 0;
+          var duplicadosLote = 0;
+          final verificacoes =
+              <
+                ({
+                  DocumentReference<Map<String, dynamic>> ref,
+                  Gasto gasto,
+                  DocumentSnapshot<Map<String, dynamic>> snap,
+                })
+              >[];
 
-              for (final entry in lote) {
-                final docRef =
-                    _gastosCollection.doc(
-                      _idDeterministicoImportacao(entry.key),
-                    );
-                final existente =
-                    await transaction.get(docRef);
+          for (final entry in lote) {
+            final docRef = _gastosCollection.doc(
+              _idDeterministicoImportacao(entry.key),
+            );
+            final existente = await transaction.get(docRef);
 
-                verificacoes.add((
-                  ref: docRef,
-                  gasto: entry.value,
-                  snap: existente,
-                ));
-              }
+            verificacoes.add((
+              ref: docRef,
+              gasto: entry.value,
+              snap: existente,
+            ));
+          }
 
-              for (final verificacao in verificacoes) {
-                if (verificacao.snap.exists) {
-                  duplicadosLote++;
-                  continue;
-                }
+          for (final verificacao in verificacoes) {
+            if (verificacao.snap.exists) {
+              duplicadosLote++;
+              continue;
+            }
 
-                transaction.set(
-                  verificacao.ref,
-                  verificacao.gasto.copyWith(id: verificacao.ref.id).toMap(),
-                );
-                importadosLote++;
-              }
+            transaction.set(
+              verificacao.ref,
+              verificacao.gasto.copyWith(id: verificacao.ref.id).toMap(),
+            );
+            importadosLote++;
+          }
 
-              return ResultadoImportacaoGastos(
-                importados: importadosLote,
-                duplicados: duplicadosLote,
-              );
-            });
+          return ResultadoImportacaoGastos(
+            importados: importadosLote,
+            duplicados: duplicadosLote,
+          );
+        });
 
         importados += parcial.importados;
         duplicados += parcial.duplicados;
@@ -395,8 +439,9 @@ class DatabaseService implements FinanceRepository {
           : hashesValidos.length;
       final lote = hashesValidos.sublist(i, fim);
 
-      final encontrados =
-          await _gastosCollection.where('hashImportacao', whereIn: lote).get();
+      final encontrados = await _gastosCollection
+          .where('hashImportacao', whereIn: lote)
+          .get();
       duplicados += encontrados.docs.length;
     }
 
@@ -492,8 +537,7 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> adicionarCartaoCredito(CartaoCredito cartao) async {
-    final docRef = _cartoesCollection
-        .doc();
+    final docRef = _cartoesCollection.doc();
     final cartaoComId = cartao.copyWith(id: docRef.id);
 
     await docRef.set(cartaoComId.toMap());
@@ -578,8 +622,7 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto() async {
-    final doc =
-        await _preferenciasCollection.doc('novo_gasto').get();
+    final doc = await _preferenciasCollection.doc('novo_gasto').get();
 
     final data = doc.data() ?? <String, dynamic>{};
     final recentesPadraoRaw =
@@ -610,11 +653,11 @@ class DatabaseService implements FinanceRepository {
 
   @override
   Future<void> registrarUsoNovoGasto({
-    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
+    required TipoGasto tipo,
+    CategoriaGasto? categoriaPadrao,
     String? categoriaPersonalizadaId,
   }) async {
-    final docRef =
-        _preferenciasCollection.doc('novo_gasto');
+    final docRef = _preferenciasCollection.doc('novo_gasto');
 
     await FirebaseFirestore.instance.runTransaction((tx) async {
       final snap = await tx.get(docRef);
@@ -698,21 +741,19 @@ class DatabaseService implements FinanceRepository {
 
     var candidatos = <Gasto>[];
 
-    final queryDireta =
-        await _gastosCollection
-            .where('tituloNormalizado', isEqualTo: tituloNormalizado)
-            .limit(24)
-            .get();
+    final queryDireta = await _gastosCollection
+        .where('tituloNormalizado', isEqualTo: tituloNormalizado)
+        .limit(24)
+        .get();
     candidatos = queryDireta.docs
         .map((doc) => Gasto.fromMap(doc.data(), doc.id))
         .toList();
 
     if (candidatos.length < 3) {
-      final fallback =
-          await _gastosCollection
-              .orderBy('data', descending: true)
-              .limit(300)
-              .get();
+      final fallback = await _gastosCollection
+          .orderBy('data', descending: true)
+          .limit(300)
+          .get();
       candidatos = fallback.docs
           .map((doc) => Gasto.fromMap(doc.data(), doc.id))
           .where(
@@ -731,25 +772,24 @@ class DatabaseService implements FinanceRepository {
     final inicioMes = DateTime(referencia.year, referencia.month);
     final fimMes = DateTime(referencia.year, referencia.month + 1);
 
-    final gastosSnapshot =
-        await _gastosCollection
-            .where('data', isGreaterThanOrEqualTo: inicioMes)
-            .where('data', isLessThan: fimMes)
-            .orderBy('data', descending: true)
-            .get();
+    final gastosSnapshot = await _gastosCollection
+        .where('data', isGreaterThanOrEqualTo: inicioMes)
+        .where('data', isLessThan: fimMes)
+        .orderBy('data', descending: true)
+        .get();
 
     final gastos = gastosSnapshot.docs
         .map((doc) => Gasto.fromMap(doc.data(), doc.id))
         .toList();
 
-    final pendentesSnapshot =
-        await _receberCollection.where('foiPago', isEqualTo: false).get();
+    final pendentesSnapshot = await _receberCollection
+        .where('foiPago', isEqualTo: false)
+        .get();
     final pendentes = pendentesSnapshot.docs
         .map((doc) => Conta.fromMap(doc.data(), doc.id))
         .toList();
 
-    final totalPorCategoria =
-        <CategoriaGasto, double>{};
+    final totalPorCategoria = <CategoriaGasto, double>{};
     for (final gasto in gastos) {
       totalPorCategoria[gasto.categoria] =
           (totalPorCategoria[gasto.categoria] ?? 0) + gasto.valor;
@@ -803,8 +843,7 @@ class DatabaseService implements FinanceRepository {
       final batch = FirebaseFirestore.instance.batch();
 
       for (final gasto in gastos.sublist(i, fim)) {
-        final docRef = _gastosCollection
-            .doc();
+        final docRef = _gastosCollection.doc();
         batch.set(docRef, gasto.copyWith(id: docRef.id).toMap());
         importados++;
       }
@@ -833,10 +872,10 @@ class DatabaseService implements FinanceRepository {
           : hashesValidos.length;
       final lote = hashesValidos.sublist(i, fim);
 
-      final encontrados =
-          await _gastosCollection.where('hashImportacao', whereIn: lote).get();
-      for (final doc
-          in encontrados.docs) {
+      final encontrados = await _gastosCollection
+          .where('hashImportacao', whereIn: lote)
+          .get();
+      for (final doc in encontrados.docs) {
         final hash = (doc.data()['hashImportacao'] ?? '').toString();
         if (hash.isNotEmpty) {
           existentes.add(hash);

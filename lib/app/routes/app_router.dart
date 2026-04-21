@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/app/session/presentation/screens/home_shell_screen.dart';
-import 'package:paga_o_que_me_deve/data/services/services.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/a_receber/a_receber.dart';
 import 'package:paga_o_que_me_deve/features/auth/auth.dart';
@@ -20,8 +19,6 @@ import 'package:paga_o_que_me_deve/features/recorrencias/recorrencias.dart';
 
 class AppRouter {
   AppRouter._();
-
-  static final FinanceRepository _db = DatabaseService();
 
   static final GoRouter router = GoRouter(
     initialLocation: AppRoutes.inicioPath,
@@ -54,10 +51,9 @@ class AppRouter {
         path: AppRoutes.inicioPath,
         name: AppRoutes.inicioName,
         builder: (context, state) {
-          return HomeShellScreen(
-            db: _db,
+          return const HomeShellScreen(
             currentTab: HomeTab.inicio,
-            child: DashboardScreen(db: _db),
+            child: DashboardScreen(),
           );
         },
       ),
@@ -65,17 +61,14 @@ class AppRouter {
         path: AppRoutes.gastosPath,
         name: AppRoutes.gastosName,
         builder: (context, state) {
-          final filtroViaQuery =
-              AppRoutes.gastosFilterFromQuery(state.uri.queryParameters);
-          final filtroViaExtra =
-              state.extra is DashboardDrillDownFilter
+          final filtroViaQuery = AppRoutes.gastosFilterFromQuery(
+            state.uri.queryParameters,
+          );
+          final filtroViaExtra = state.extra is DashboardDrillDownFilter
               ? state.extra! as DashboardDrillDownFilter
               : null;
-          final filtro =
-              filtroViaQuery ?? filtroViaExtra;
-
+          final filtro = filtroViaQuery ?? filtroViaExtra;
           return HomeShellScreen(
-            db: _db,
             currentTab: HomeTab.gastos,
             child: GastosScreen(
               key: ValueKey<String>(
@@ -83,7 +76,6 @@ class AppRouter {
                     ? 'gastos_sem_filtro'
                     : 'gastos_${filtro.mesReferencia?.millisecondsSinceEpoch ?? 0}_${filtro.categoriaPadrao?.name ?? ''}_${filtro.categoriaPersonalizadaId ?? ''}_${filtro.tipo?.name ?? ''}',
               ),
-              db: _db,
               initialFilter: filtro,
             ),
           );
@@ -93,10 +85,9 @@ class AppRouter {
         path: AppRoutes.receberPath,
         name: AppRoutes.receberName,
         builder: (context, state) {
-          return HomeShellScreen(
-            db: _db,
+          return const HomeShellScreen(
             currentTab: HomeTab.receber,
-            child: AReceberScreen(db: _db),
+            child: AReceberScreen(),
           );
         },
       ),
@@ -104,10 +95,9 @@ class AppRouter {
         path: AppRoutes.guardadoPath,
         name: AppRoutes.guardadoName,
         builder: (context, state) {
-          return HomeShellScreen(
-            db: _db,
+          return const HomeShellScreen(
             currentTab: HomeTab.guardado,
-            child: GuardadoScreen(db: _db),
+            child: GuardadoScreen(),
           );
         },
       ),
@@ -115,10 +105,9 @@ class AppRouter {
         path: AppRoutes.perfilPath,
         name: AppRoutes.perfilName,
         builder: (context, state) {
-          return HomeShellScreen(
-            db: _db,
+          return const HomeShellScreen(
             currentTab: HomeTab.perfil,
-            child: const PerfilScreen(),
+            child: PerfilScreen(),
           );
         },
       ),
@@ -126,42 +115,42 @@ class AppRouter {
         path: AppRoutes.recorrenciasPath,
         name: AppRoutes.recorrenciasName,
         builder: (context, state) {
-          return ComprasRecorrentesScreen(db: _db);
+          return const ComprasRecorrentesScreen();
         },
       ),
       GoRoute(
         path: AppRoutes.novoGastoPath,
         name: AppRoutes.novoGastoName,
         builder: (context, state) {
-          return NovoGastoScreen(db: _db);
+          return const NovoGastoScreen();
         },
       ),
       GoRoute(
         path: AppRoutes.orcamentosPath,
         name: AppRoutes.orcamentosName,
         builder: (context, state) {
-          return OrcamentosScreen(db: _db);
+          return const OrcamentosScreen();
         },
       ),
       GoRoute(
         path: AppRoutes.cartoesPath,
         name: AppRoutes.cartoesName,
         builder: (context, state) {
-          return CartoesScreen(db: _db);
+          return const CartoesScreen();
         },
       ),
       GoRoute(
         path: AppRoutes.importarPath,
         name: AppRoutes.importarName,
         builder: (context, state) {
-          return ImportacaoScreen(db: _db);
+          return const ImportacaoScreen();
         },
       ),
       GoRoute(
         path: AppRoutes.novoRecebivelPath,
         name: AppRoutes.novoRecebivelName,
         builder: (context, state) {
-          return NovoRecebivelScreen(db: _db);
+          return const NovoRecebivelScreen();
         },
       ),
     ],

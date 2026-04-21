@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -7,9 +9,7 @@ import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/a_receber/data/services/recebiveis_service.dart';
 
 class NovoRecebivelScreen extends StatefulWidget {
-  const NovoRecebivelScreen({required this.db, super.key});
-
-  final FinanceRepository db;
+  const NovoRecebivelScreen({super.key});
 
   @override
   State<NovoRecebivelScreen> createState() => _NovoRecebivelScreenState();
@@ -17,11 +17,13 @@ class NovoRecebivelScreen extends StatefulWidget {
 
 class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   late final RecebiveisService _recebiveisService;
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _descricaoController = TextEditingController();
   final TextEditingController _valorController = TextEditingController();
   bool _salvando = false;
+
+  DateTime _dataSelecionada = DateTime.now();
 
   static const AppSemanticColors _fallbackSemanticColors = AppSemanticColors(
     success: Color(0xFF0F9D7A),
@@ -35,29 +37,38 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   @override
   void initState() {
     super.initState();
-    _recebiveisService = RecebiveisService(widget.db);
+    final db = getIt<FinanceRepository>();
+    _recebiveisService = RecebiveisService(db);
+
     _nomeController.addListener(_onCamposAlterados);
     _descricaoController.addListener(_onCamposAlterados);
     _valorController.addListener(_onCamposAlterados);
+  }
+
+  Future<void> _selecionarData(BuildContext context) async {
+    final dataEscolhida = await showDatePicker(
+      context: context,
+      initialDate: _dataSelecionada,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      helpText: 'Selecione a data de recebimento',
+    );
+
+    if (dataEscolhida != null && dataEscolhida != _dataSelecionada) {
+      setState(() {
+        _dataSelecionada = dataEscolhida;
+      });
+    }
+  }
+
+  String get _dataFormatada {
+    return '${_dataSelecionada.day.toString().padLeft(2, '0')}/${_dataSelecionada.month.toString().padLeft(2, '0')}/${_dataSelecionada.year}';
   }
 
   void _onCamposAlterados() {
     if (mounted) {
       setState(() {});
     }
-  }
-
-  String _normalizarMensagemErro(Object error) {
-    final texto = error.toString();
-    final lower = texto.toLowerCase();
-
-    if (lower.contains('firestore.googleapis.com') ||
-        lower.contains('permission_denied')) {
-      return 'Cloud Firestore desativado ou sem permissão no projeto.\n'
-          'Ative o Firestore no Firebase Console e tente novamente.';
-    }
-
-    return 'Erro ao salvar: $texto';
   }
 
   @override
@@ -114,7 +125,7 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
           nome: _nomeController.text.trim(),
           descricao: _descricaoController.text.trim(),
           valor: valor,
-          data: DateTime.now(),
+          data: _dataSelecionada,
         );
 
         await _recebiveisService.adicionarRecebivel(novaConta);
@@ -125,7 +136,8 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
         }
       } catch (e) {
         if (mounted) {
-          AppFeedback.showError(context, _normalizarMensagemErro(e));
+          final exception = AppException.from(e);
+          AppFeedback.showError(context, exception.message);
         }
       } finally {
         if (mounted) {
@@ -247,6 +259,28 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                           const SizedBox(height: AppSpacing.s8),
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 180),
+                            child: Row(
+                              key: ValueKey<String>(_dataFormatada),
+                              children: [
+                                Icon(
+                                  Icons.event,
+                                  size: 14,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Previsão: $_dataFormatada',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s8),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
                             child: Text(
                               descricaoPreview,
                               key: ValueKey<String>(descricaoPreview),
@@ -329,6 +363,34 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
                         }
                         return null;
                       },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s16),
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle(
+                      title: 'Data do Recebimento',
+                      icon: Icons.calendar_today_outlined,
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    InkWell(
+                      onTap: () => _selecionarData(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Data prevista',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_month),
+                        ),
+                        child: Text(
+                          _dataFormatada,
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                      ),
                     ),
                   ],
                 ),

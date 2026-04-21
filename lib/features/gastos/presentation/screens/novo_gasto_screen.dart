@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/app_tokens.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -10,15 +12,14 @@ import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.
 import 'package:paga_o_que_me_deve/features/gastos/presentation/controllers/novo_gasto_categoria_controller.dart';
 
 class NovoGastoScreen extends StatefulWidget {
-  const NovoGastoScreen({required this.db, super.key});
-
-  final FinanceRepository db;
+  const NovoGastoScreen({super.key});
 
   @override
   State<NovoGastoScreen> createState() => _NovoGastoScreenState();
 }
 
 class _NovoGastoScreenState extends State<NovoGastoScreen> {
+  late final FinanceRepository _db;
   bool _isDisposed = false;
 
   late final GastosService _gastosService;
@@ -63,8 +64,9 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   @override
   void initState() {
     super.initState();
-    _gastosService = GastosService(widget.db);
-    _categoriasService = CategoriasService(widget.db);
+    _db = getIt<FinanceRepository>();
+    _gastosService = GastosService(_db);
+    _categoriasService = CategoriasService(_db);
 
     _tituloController?.addListener(_onCamposAlterados);
     _tituloController?.addListener(_onTituloAlteradoParaSugestao);
@@ -348,15 +350,6 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     });
   }
 
-  String _normalizarMensagemErro(Object error) {
-    final lower = error.toString().toLowerCase();
-    if (lower.contains('firestore.googleapis.com') ||
-        lower.contains('permission_denied')) {
-      return 'Erro no Firestore. Tente novamente.';
-    }
-    return 'Erro ao salvar gasto.';
-  }
-
   String _formatarData(DateTime data) => AppFormatters.dataCurta(data);
 
   double? _valorAtualOuNull() {
@@ -515,11 +508,8 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         return;
       }
 
-      AppFeedback.showError(context, _normalizarMensagemErro(e));
-    } finally {
-      if (mounted) {
-        setState(() => _salvando = false);
-      }
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     }
   }
 
@@ -579,11 +569,8 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, 'Não foi possível criar a categoria: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _salvandoCategoria = false);
-      }
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     }
   }
 

@@ -30,6 +30,7 @@ class ResultadoMapeamentoExtrato {
     this.possiveisErros = const <String>[],
     this.amostraLinhasIgnoradas = const <String>[],
   });
+
   final List<Gasto> gastos;
   final List<RecebimentoDetectado> recebimentosDetectados;
   final int ignorados;
@@ -37,6 +38,28 @@ class ResultadoMapeamentoExtrato {
   final Map<String, int> categoriasPorFonte;
   final List<String> possiveisErros;
   final List<String> amostraLinhasIgnoradas;
+
+  ResultadoMapeamentoExtrato copyWith({
+    List<Gasto>? gastos,
+    List<RecebimentoDetectado>? recebimentosDetectados,
+    int? ignorados,
+    Map<String, int>? ignoradosPorMotivo,
+    Map<String, int>? categoriasPorFonte,
+    List<String>? possiveisErros,
+    List<String>? amostraLinhasIgnoradas,
+  }) {
+    return ResultadoMapeamentoExtrato(
+      gastos: gastos ?? this.gastos,
+      ignorados: ignorados ?? this.ignorados,
+      recebimentosDetectados:
+          recebimentosDetectados ?? this.recebimentosDetectados,
+      ignoradosPorMotivo: ignoradosPorMotivo ?? this.ignoradosPorMotivo,
+      categoriasPorFonte: categoriasPorFonte ?? this.categoriasPorFonte,
+      possiveisErros: possiveisErros ?? this.possiveisErros,
+      amostraLinhasIgnoradas:
+          amostraLinhasIgnoradas ?? this.amostraLinhasIgnoradas,
+    );
+  }
 }
 
 enum TipoRecebimentoDetectado {

@@ -18,10 +18,10 @@ class InsightsService {
     final referencia = agora ?? DateTime.now();
     final itens = <InsightItem>[];
 
-    final orcamentosOrdenados =
-        List<OrcamentoCategoriaResumo>.from(orcamentos)..sort(
-          (a, b) => b.percentualUtilizado.compareTo(a.percentualUtilizado),
-        );
+    final orcamentosOrdenados = List<OrcamentoCategoriaResumo>.from(orcamentos)
+      ..sort(
+        (a, b) => b.percentualUtilizado.compareTo(a.percentualUtilizado),
+      );
 
     for (final item in orcamentosOrdenados) {
       final percentual = item.percentualUtilizado * 100;
@@ -31,7 +31,8 @@ class InsightsService {
         itens.add(
           InsightItem(
             nivel: InsightNivel.alerta,
-            mensagem: 'Você ultrapassou o orçamento de $categoria.',
+            // Texto de impacto solicitado:
+            mensagem: 'Atenção: Orçamento de $categoria estourado este mês!',
             icone: Icons.error_outline_rounded,
           ),
         );
@@ -40,7 +41,7 @@ class InsightsService {
           InsightItem(
             nivel: InsightNivel.atencao,
             mensagem:
-                'Você já consumiu ${percentual.toStringAsFixed(0)}% do orçamento de $categoria.',
+                'Cuidado! Você já consumiu ${percentual.toStringAsFixed(0)}% do orçamento de $categoria.',
             icone: Icons.warning_amber_rounded,
           ),
         );
@@ -59,8 +60,7 @@ class InsightsService {
 
     final orcamentoTotal = orcamentos.fold<double>(
       0,
-      (total, item) =>
-          total + item.orcamento.valorLimite,
+      (total, item) => total + item.orcamento.valorLimite,
     );
 
     if (orcamentoTotal > 0 && previsao.projecaoTotal > orcamentoTotal) {

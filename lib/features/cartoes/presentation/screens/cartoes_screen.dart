@@ -1,15 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
+import 'package:paga_o_que_me_deve/core/utils/app_feedback.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/cartoes/data/services/cartoes_service.dart';
 
-class CartoesScreen extends StatelessWidget {
-  const CartoesScreen({required this.db, super.key});
+class CartoesScreen extends StatefulWidget {
+  const CartoesScreen({super.key});
 
-  final FinanceRepository db;
+  @override
+  State<CartoesScreen> createState() => _CartoesScreenState();
+}
 
-  CartoesService get _cartoesService => CartoesService(db);
+class _CartoesScreenState extends State<CartoesScreen> {
+  late final FinanceRepository _db;
+  late final CartoesService _cartoesService;
+
+  @override
+  void initState() {
+    super.initState();
+    _db = getIt<FinanceRepository>();
+    _cartoesService = CartoesService(_db);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,16 +46,19 @@ class CartoesScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
+            final exception = AppException.from(snapshot.error);
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.s16),
-                child: Text('Erro ao carregar cartoes: ${snapshot.error}'),
+                child: Text(
+                  exception.message,
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }
 
-          final cartoes =
-              snapshot.data ?? <CartaoCredito>[];
+          final cartoes = snapshot.data ?? <CartaoCredito>[];
           if (cartoes.isEmpty) {
             return const Center(
               child: Padding(
@@ -95,19 +112,23 @@ class CartoesScreen extends StatelessWidget {
       return;
     }
 
-    await _cartoesService.deletarCartaoCredito(cartao.id);
+    try {
+      await _cartoesService.deletarCartaoCredito(cartao.id);
+      if (!context.mounted) return;
+      AppFeedback.showSuccess(context, 'Cartão excluído com sucesso.');
+    } catch (e) {
+      if (!context.mounted) return;
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
+    }
   }
 
   Future<void> _abrirNovoCartaoDialog(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final nomeController = TextEditingController();
     final finalController = TextEditingController();
-    final fechamentoController = TextEditingController(
-      text: '10',
-    );
-    final vencimentoController = TextEditingController(
-      text: '20',
-    );
+    final fechamentoController = TextEditingController(text: '10');
+    final vencimentoController = TextEditingController(text: '20');
 
     final salvar = await showDialog<bool>(
       context: context,
@@ -195,7 +216,15 @@ class CartoesScreen extends StatelessWidget {
       diaVencimento: int.parse(vencimentoController.text),
     );
 
-    await _cartoesService.adicionarCartaoCredito(novo);
+    try {
+      await _cartoesService.adicionarCartaoCredito(novo);
+      if (!context.mounted) return;
+      AppFeedback.showSuccess(context, 'Cartão salvo com sucesso.');
+    } catch (e) {
+      if (!context.mounted) return;
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
+    }
   }
 
   String? _validarDia(String? value) {

@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
@@ -10,16 +12,13 @@ import 'package:paga_o_que_me_deve/features/cartoes/cartoes.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/cancelamento_csv_service.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/importacao_service.dart';
-
 import 'package:paga_o_que_me_deve/features/importacao/presentation/widgets/cancelamento_section.dart';
 import 'package:paga_o_que_me_deve/features/importacao/presentation/widgets/importacao_sections.dart';
 
 enum AcaoRecebimentoImportacao { vincular, criar, ignorar }
 
 class ImportacaoScreen extends StatefulWidget {
-  const ImportacaoScreen({required this.db, super.key});
-
-  final FinanceRepository db;
+  const ImportacaoScreen({super.key});
 
   @override
   State<ImportacaoScreen> createState() => _ImportacaoScreenState();
@@ -28,7 +27,17 @@ class ImportacaoScreen extends StatefulWidget {
 class _ImportacaoScreenState extends State<ImportacaoScreen> {
   final ExtratoCsvService _extratoService = ExtratoCsvService();
   final CancelamentoCsvService _cancelamentoService = CancelamentoCsvService();
+  late final FinanceRepository _db;
   late final ImportacaoService _importacaoService;
+
+  final ScrollController _scrollController = ScrollController();
+
+  late final Stream<List<CartaoCredito>> _cartoesStream;
+  late final Stream<List<RegraCategoriaImportacao>> _regrasStream;
+  late final Stream<List<Conta>> _contasStream;
+
+  final Map<int, CategoriaGasto> _categoriasOverride = <int, CategoriaGasto>{};
+  final Map<String, bool> _acoesCancelamento = <String, bool>{};
 
   bool _carregandoArquivo = false;
   bool _salvando = false;
@@ -45,14 +54,22 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       <String, AcaoRecebimentoImportacao>{};
   final Map<String, String?> _vinculosRecebimentos = <String, String?>{};
   final Map<CampoExtrato, String?> _mapeamento = <CampoExtrato, String?>{};
-  final Map<TransacaoCanceladaDetectada, bool> _acoesCancelamento =
-      <TransacaoCanceladaDetectada, bool>{};
 
   @override
   void initState() {
     super.initState();
-    _importacaoService = ImportacaoService(widget.db);
+    _db = getIt<FinanceRepository>();
+    _importacaoService = ImportacaoService(_db);
+    _cartoesStream = _importacaoService.cartoesCredito;
+    _regrasStream = _importacaoService.regrasCategoriaImportacao;
+    _contasStream = _importacaoService.contasAReceber;
     _resetarMapeamento();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _resetarMapeamento() {
@@ -67,8 +84,29 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     _acoesRecebimentos.clear();
     _vinculosRecebimentos.clear();
     _acoesCancelamento.clear();
+    _categoriasOverride.clear();
     _chaveDuplicadosCache = null;
     _duplicadosCache = null;
+  }
+
+  Future<void> _manterPosicaoScrollDurante(
+    Future<void> Function() action,
+  ) async {
+    final tinhaClientes = _scrollController.hasClients;
+    final offsetAntes = tinhaClientes ? _scrollController.offset : 0.0;
+
+    await action();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final destino = offsetAntes.clamp(0.0, maxScroll);
+
+      if ((_scrollController.offset - destino).abs() > 1) {
+        _scrollController.jumpTo(destino);
+      }
+    });
   }
 
   CartaoCredito _resolverCartaoSelecionado(List<CartaoCredito> cartoes) {
@@ -87,12 +125,25 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     return cartoes.first;
   }
 
+  List<Gasto> _aplicarOverridesCategoria(List<Gasto> gastos) {
+    return List<Gasto>.generate(gastos.length, (index) {
+      final gasto = gastos[index];
+      final categoriaOverride = _categoriasOverride[index];
+
+      if (categoriaOverride == null || categoriaOverride == gasto.categoria) {
+        return gasto;
+      }
+
+      return gasto.copyWith(categoria: categoriaOverride);
+    });
+  }
+
   List<Gasto> _filtrarGastosPorCancelamento(
     List<Gasto> gastos,
     List<TransacaoCanceladaDetectada> cancelados,
   ) {
     final idsIgnorar = cancelados
-        .where((c) => _acoesCancelamento[c] == true)
+        .where((c) => _acoesCancelamento[c.id] == true)
         .map((c) => c.gasto.id)
         .toSet();
 
@@ -104,7 +155,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     List<TransacaoCanceladaDetectada> cancelados,
   ) {
     final idsIgnorar = cancelados
-        .where((c) => _acoesCancelamento[c] == true)
+        .where((c) => _acoesCancelamento[c.id] == true)
         .map((c) => c.recebimento.id)
         .toSet();
 
@@ -167,7 +218,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       });
     } catch (e) {
       if (mounted) {
-        AppFeedback.showError(context, 'Erro ao importar CSV: $e');
+        final exception = AppException.from(e);
+        AppFeedback.showError(context, exception.message);
       }
     } finally {
       if (mounted) {
@@ -319,12 +371,224 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, 'Falha ao salvar importação: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
       }
     }
+  }
+
+  void _abrirTodasImportacoes(List<Gasto> gastos) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            return ScaffoldMessenger(
+              child: Scaffold(
+                backgroundColor:
+                    Colors.transparent, // Mantém o visual arredondado do modal
+                body: Builder(
+                  builder: (innerContext) {
+                    // <--- Pegamos este context!
+                    return SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.s16,
+                          AppSpacing.s8,
+                          AppSpacing.s16,
+                          AppSpacing.s16,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Todas as importações (${gastos.length})',
+                              style: Theme.of(modalContext).textTheme.titleLarge
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: AppSpacing.s12),
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: gastos.length,
+                                itemBuilder: (context, index) {
+                                  final gasto = gastos[index];
+                                  final categoriaAtual =
+                                      _categoriasOverride[index] ??
+                                      gasto.categoria;
+
+                                  final parcela = gasto.parcelaLabel == null
+                                      ? ''
+                                      : ' • ${gasto.parcelaLabel}';
+                                  final compra = gasto.dataCompra == null
+                                      ? ''
+                                      : ' • compra ${AppFormatters.dataCurta(gasto.dataCompra!)}';
+                                  final theme = Theme.of(modalContext);
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.s12,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 4.0,
+                                            ),
+                                            child: Text(
+                                              '${AppFormatters.dataCurta(gasto.data)}$compra • ${gasto.titulo}$parcela • ${AppFormatters.moeda(gasto.valor)}',
+                                              style: theme.textTheme.bodyMedium,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: AppSpacing.s8),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            PopupMenuButton<CategoriaGasto>(
+                                              initialValue: categoriaAtual,
+                                              tooltip:
+                                                  'Alterar somente este item',
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      12,
+                                                    ),
+                                              ),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: categoriaAtual.color
+                                                      .withValues(alpha: 0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        8,
+                                                      ),
+                                                  border: Border.all(
+                                                    color: categoriaAtual.color
+                                                        .withValues(alpha: 0.3),
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      categoriaAtual.icon,
+                                                      size: 14,
+                                                      color:
+                                                          categoriaAtual.color,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      categoriaAtual.label,
+                                                      style: theme
+                                                          .textTheme
+                                                          .labelSmall
+                                                          ?.copyWith(
+                                                            color:
+                                                                categoriaAtual
+                                                                    .color,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Icon(
+                                                      Icons.arrow_drop_down,
+                                                      size: 14,
+                                                      color:
+                                                          categoriaAtual.color,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              onSelected: (novaCategoria) {
+                                                setState(() {
+                                                  _categoriasOverride[index] =
+                                                      novaCategoria;
+                                                });
+                                                setModalState(() {});
+                                              },
+                                              itemBuilder: (context) {
+                                                return CategoriaGasto.values
+                                                    .map((
+                                                      cat,
+                                                    ) {
+                                                      return PopupMenuItem<
+                                                        CategoriaGasto
+                                                      >(
+                                                        value: cat,
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(
+                                                              cat.icon,
+                                                              size: 18,
+                                                              color: cat.color,
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            Text(cat.label),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    })
+                                                    .toList();
+                                              },
+                                            ),
+                                            const SizedBox(height: 4),
+                                            TextButton(
+                                              onPressed: () async {
+                                                setState(() {
+                                                  _categoriasOverride[index] =
+                                                      categoriaAtual;
+                                                });
+                                                setModalState(() {});
+
+                                                // Agora passamos o innerContext!
+                                                await _aprenderNovaRegra(
+                                                  gasto.titulo,
+                                                  categoriaAtual,
+                                                  feedbackContext: innerContext,
+                                                );
+                                              },
+                                              child: const Text('Aprender'),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -335,24 +599,22 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: StreamBuilder<List<CartaoCredito>>(
-        stream: _importacaoService.cartoesCredito,
+        stream: _cartoesStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final cartoes =
-              snapshot.data ?? <CartaoCredito>[];
+          final cartoes = snapshot.data ?? <CartaoCredito>[];
 
           if (cartoes.isEmpty) {
             return _buildSemCartoes();
           }
 
-          final cartaoSelecionadoAtual =
-              _resolverCartaoSelecionado(cartoes);
+          final cartaoSelecionadoAtual = _resolverCartaoSelecionado(cartoes);
 
           return StreamBuilder<List<RegraCategoriaImportacao>>(
-            stream: _importacaoService.regrasCategoriaImportacao,
+            stream: _regrasStream,
             builder: (context, regrasSnapshot) {
               final regrasAprendidas =
                   regrasSnapshot.data ?? <RegraCategoriaImportacao>[];
@@ -362,27 +624,38 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 cartaoSelecionadoAtual,
               );
 
-              final cancelamentosDetectados =
-                  _cancelamentoService.detectarCancelamentos(
-                    gastos: preview.gastos,
-                    recebimentos: preview.recebimentosDetectados,
-                  );
-
-              final sugestoesRegras =
-                  _extratoService.sugerirRegrasParaGastos(
-                    gastos: preview.gastos,
-                    regrasExistentes: regrasAprendidas,
-                  );
-
-              final duplicadosFuture = _obterDuplicadosFuture(
+              final previewComOverrides = _aplicarOverridesCategoria(
                 preview.gastos,
               );
 
+              final cancelamentosDetectados = _cancelamentoService
+                  .detectarCancelamentos(
+                    gastos: previewComOverrides,
+                    recebimentos: preview.recebimentosDetectados,
+                  );
+
+              final cancelamentosVisiveis = cancelamentosDetectados
+                  .where((c) => _acoesCancelamento[c.id] != true)
+                  .toList();
+
+              final sugestoesRegras = _extratoService.sugerirRegrasParaGastos(
+                gastos: previewComOverrides,
+                regrasExistentes: regrasAprendidas,
+              );
+
+              final duplicadosFuture = _obterDuplicadosFuture(
+                previewComOverrides,
+              );
+
+              final itensPreviewLimitados = previewComOverrides
+                  .take(8)
+                  .toList();
+              final temMaisImportacoes = previewComOverrides.length > 8;
+
               return StreamBuilder<List<Conta>>(
-                stream: _importacaoService.contasAReceber,
+                stream: _contasStream,
                 builder: (context, contasSnapshot) {
-                  final todasAsContas =
-                      contasSnapshot.data ?? <Conta>[];
+                  final todasAsContas = contasSnapshot.data ?? <Conta>[];
                   final contasPendentes = todasAsContas
                       .where((conta) => !conta.foiPago)
                       .toList();
@@ -394,6 +667,8 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                       );
 
                   return ListView(
+                    key: const PageStorageKey('lista_importacao_extrato'),
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(AppSpacing.s16),
                     children: [
                       CartaoStepSection(
@@ -411,8 +686,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  CartoesCreditoScreen(db: widget.db),
+                              builder: (_) => const CartoesCreditoScreen(),
                             ),
                           );
                         },
@@ -451,13 +725,13 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                           const SizedBox(height: AppSpacing.s12),
                           _buildSugestoesRegrasCard(sugestoesRegras),
                         ],
-                        if (cancelamentosDetectados.isNotEmpty) ...[
+                        if (cancelamentosVisiveis.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.s12),
                           CancelamentoSection(
-                            cancelamentos: cancelamentosDetectados,
+                            cancelamentos: cancelamentosVisiveis,
                             onAcao: (par, ignorar) {
                               setState(() {
-                                _acoesCancelamento[par] = ignorar;
+                                _acoesCancelamento[par.id] = ignorar;
                               });
                             },
                           ),
@@ -470,28 +744,66 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                           ),
                         ],
                         const SizedBox(height: AppSpacing.s12),
-                        PreviewImportacaoSection(
-                          preview: preview,
-                          duplicadosFuture: duplicadosFuture,
-                          salvando: _salvando,
-                          podeImportar: _mapeamentoObrigatorioOk && !_salvando,
-                          onImportar: () => _importar(
-                            gastos: _filtrarGastosPorCancelamento(
-                              preview.gastos,
-                              cancelamentosDetectados,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (temMaisImportacoes)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.s8,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _abrirTodasImportacoes(
+                                      previewComOverrides,
+                                    ),
+                                    icon: const Icon(Icons.visibility_outlined),
+                                    label: Text(
+                                      'Ver todas (${previewComOverrides.length})',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            PreviewImportacaoSection(
+                              preview: ResultadoMapeamentoExtrato(
+                                gastos: previewComOverrides,
+                                ignorados: preview.ignorados,
+                                recebimentosDetectados:
+                                    preview.recebimentosDetectados,
+                                ignoradosPorMotivo: preview.ignoradosPorMotivo,
+                                categoriasPorFonte: preview.categoriasPorFonte,
+                                possiveisErros: preview.possiveisErros,
+                                amostraLinhasIgnoradas:
+                                    preview.amostraLinhasIgnoradas,
+                              ),
+                              duplicadosFuture: duplicadosFuture,
+                              salvando: _salvando,
+                              podeImportar:
+                                  _mapeamentoObrigatorioOk && !_salvando,
+                              onImportar: () => _importar(
+                                gastos: _filtrarGastosPorCancelamento(
+                                  previewComOverrides,
+                                  cancelamentosDetectados,
+                                ),
+                                recebimentos:
+                                    _filtrarRecebimentosPorCancelamento(
+                                      preview.recebimentosDetectados,
+                                      cancelamentosDetectados,
+                                    ),
+                                sugestoesVinculo: sugestoesVinculo,
+                                contasPendentes: contasPendentes,
+                                todasAsContas: todasAsContas,
+                              ),
+                              itensPreview: List<Widget>.generate(
+                                itensPreviewLimitados.length,
+                                (index) => _buildItemPreview(
+                                  itensPreviewLimitados[index],
+                                  itemKey: index,
+                                ),
+                              ),
                             ),
-                            recebimentos: _filtrarRecebimentosPorCancelamento(
-                              preview.recebimentosDetectados,
-                              cancelamentosDetectados,
-                            ),
-                            sugestoesVinculo: sugestoesVinculo,
-                            contasPendentes: contasPendentes,
-                            todasAsContas: todasAsContas,
-                          ),
-                          itensPreview: preview.gastos
-                              .take(8)
-                              .map(_buildItemPreview)
-                              .toList(),
+                          ],
                         ),
                       ],
                     ],
@@ -561,28 +873,33 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     if (sugestoes.isEmpty) return;
 
     setState(() => _salvandoSugestoes = true);
-    try {
-      for (final sugestao in sugestoes) {
-        await _importacaoService.salvarRegraCategoriaImportacao(
-          termo: sugestao.termo,
-          categoria: sugestao.categoria,
-        );
-      }
 
-      if (!mounted) return;
+    await _manterPosicaoScrollDurante(() async {
+      try {
+        for (final sugestao in sugestoes) {
+          await _importacaoService.salvarRegraCategoriaImportacao(
+            termo: sugestao.termo,
+            categoria: sugestao.categoria,
+          );
+        }
 
-      AppFeedback.showSuccess(
-        context,
-        '${sugestoes.length} sugestões aplicadas e aprendidas.',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      AppFeedback.showError(context, 'Falha ao salvar sugestões: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _salvandoSugestoes = false);
+        if (mounted) {
+          AppFeedback.showSuccess(
+            context,
+            '${sugestoes.length} sugestões aplicadas e aprendidas.',
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          final exception = AppException.from(e);
+          AppFeedback.showError(context, exception.message);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _salvandoSugestoes = false);
+        }
       }
-    }
+    });
   }
 
   Widget _buildSugestoesRegrasCard(List<SugestaoRegraCategoria> sugestoes) {
@@ -696,7 +1013,9 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     final contaSelecionadaIdAtual =
         _vinculosRecebimentos[recebimento.id] ?? sugestaoPadraoId;
 
-    final contaSelecionadaExiste = !(contaSelecionadaIdAtual == null) && sugestoes.any((s) => s.conta.id == contaSelecionadaIdAtual);
+    final contaSelecionadaExiste =
+        !(contaSelecionadaIdAtual == null) &&
+        sugestoes.any((s) => s.conta.id == contaSelecionadaIdAtual);
 
     final contaSelecionadaId = contaSelecionadaExiste
         ? contaSelecionadaIdAtual
@@ -880,7 +1199,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => CartoesCreditoScreen(db: widget.db),
+                    builder: (_) => const CartoesCreditoScreen(),
                   ),
                 );
               },
@@ -903,8 +1222,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     }
 
     return DropdownButtonFormField<String?>(
-      initialValue:
-          _mapeamento[campo], // <-- Troque 'value' por 'initialValue' aqui
+      initialValue: _mapeamento[campo],
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
@@ -934,20 +1252,204 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
     );
   }
 
-  Widget _buildItemPreview(Gasto gasto) {
+  Widget _buildItemPreview(Gasto gasto, {required int itemKey}) {
+    final categoriaAtual = _categoriasOverride[itemKey] ?? gasto.categoria;
     final parcela = gasto.parcelaLabel == null
         ? ''
         : ' • ${gasto.parcelaLabel}';
     final compra = gasto.dataCompra == null
         ? ''
         : ' • compra ${AppFormatters.dataCurta(gasto.dataCompra!)}';
+    final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-      child: Text(
-        '${AppFormatters.dataCurta(gasto.data)}$compra • ${gasto.titulo}$parcela • ${AppFormatters.moeda(gasto.valor)} • ${gasto.categoria.label}',
+      padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                '${AppFormatters.dataCurta(gasto.data)}$compra • ${gasto.titulo}$parcela • ${AppFormatters.moeda(gasto.valor)}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              PopupMenuButton<CategoriaGasto>(
+                initialValue: categoriaAtual,
+                tooltip: 'Alterar somente este item',
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: categoriaAtual.color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: categoriaAtual.color.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        categoriaAtual.icon,
+                        size: 14,
+                        color: categoriaAtual.color,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        categoriaAtual.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: categoriaAtual.color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        size: 14,
+                        color: categoriaAtual.color,
+                      ),
+                    ],
+                  ),
+                ),
+                onSelected: (novaCategoria) {
+                  setState(() {
+                    _categoriasOverride[itemKey] = novaCategoria;
+                  });
+                },
+                itemBuilder: (context) {
+                  return CategoriaGasto.values.map((cat) {
+                    return PopupMenuItem<CategoriaGasto>(
+                      value: cat,
+                      child: Row(
+                        children: [
+                          Icon(cat.icon, size: 18, color: cat.color),
+                          const SizedBox(width: 8),
+                          Text(cat.label),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () async {
+                  setState(() {
+                    _categoriasOverride[itemKey] = categoriaAtual;
+                  });
+                  await _aprenderNovaRegra(gasto.titulo, categoriaAtual);
+                },
+                child: const Text('Aprender'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _aprenderNovaRegra(
+    String titulo,
+    CategoriaGasto categoria, {
+    int? itemKey,
+    BuildContext? feedbackContext,
+  }) async {
+    final termo = _extrairTermoRegra(titulo);
+
+    if (itemKey != null) {
+      setState(() {
+        _categoriasOverride[itemKey] = categoria;
+      });
+    }
+
+    await _manterPosicaoScrollDurante(() async {
+      try {
+        await _importacaoService.salvarRegraCategoriaImportacao(
+          termo: termo,
+          categoria: categoria,
+        );
+        final ctx = feedbackContext ?? context;
+
+        if (!ctx.mounted) return;
+
+        ScaffoldMessenger.of(ctx).clearSnackBars();
+        AppFeedback.showSuccess(
+          ctx,
+          'Regra aprendida! "$termo" -> ${categoria.label}.',
+        );
+      } catch (e) {
+        final ctx = feedbackContext ?? context;
+        if (!ctx.mounted) return;
+
+        AppFeedback.showError(ctx, AppException.from(e).message);
+      }
+    });
+  }
+
+  String _extrairTermoRegra(String titulo) {
+    var texto = titulo.trim();
+
+    final prefixosRemover = <String>[
+      'compra no débito -',
+      'compra no credito -',
+      'compra no crédito -',
+      'compra no debito -',
+      'compra -',
+      'pagamento de',
+      'pagamento -',
+      'pix enviado para',
+      'pix recebido de',
+      'transferencia para',
+      'transferência para',
+      'transferencia de',
+      'transferência de',
+      'transferencia enviada',
+      'transferência enviada',
+      'pelo pix',
+    ];
+
+    final lower = texto.toLowerCase();
+
+    for (final prefixo in prefixosRemover) {
+      if (lower.startsWith(prefixo)) {
+        texto = texto.substring(prefixo.length).trim();
+        break;
+      }
+    }
+
+    texto = texto
+        .replaceAll(RegExp(r'^\-\s*'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    final partes = texto
+        .split(RegExp(r'\s+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .where((e) => !RegExp(r'^\d+$').hasMatch(e))
+        .toList();
+
+    if (partes.isEmpty) {
+      return titulo.trim();
+    }
+
+    if (partes.length == 1) {
+      return partes.first;
+    }
+
+    return partes.take(2).join(' ');
   }
 
   String _decodificarTexto(Uint8List bytes) {

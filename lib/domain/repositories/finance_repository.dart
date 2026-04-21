@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:paga_o_que_me_deve/domain/models/cartao_credito.dart';
 import 'package:paga_o_que_me_deve/domain/models/categoria_personalizada.dart';
 import 'package:paga_o_que_me_deve/domain/models/conta.dart';
@@ -9,14 +8,12 @@ import 'package:paga_o_que_me_deve/domain/models/preferencias_novo_gasto.dart';
 import 'package:paga_o_que_me_deve/domain/models/regra_categoria_importacao.dart';
 
 class DashboardResumo {
-
   const DashboardResumo(this.gastos, this.contas);
   final List<Gasto> gastos;
   final List<Conta> contas;
 }
 
 class ResultadoImportacaoGastos {
-
   const ResultadoImportacaoGastos({
     required this.importados,
     required this.duplicados,
@@ -26,7 +23,6 @@ class ResultadoImportacaoGastos {
 }
 
 class PaginaGastosResultado {
-
   const PaginaGastosResultado({
     required this.gastos,
     required this.cursor,
@@ -38,7 +34,6 @@ class PaginaGastosResultado {
 }
 
 class RelatorioMensalFinanceiro {
-
   const RelatorioMensalFinanceiro({
     required this.mesReferencia,
     required this.gastosMes,
@@ -58,7 +53,6 @@ class RelatorioMensalFinanceiro {
 }
 
 class SugestaoRecorrenciaDespesa {
-
   const SugestaoRecorrenciaDespesa({
     required this.periodicidade,
     required this.ocorrencias,
@@ -81,6 +75,8 @@ abstract class FinanceRepository {
   Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao;
   Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas;
   Stream<List<Guardado>> get guardados;
+  Future<({double gastos, double receber, List<String> nomesReceber})>
+  buscarResumoParaNotificacao(DateTime data);
 
   Future<void> adicionarRecebivel(Conta conta);
   Future<void> alternarStatusRecebivel(String id, bool statusAtual);
@@ -123,7 +119,8 @@ abstract class FinanceRepository {
 
   Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto();
   Future<void> registrarUsoNovoGasto({
-    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
+    required TipoGasto tipo,
+    CategoriaGasto? categoriaPadrao,
     String? categoriaPersonalizadaId,
   });
 

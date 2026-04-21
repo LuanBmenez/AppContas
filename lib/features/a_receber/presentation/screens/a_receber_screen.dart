@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
@@ -8,12 +10,10 @@ import 'package:paga_o_que_me_deve/features/a_receber/presentation/screens/novo_
 
 class AReceberScreen extends StatefulWidget {
   const AReceberScreen({
-    required this.db,
     super.key,
     this.somentePendentes = false,
   });
 
-  final FinanceRepository db;
   final bool somentePendentes;
 
   @override
@@ -53,7 +53,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
   @override
   void initState() {
     super.initState();
-    _recebiveisService = RecebiveisService(widget.db);
+    final db = getIt<FinanceRepository>();
+    _recebiveisService = RecebiveisService(db);
     _contasStream = _recebiveisService.contasAReceber;
     _buscaController.addListener(_onBuscaAlterada);
   }
@@ -118,15 +119,16 @@ class _AReceberScreenState extends State<AReceberScreen> {
                         child: DropdownButtonFormField<int>(
                           initialValue: mesSelecionado,
                           decoration: const InputDecoration(labelText: 'Mês'),
-                          items: List<DropdownMenuItem<int>>.generate(12, (
-                            index,
-                          ) {
-                            final month = index + 1;
-                            return DropdownMenuItem<int>(
-                              value: month,
-                              child: Text(AppFormatters.nomeMes(month)),
-                            );
-                          }),
+                          items: List<DropdownMenuItem<int>>.generate(
+                            12,
+                            (index) {
+                              final month = index + 1;
+                              return DropdownMenuItem<int>(
+                                value: month,
+                                child: Text(AppFormatters.nomeMes(month)),
+                              );
+                            },
+                          ),
                           onChanged: (value) {
                             if (value != null) {
                               setModalState(() => mesSelecionado = value);
@@ -139,15 +141,16 @@ class _AReceberScreenState extends State<AReceberScreen> {
                         child: DropdownButtonFormField<int>(
                           initialValue: anoSelecionado,
                           decoration: const InputDecoration(labelText: 'Ano'),
-                          items: List<DropdownMenuItem<int>>.generate(81, (
-                            index,
-                          ) {
-                            final year = 2020 + index;
-                            return DropdownMenuItem<int>(
-                              value: year,
-                              child: Text(year.toString()),
-                            );
-                          }),
+                          items: List<DropdownMenuItem<int>>.generate(
+                            81,
+                            (index) {
+                              final year = 2020 + index;
+                              return DropdownMenuItem<int>(
+                                value: year,
+                                child: Text(year.toString()),
+                              );
+                            },
+                          ),
                           onChanged: (value) {
                             if (value != null) {
                               setModalState(() => anoSelecionado = value);
@@ -223,16 +226,6 @@ class _AReceberScreenState extends State<AReceberScreen> {
     setState(() {
       _termoBusca = novoTermo;
     });
-  }
-
-  String _mensagemErroFirestore(Object? error) {
-    final erro = (error ?? '').toString().toLowerCase();
-    if (erro.contains('firestore.googleapis.com') ||
-        erro.contains('permission_denied')) {
-      return 'Firestore sem permissão ou desativado no projeto.\n'
-          'Ative o Cloud Firestore no Firebase Console e tente novamente.';
-    }
-    return 'Erro ao carregar as contas.';
   }
 
   Future<bool> _confirmarExclusao(BuildContext context, Conta conta) async {
@@ -313,7 +306,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
       _encerrarSelecaoLote();
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, 'Erro ao excluir em lote: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() => _processandoLote = false);
@@ -350,7 +344,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
       _encerrarSelecaoLote();
     } catch (e) {
       if (!mounted) return;
-      AppFeedback.showError(context, 'Erro ao atualizar em lote: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() => _processandoLote = false);
@@ -362,7 +357,7 @@ class _AReceberScreenState extends State<AReceberScreen> {
     Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => NovoRecebivelScreen(db: widget.db),
+        builder: (_) => const NovoRecebivelScreen(),
       ),
     );
   }
@@ -440,7 +435,9 @@ class _AReceberScreenState extends State<AReceberScreen> {
       decoration: BoxDecoration(
         color: cor.withValues(alpha: destaque ? 0.12 : 0.09),
         borderRadius: BorderRadius.circular(destaque ? 18 : 999),
-        border: Border.all(color: cor.withValues(alpha: destaque ? 0.24 : 0.2)),
+        border: Border.all(
+          color: cor.withValues(alpha: destaque ? 0.24 : 0.2),
+        ),
       ),
       child: Row(
         children: [
@@ -652,7 +649,9 @@ class _AReceberScreenState extends State<AReceberScreen> {
               width: 1.4,
             ),
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
       ),
     );
@@ -823,7 +822,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
             );
           } catch (e) {
             if (!mounted) return;
-            AppFeedback.showError(context, 'Erro ao atualizar: $e');
+            final exception = AppException.from(e);
+            AppFeedback.showError(context, exception.message);
           }
         },
         onLongPress: () {
@@ -920,7 +920,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
           await _recebiveisService.deletarRecebivel(conta.id);
         } catch (e) {
           if (!mounted) return;
-          AppFeedback.showError(context, 'Erro: $e');
+          final exception = AppException.from(e);
+          AppFeedback.showError(context, exception.message);
         }
       },
       background: Container(
@@ -1105,11 +1106,12 @@ class _AReceberScreenState extends State<AReceberScreen> {
         }
 
         if (snapshot.hasError) {
+          final exception = AppException.from(snapshot.error);
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.s16),
               child: Text(
-                _mensagemErroFirestore(snapshot.error),
+                exception.message,
                 textAlign: TextAlign.center,
               ),
             ),

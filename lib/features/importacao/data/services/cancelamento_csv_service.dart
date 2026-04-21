@@ -2,15 +2,22 @@ import 'package:paga_o_que_me_deve/domain/models/gasto.dart';
 import 'package:paga_o_que_me_deve/features/importacao/data/services/extrato_csv_service.dart';
 
 class TransacaoCanceladaDetectada {
-
   const TransacaoCanceladaDetectada({
     required this.gasto,
     required this.recebimento,
     required this.scoreMatch,
   });
+
   final Gasto gasto;
   final RecebimentoDetectado recebimento;
   final double scoreMatch;
+
+  String get id {
+    final gastoKey =
+        gasto.hashImportacao ??
+        '${gasto.titulo}|${gasto.data.toIso8601String()}|${gasto.valor.toStringAsFixed(2)}';
+    return '$gastoKey|${recebimento.id}';
+  }
 }
 
 class CancelamentoCsvService {
@@ -31,7 +38,11 @@ class CancelamentoCsvService {
       double melhorScore = 0;
 
       for (final gasto in gastos) {
-        if (gastosUsados.contains(gasto.id)) continue;
+        final gastoKey =
+            gasto.hashImportacao ??
+            '${gasto.titulo}|${gasto.data.toIso8601String()}|${gasto.valor.toStringAsFixed(2)}';
+
+        if (gastosUsados.contains(gastoKey)) continue;
 
         final diffValor = (gasto.valor.abs() - receb.valor.abs()).abs();
         if (diffValor > 1.0) continue;
@@ -58,16 +69,20 @@ class CancelamentoCsvService {
       }
 
       if (melhorGasto != null) {
-        cancelados.add(
-          TransacaoCanceladaDetectada(
-            gasto: melhorGasto,
-            recebimento: receb,
-            scoreMatch: melhorScore,
-          ),
+        final transacao = TransacaoCanceladaDetectada(
+          gasto: melhorGasto,
+          recebimento: receb,
+          scoreMatch: melhorScore,
         );
-        gastosUsados.add(melhorGasto.id);
+
+        cancelados.add(transacao);
+        gastosUsados.add(
+          melhorGasto.hashImportacao ??
+              '${melhorGasto.titulo}|${melhorGasto.data.toIso8601String()}|${melhorGasto.valor.toStringAsFixed(2)}',
+        );
       }
     }
+
     return cancelados;
   }
 

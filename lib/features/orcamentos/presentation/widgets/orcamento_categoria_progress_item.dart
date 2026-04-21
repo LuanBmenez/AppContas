@@ -6,7 +6,8 @@ import 'package:paga_o_que_me_deve/features/orcamentos/domain/models/orcamento_c
 
 class OrcamentoCategoriaProgressItem extends StatelessWidget {
   const OrcamentoCategoriaProgressItem({
-    required this.resumo, super.key,
+    required this.resumo,
+    super.key,
     this.onTap,
     this.onDelete,
     this.compacto = false,
@@ -88,12 +89,29 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
                       color: statusColor.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: Text(
-                      _statusLabel(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (resumo.status !=
+                            OrcamentoCategoriaStatus.normal) ...[
+                          Icon(
+                            resumo.status == OrcamentoCategoriaStatus.estourado
+                                ? Icons.error_outline
+                                : Icons.warning_amber_rounded,
+                            size: 14,
+                            color: statusColor,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          _statusLabel(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: statusColor,
+                            fontWeight:
+                                FontWeight.w800, // Deixei um pouco mais negrito
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   if (onDelete != null) ...[
@@ -107,6 +125,28 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.s10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(
+                    milliseconds: 1200,
+                  ), // Duração da animação
+                  curve: Curves.easeOutCubic, // Curva suave de desaceleração
+                  tween: Tween<double>(begin: 0, end: progress),
+                  builder: (context, value, _) {
+                    return LinearProgressIndicator(
+                      value: value,
+                      minHeight: compacto
+                          ? 6
+                          : 10, // Ligeiramente mais gordinha para dar destaque
+                      backgroundColor:
+                          theme.colorScheme.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s8),
               LinearProgressIndicator(
                 value: progress,
                 minHeight: compacto ? 6 : 8,

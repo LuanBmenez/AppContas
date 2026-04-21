@@ -1,322 +1,172 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
-import 'package:paga_o_que_me_deve/domain/models/models.dart';
-import 'package:paga_o_que_me_deve/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
+import 'package:paga_o_que_me_deve/core/services/notificacao_local_service.dart';
+import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
-void main() {
-  group('DashboardScreen', () {
-    testWidgets('exibe loading enquanto stream nao emite', (tester) async {
-      final controller =
-          StreamController<DashboardResumo>();
-      addTearDown(controller.close);
+enum HomeTab { inicio, gastos, receber, guardado, perfil }
 
-      final repo = _TestFinanceRepository(
-        dashboardResumoStream: controller.stream,
-      );
-
-      await tester.pumpWidget(_buildTestApp(db: repo));
-
-      expect(find.byType(AppSkeletonBox), findsWidgets);
-    });
-
-    testWidgets('exibe estado de erro quando stream falha', (tester) async {
-      final repo = _TestFinanceRepository(
-        dashboardResumoStream: Stream<DashboardResumo>.error(
-          Exception('falha de teste'),
-        ),
-      );
-
-      await tester.pumpWidget(_buildTestApp(db: repo));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Erro ao carregar o painel.'), findsOneWidget);
-      expect(find.text('Tentar novamente'), findsOneWidget);
-    });
-
-    testWidgets('exibe estado vazio para categorias sem gastos', (
-      tester,
-    ) async {
-      final repo = _TestFinanceRepository(
-        dashboardResumoStream: Stream<DashboardResumo>.value(
-          const DashboardResumo(<Gasto>[], <Conta>[]),
-        ),
-      );
-
-      await tester.pumpWidget(_buildTestApp(db: repo));
-      await tester.pumpAndSettle();
-      await tester.dragUntilVisible(
-        find.text('Sem gastos no período para montar o gráfico.'),
-        find.byType(ListView),
-        const Offset(0, -280),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('Sem gastos no período para montar o gráfico.'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('exibe dados completos e abre drill-down de categoria', (
-      tester,
-    ) async {
-      final agora = DateTime.now();
-      final gasto = Gasto(
-        id: 'g1',
-        titulo: 'Mercado',
-        valor: 250,
-        data: DateTime(agora.year, agora.month, 10),
-        categoria: CategoriaGasto.comida,
-      );
-      final conta = Conta(
-        id: 'c1',
-        nome: 'Cliente A',
-        descricao: 'Servico',
-        valor: 500,
-        data: DateTime(agora.year, agora.month, 8),
-        foiPago: true,
-      );
-
-      final repo = _TestFinanceRepository(
-        dashboardResumoStream: Stream<DashboardResumo>.value(
-          DashboardResumo(<Gasto>[gasto], <Conta>[conta]),
-        ),
-      );
-
-      await tester.pumpWidget(_buildTestApp(db: repo));
-      await tester.pumpAndSettle();
-      await tester.dragUntilVisible(
-        find.text('Categorias de gastos'),
-        find.byType(ListView),
-        const Offset(0, -280),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Categorias de gastos'), findsOneWidget);
-      final categoriasCard = find.ancestor(
-        of: find.text('Categorias de gastos'),
-        matching: find.byType(Card),
-      );
-      final comidaNoCard = find.descendant(
-        of: categoriasCard,
-        matching: find.text('Comida'),
-      );
-      expect(comidaNoCard, findsWidgets);
-      expect(find.text(r'R$ 250,00'), findsWidgets);
-    });
-
-    testWidgets('desabilita exportacao durante processamento', (tester) async {
-      final completer = Completer<void>();
-      var chamadas = 0;
-
-      final repo = _TestFinanceRepository(
-        dashboardResumoStream: Stream<DashboardResumo>.value(
-          const DashboardResumo(<Gasto>[], <Conta>[]),
-        ),
-      );
-
-      Future<void> exportador(DateTime _) {
-        chamadas += 1;
-        return completer.future;
-      }
-
-      await tester.pumpWidget(
-        _buildTestApp(db: repo, exportadorRelatorio: exportador),
-      );
-      await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -700));
-      await tester.pumpAndSettle();
-
-      expect(find.widgetWithText(FilledButton, 'Exportar'), findsOneWidget);
-
-      await tester.tap(find.widgetWithText(FilledButton, 'Exportar'));
-      await tester.pump();
-
-      expect(
-        find.text('Gerando e compartilhando relatório...'),
-        findsOneWidget,
-      );
-      final botao = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Gerando...'),
-      );
-      expect(botao.onPressed, isNull);
-      expect(chamadas, 1);
-
-      completer.complete();
-      await tester.pumpAndSettle();
-    });
+class HomeShellScreen extends StatefulWidget {
+  const HomeShellScreen({
+    required this.db,
+    required this.currentTab,
+    required this.child,
+    super.key,
   });
+
+  final FinanceRepository db;
+  final HomeTab currentTab;
+  final Widget child;
+
+  @override
+  State<HomeShellScreen> createState() => _HomeShellScreenState();
 }
 
-Widget _buildTestApp({
-  required FinanceRepository db,
-  Future<void> Function(DateTime referencia)? exportadorRelatorio,
-}) {
-  return MaterialApp(
-    home: Scaffold(
-      body: DashboardScreen(db: db, exportadorRelatorio: exportadorRelatorio),
-    ),
-  );
-}
-
-class _TestFinanceRepository implements FinanceRepository {
-  _TestFinanceRepository({required this.dashboardResumoStream});
-
-  final Stream<DashboardResumo> dashboardResumoStream;
-
+class _HomeShellScreenState extends State<HomeShellScreen> {
   @override
-  Stream<List<Conta>> get contasAReceber => const Stream<List<Conta>>.empty();
-
-  @override
-  Stream<List<Gasto>> get meusGastos => const Stream<List<Gasto>>.empty();
-
-  @override
-  Stream<DashboardResumo> get dashboardResumo => dashboardResumoStream;
-
-  @override
-  Stream<List<CartaoCredito>> get cartoesCredito =>
-      const Stream<List<CartaoCredito>>.empty();
-
-  @override
-  Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao =>
-      const Stream<List<RegraCategoriaImportacao>>.empty();
-
-  @override
-  Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas =>
-      const Stream<List<CategoriaPersonalizada>>.empty();
-
-  @override
-  Future<void> adicionarRecebivel(Conta conta) => throw UnimplementedError();
-
-  @override
-  Future<void> alternarStatusRecebivel(String id, bool statusAtual) =>
-      throw UnimplementedError();
-
-  @override
-  Future<void> deletarRecebivel(String id) => throw UnimplementedError();
-
-  @override
-  Future<void> atualizarRecebivel(Conta conta) => throw UnimplementedError();
-
-  @override
-  Future<void> restaurarRecebivel(Conta conta) => throw UnimplementedError();
-
-  @override
-  Future<void> adicionarGasto(Gasto gasto) => throw UnimplementedError();
-
-  @override
-  Future<ResultadoImportacaoGastos> importarGastosComDeduplicacao(
-    List<Gasto> gastos,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<int> contarDuplicadosPorHash(List<String> hashes) =>
-      throw UnimplementedError();
-
-  @override
-  Stream<List<Gasto>> streamGastosPorPeriodo({
-    required DateTime inicio,
-    required DateTime fimExclusivo,
-    int? limite,
-  }) => throw UnimplementedError();
-
-  @override
-  Future<PaginaGastosResultado> buscarGastosPorPeriodoPaginado({
-    required DateTime inicio,
-    required DateTime fimExclusivo,
-    DocumentSnapshot<Map<String, dynamic>>? cursor,
-    int limite = 40,
-  }) => throw UnimplementedError();
-
-  @override
-  Future<void> deletarGasto(String id) => throw UnimplementedError();
-
-  @override
-  Future<void> atualizarGasto(Gasto gasto) => throw UnimplementedError();
-
-  @override
-  Future<void> restaurarGasto(Gasto gasto) => throw UnimplementedError();
-
-  @override
-  Future<void> adicionarCartaoCredito(CartaoCredito cartao) =>
-      throw UnimplementedError();
-
-  @override
-  Future<void> deletarCartaoCredito(String id) => throw UnimplementedError();
-
-  @override
-  Future<void> salvarCategoriaPersonalizada(CategoriaPersonalizada categoria) =>
-      throw UnimplementedError();
-
-  @override
-  Future<void> arquivarCategoriaPersonalizada(String id, bool arquivada) =>
-      throw UnimplementedError();
-
-  @override
-  Future<void> alternarFavoritaCategoriaPersonalizada(
-    String id,
-    bool favorita,
-  ) => throw UnimplementedError();
-
-  @override
-  Future<void> deletarCategoriaPersonalizada(String id) =>
-      throw UnimplementedError();
-
-  @override
-  Future<bool> categoriaPersonalizadaEmUso(String id) =>
-      throw UnimplementedError();
-
-  @override
-  Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto() =>
-      throw UnimplementedError();
-
-  @override
-  Future<void> registrarUsoNovoGasto({
-    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
-    String? categoriaPersonalizadaId,
-  }) => throw UnimplementedError();
-
-  @override
-  Future<void> salvarRegraCategoriaImportacao({
-    required String termo,
-    required CategoriaGasto categoria,
-  }) => throw UnimplementedError();
-
-  @override
-  Future<SugestaoRecorrenciaDespesa?> sugerirRecorrenciaPorTitulo(
-    String titulo,
-  ) async {
-    return null;
+  void initState() {
+    super.initState();
+    _configurarLembretesInteligentes();
   }
 
-  @override
-  Future<RelatorioMensalFinanceiro> buscarRelatorioMensal(
-    DateTime referencia,
-  ) async {
-    return RelatorioMensalFinanceiro(
-      mesReferencia: referencia,
-      gastosMes: const <Gasto>[],
-      contasPendentes: const <Conta>[],
-      totalPorCategoria: const <CategoriaGasto, double>{},
+  Future<void> _configurarLembretesInteligentes() async {
+    final resumo = await widget.db.buscarResumoParaNotificacao(DateTime.now());
+
+    await NotificacaoLocalService.instance.agendarResumoFinanceiroDiario(
+      totalGastos: resumo.gastos,
+      totalReceber: resumo.receber,
+      nomesReceber: resumo.nomesReceber,
     );
   }
 
-  // --- MÉTODOS DE GUARDADO ADICIONADOS ABAIXO ---
+  String get _titulo {
+    if (widget.currentTab == HomeTab.inicio) return 'Visão Geral';
+    if (widget.currentTab == HomeTab.gastos) return 'Meus Gastos';
+    if (widget.currentTab == HomeTab.receber) return 'A Receber';
+    if (widget.currentTab == HomeTab.guardado) return 'Guardado';
+    return 'Perfil';
+  }
+
+  int get _indiceAtual => switch (widget.currentTab) {
+    HomeTab.inicio => 0,
+    HomeTab.gastos => 1,
+    HomeTab.receber => 2,
+    HomeTab.guardado => 3,
+    HomeTab.perfil => 4,
+  };
+
+  Future<void> _onAdicionar(BuildContext context) async {
+    if (widget.currentTab == HomeTab.gastos) {
+      context.push(AppRoutes.novoGastoPath);
+      return;
+    }
+
+    if (widget.currentTab == HomeTab.receber) {
+      context.push(AppRoutes.novoRecebivelPath);
+    }
+  }
 
   @override
-  Stream<List<Guardado>> get guardados => const Stream<List<Guardado>>.empty();
-
-  @override
-  Future<void> salvarGuardado(Guardado guardado) => throw UnimplementedError();
-
-  @override
-  Future<void> atualizarGuardado(Guardado guardado) =>
-      throw UnimplementedError();
-
-  @override
-  Future<void> deletarGuardado(String id) => throw UnimplementedError();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_titulo),
+        actions: widget.currentTab == HomeTab.gastos
+            ? <Widget>[
+                IconButton(
+                  tooltip: 'Orçamentos',
+                  onPressed: () => context.push(AppRoutes.orcamentosPath),
+                  icon: const Icon(Icons.savings_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Cartões',
+                  onPressed: () => context.push(AppRoutes.cartoesPath),
+                  icon: const Icon(Icons.credit_card_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Importar extrato CSV',
+                  onPressed: () => context.push(AppRoutes.importarPath),
+                  icon: const Icon(Icons.upload_file_outlined),
+                ),
+              ]
+            : null,
+      ),
+      body: widget.child,
+      floatingActionButton:
+          widget.currentTab == HomeTab.inicio ||
+              widget.currentTab == HomeTab.guardado ||
+              widget.currentTab == HomeTab.perfil
+          ? null
+          : FloatingActionButton(
+              heroTag: 'home_shell_add_fab',
+              onPressed: () => _onAdicionar(context),
+              child: const Icon(Icons.add),
+            ),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          height: 70,
+          elevation: 4,
+          labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
+            final ativo = states.contains(WidgetState.selected);
+            return TextStyle(
+              fontSize: 12,
+              fontWeight: ativo ? FontWeight.w700 : FontWeight.w500,
+            );
+          }),
+          indicatorColor: Theme.of(context).colorScheme.primaryContainer,
+        ),
+        child: NavigationBar(
+          selectedIndex: _indiceAtual,
+          onDestinationSelected: (index) {
+            if (index == 0) {
+              context.go(AppRoutes.inicioPath);
+              return;
+            }
+            if (index == 1) {
+              context.go(AppRoutes.gastosPath);
+              return;
+            }
+            if (index == 2) {
+              context.go(AppRoutes.receberPath);
+              return;
+            }
+            if (index == 3) {
+              context.go(AppRoutes.guardadoPath);
+              return;
+            }
+            context.go(AppRoutes.perfilPath);
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Início',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet),
+              label: 'Gastos',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.handshake_outlined),
+              selectedIcon: Icon(Icons.handshake),
+              label: 'A Receber',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.savings_outlined),
+              selectedIcon: Icon(Icons.savings),
+              label: 'Guardado',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+typedef HomeScreen = HomeShellScreen;

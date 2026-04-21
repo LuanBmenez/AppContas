@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
+import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/categorias_service.dart';
 import 'package:paga_o_que_me_deve/features/gastos/data/services/gastos_service.dart';
-
 import 'package:paga_o_que_me_deve/features/gastos/presentation/screens/novo_gasto_screen.dart';
 
 class GastosScreen extends StatefulWidget {
-  const GastosScreen({required this.db, super.key, this.initialFilter});
+  const GastosScreen({super.key, this.initialFilter});
 
-  final FinanceRepository db;
   final DashboardDrillDownFilter? initialFilter;
 
   @override
@@ -19,6 +19,7 @@ class GastosScreen extends StatefulWidget {
 }
 
 class _GastosScreenState extends State<GastosScreen> {
+  late final FinanceRepository _db;
   late final GastosService _gastosService;
   late final CategoriasService _categoriasService;
   final ScrollController _listController = ScrollController();
@@ -62,8 +63,9 @@ class _GastosScreenState extends State<GastosScreen> {
   @override
   void initState() {
     super.initState();
-    _gastosService = GastosService(widget.db);
-    _categoriasService = CategoriasService(widget.db);
+    _db = getIt<FinanceRepository>();
+    _gastosService = GastosService(_db);
+    _categoriasService = CategoriasService(_db);
 
     final filtro = widget.initialFilter;
     if (filtro != null) {
@@ -442,7 +444,8 @@ class _GastosScreenState extends State<GastosScreen> {
         return;
       }
 
-      AppFeedback.showError(context, 'Erro ao atualizar categoria: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     }
   }
 
@@ -525,7 +528,8 @@ class _GastosScreenState extends State<GastosScreen> {
         return;
       }
 
-      AppFeedback.showError(context, 'Erro ao excluir em lote: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() => _processandoLote = false);
@@ -609,7 +613,8 @@ class _GastosScreenState extends State<GastosScreen> {
         return;
       }
 
-      AppFeedback.showError(context, 'Erro ao alterar categoria em lote: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() => _processandoLote = false);
@@ -693,7 +698,8 @@ class _GastosScreenState extends State<GastosScreen> {
         return;
       }
 
-      AppFeedback.showError(context, 'Erro ao alterar tipo em lote: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     } finally {
       if (mounted) {
         setState(() => _processandoLote = false);
@@ -717,7 +723,8 @@ class _GastosScreenState extends State<GastosScreen> {
       if (!mounted) {
         return;
       }
-      AppFeedback.showError(context, 'Erro ao excluir gasto: $e');
+      final exception = AppException.from(e);
+      AppFeedback.showError(context, exception.message);
     }
   }
 
@@ -734,11 +741,12 @@ class _GastosScreenState extends State<GastosScreen> {
         }
 
         if (snapshot.hasError) {
+          final exception = AppException.from(snapshot.error);
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.s16),
               child: Text(
-                'Erro ao carregar gastos: ${snapshot.error}',
+                exception.message,
                 textAlign: TextAlign.center,
               ),
             ),
@@ -777,7 +785,7 @@ class _GastosScreenState extends State<GastosScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => NovoGastoScreen(db: widget.db),
+                                builder: (_) => const NovoGastoScreen(),
                               ),
                             );
                           },
@@ -937,25 +945,6 @@ class _GastosScreenState extends State<GastosScreen> {
                         },
                       ),
                     ),
-                    // const SizedBox(height: AppSpacing.s8),
-                    // Padding(
-                    //   padding: const EdgeInsets.all(AppSpacing.s16),
-                    //   child: SizedBox(
-                    //     width: double.infinity,
-                    //     child: FilledButton.icon(
-                    //       onPressed: () {
-                    //         Navigator.push(
-                    //           context,
-                    //           MaterialPageRoute(
-                    //             builder: (_) => NovoGastoScreen(db: widget.db),
-                    //           ),
-                    //         );
-                    //       },
-                    //       icon: const Icon(Icons.add),
-                    //       label: const Text('Novo gasto'),
-                    //     ),
-                    //   ),
-                    // ),
                   ],
                 ),
               ),
@@ -969,7 +958,14 @@ class _GastosScreenState extends State<GastosScreen> {
 
 class ExpenseSummaryCard extends StatelessWidget {
   const ExpenseSummaryCard({
-    required this.totalLabel, required this.totalValue, required this.monthLabel, required this.itemCount, required this.hasActiveFilters, required this.filterChips, required this.onSelectMonth, super.key,
+    required this.totalLabel,
+    required this.totalValue,
+    required this.monthLabel,
+    required this.itemCount,
+    required this.hasActiveFilters,
+    required this.filterChips,
+    required this.onSelectMonth,
+    super.key,
   });
 
   final String totalLabel;
@@ -1104,7 +1100,16 @@ class ExpenseSummaryCard extends StatelessWidget {
 
 class BulkActionBar extends StatelessWidget {
   const BulkActionBar({
-    required this.selectedCount, required this.isBusy, required this.canSelectAll, required this.canActOnSelection, required this.onCancel, required this.onSelectAll, required this.onChangeCategory, required this.onChangeType, required this.onDelete, super.key,
+    required this.selectedCount,
+    required this.isBusy,
+    required this.canSelectAll,
+    required this.canActOnSelection,
+    required this.onCancel,
+    required this.onSelectAll,
+    required this.onChangeCategory,
+    required this.onChangeType,
+    required this.onDelete,
+    super.key,
   });
 
   final int selectedCount;
