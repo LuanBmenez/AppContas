@@ -1,97 +1,88 @@
-# AppContas
+# AppContas 💰
 
 Aplicativo de finanças pessoais desenvolvido em **Flutter** com **Firebase**, focado no controle de **gastos**, **valores a receber**, **dashboard financeiro**, **importação de extratos** e **organização dos dados por usuário**.
 
-## Sobre o projeto
+## 📖 Sobre o projeto
 
-O **AppContas** foi criado para facilitar o acompanhamento financeiro do dia a dia de forma simples, prática e visual.
+O **AppContas** foi criado para facilitar o acompanhamento financeiro do dia a dia de forma simples, prática e visual. O app permite registrar despesas, acompanhar cobranças, importar lançamentos de extratos bancários via CSV e visualizar um painel com resumos e comparativos financeiros.
 
-O app permite registrar despesas, acompanhar cobranças, importar lançamentos de extratos e visualizar um painel com resumos e comparativos financeiros.
-
-Além disso, o projeto já evolui com foco em:
-- experiência visual mais refinada
-- separação de dados por usuário
-- dashboard com insights
-- base preparada para novas automações financeiras
+O projeto evolui com foco constante em:
+- Experiência visual refinada e fluida.
+- Separação segura de dados por usuário na nuvem.
+- Dashboard inteligente com insights automáticos.
+- Base modular preparada para novas automações financeiras e integrações.
 
 ---
 
-## Funcionalidades atuais
+## ✨ Funcionalidades
 
-### Gestão de gastos
-- Cadastro manual de gastos
-- Organização por categorias
-- Filtros por período, categoria e tipo
-- Edição individual de categoria
-- Exclusão por gesto
-- Seleção em lote para ações em massa
-- Regras automáticas de categorização
-- Importação com prévia e deduplicação
+### 📊 Dashboard e Insights
+- Resumo financeiro e saldo do período atual.
+- Comparativos visuais com períodos anteriores.
+- Gráficos de distribuição de gastos por categoria (Drill-down por categoria).
+- Cards de insights automáticos sobre o comportamento financeiro.
+- Exportação de relatório completo em PDF.
 
-### Importação de extratos
-- Importação de extratos em CSV
-- Pré-visualização antes de salvar
-- Deduplicação por hash de importação
-- Tentativa de categorização automática com base no histórico
-- Regras de categoria para futuras importações
+### 💸 Gestão de Gastos e Orçamentos
+- Cadastro manual de gastos e organização por categorias personalizadas.
+- Definição e acompanhamento de **Orçamentos** por categoria.
+- Filtros avançados por período, categoria e tipo.
+- Ações em lote (seleção múltipla) e exclusão rápida por gesto (swipe).
+- Gestão de **Compras Recorrentes** com alertas e sincronização de notificações.
 
-### Dashboard financeiro
-- Resumo financeiro do período
-- Saldo do período
-- Comparativo com períodos anteriores
-- Total de saídas
-- Total a receber
-- Distribuição de gastos por categoria
-- Drill-down por categoria
-- Exportação de relatório em PDF
-- Cards de insights e comparativos visuais
+### 📥 Importação de Extratos
+- Importação de extratos bancários em formato CSV.
+- Tela de pré-visualização para revisão antes de salvar.
+- Sistema de deduplicação inteligente (evita lançamentos repetidos por hash).
+- Categorização automática baseada no histórico de gastos.
+- Criação de regras de categoria para futuras importações.
 
-### Contas a receber
-- Cadastro de cobranças
-- Controle de pendências e valores recebidos
-- Busca por nome do devedor
-- Alteração de status
-- Seleção em lote
-- Exclusão de cobranças
+### 🤝 Contas a Receber e Guardado
+- Cadastro de cobranças e controle de valores pendentes/recebidos.
+- Área dedicada para controle de valores **Guardados** (metas/poupança).
+- Alteração rápida de status de cobranças e busca por nome do devedor.
 
-### Conta e autenticação
-- Login com Firebase Authentication
-- Separação de dados por usuário
-- Perfil com informações da conta
-- Logout
+### 🔐 Conta e Autenticação
+- Login e Autenticação seguros via Firebase Authentication.
+- Dados 100% isolados por usuário no Cloud Firestore.
+- Perfil de usuário configurável com preferências e logout.
 
 ---
 
-## Tecnologias utilizadas
+## 🛠 Tecnologias e Pacotes Utilizados
 
-- **Flutter**
-- **Dart**
-- **Firebase Core**
-- **Firebase Authentication**
-- **Cloud Firestore**
-- **Intl**
-- **RxDart**
-- **File Picker**
-- **PDF / Printing**
-- **Share Plus**
-- **Path Provider**
+O projeto utiliza uma arquitetura moderna baseada em *features*, com injeção de dependências e navegação declarativa:
+
+- **Framework:** Flutter / Dart
+- **Backend & Cloud:** Firebase Core, Authentication, Cloud Firestore, App Check e Analytics
+- **Navegação:** Go Router
+- **Gerenciamento de Estado & Injeção:** Provider, GetIt, RxDart
+- **Manipulação de Arquivos:** File Picker, Path Provider
+- **Geração de Documentos:** PDF, Printing, Share Plus
+- **Notificações & Tempo:** Flutter Local Notifications, Timezone, Intl
 
 ---
 
-## Estrutura do projeto
+## 📂 Estrutura do Projeto
+
+A base de código segue uma arquitetura baseada em funcionalidades (*Feature-First*), facilitando a manutenção e escalabilidade:
 
 ```bash
 lib/
-├── core/
-│   ├── theme/
-│   └── utils/
-├── data/
-│   └── services/
-├── domain/
-│   ├── models/
-│   └── repositories/
-├── features/
-├── screens/
-├── services/
-├── ui/
-└── widgets/
+├── app/                  # Configurações globais e rotas (GoRouter)
+├── core/                 # Temas, tokens, utilitários e widgets globais genéricos
+├── data/                 # Serviços base de infraestrutura (DatabaseService)
+├── domain/               # Modelos de dados globais e abstrações de repositórios
+└── features/             # Módulos independentes da aplicação
+    ├── a_receber/        # Controle de cobranças
+    ├── auth/             # Fluxos de login e autenticação
+    ├── cartoes/          # Gestão de cartões de crédito
+    ├── dashboard/        # Telas de resumo, gráficos e exportação de PDF
+    ├── gastos/           # Lançamento e listagem de despesas
+    ├── guardado/         # Controle de economias e metas
+    ├── importacao/       # Lógica e UI para leitura de CSVs
+    ├── insights/         # Geração de dicas e resumos baseados nos dados
+    ├── orcamentos/       # Definição de limites de gastos
+    ├── perfil/           # Configurações do usuário
+    ├── recebimentos/     # Gestão de entradas
+    └── recorrencias/     # Despesas fixas e lembretes locais
