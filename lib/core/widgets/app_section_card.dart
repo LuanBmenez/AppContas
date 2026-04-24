@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class AppSectionCard extends StatelessWidget {
@@ -9,13 +8,9 @@ class AppSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Como configurámos o CardTheme no app_theme.dart,
+    // não precisamos de repetir o shape, elevation ou color aqui!
     return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.s16),
         child: child,

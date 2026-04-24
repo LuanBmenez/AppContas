@@ -28,8 +28,8 @@ class AppRoutes {
   static const String perfilName = 'perfil';
   static const String novoGastoName = 'gastos-novo';
   static const String orcamentosName = 'gastos-orcamentos';
-  static const String cartoesName = 'despesas-cartoes';
-  static const String importarName = 'despesas-importar';
+  static const String cartoesName = 'gastos-cartoes'; // Atualizado
+  static const String importarName = 'gastos-importar'; // Atualizado
   static const String recorrenciasName = 'perfil-recorrencias';
   static const String novoRecebivelName = 'receber-nova';
 
@@ -69,9 +69,7 @@ class AppRoutes {
   ) {
     final mesReferencia = _parseMes(query['mes']);
     final categoriaPadrao = _parseCategoria(query['categoria']);
-    final categoriaCustomId = _parseNonEmpty(
-      query['categoriaCustomId'],
-    );
+    final categoriaCustomId = _parseNonEmpty(query['categoriaCustomId']);
     final tipo = _parseTipo(query['tipo']);
 
     if (mesReferencia == null &&
@@ -104,49 +102,33 @@ class AppRoutes {
   }
 
   static DateTime? _parseMes(String? value) {
-    if (value == null || value.length != 7) {
-      return null;
-    }
+    if (value == null || value.length != 7) return null;
+
     final partes = value.split('-');
-    if (partes.length != 2) {
-      return null;
-    }
+    if (partes.length != 2) return null;
+
     final ano = int.tryParse(partes[0]);
     final mes = int.tryParse(partes[1]);
-    if (ano == null || mes == null || mes < 1 || mes > 12) {
-      return null;
-    }
+
+    if (ano == null || mes == null || mes < 1 || mes > 12) return null;
+
     return DateTime(ano, mes);
   }
 
   static CategoriaGasto? _parseCategoria(String? value) {
-    if (value == null || value.isEmpty) {
-      return null;
-    }
-    for (final categoria in CategoriaGasto.values) {
-      if (categoria.name == value) {
-        return categoria;
-      }
-    }
-    return null;
+    if (value == null || value.isEmpty) return null;
+    // Uso do asNameMap() para buscar o enum pelo nome em tempo constante
+    return CategoriaGasto.values.asNameMap()[value];
   }
 
   static TipoGasto? _parseTipo(String? value) {
-    if (value == null || value.isEmpty) {
-      return null;
-    }
-    for (final tipo in TipoGasto.values) {
-      if (tipo.name == value) {
-        return tipo;
-      }
-    }
-    return null;
+    if (value == null || value.isEmpty) return null;
+    // Uso do asNameMap() para buscar o enum pelo nome
+    return TipoGasto.values.asNameMap()[value];
   }
 
   static String? _parseNonEmpty(String? value) {
-    if (value == null || value.isEmpty) {
-      return null;
-    }
+    if (value == null || value.isEmpty) return null;
     return value;
   }
 }

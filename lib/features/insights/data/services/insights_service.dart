@@ -31,7 +31,6 @@ class InsightsService {
         itens.add(
           InsightItem(
             nivel: InsightNivel.alerta,
-            // Texto de impacto solicitado:
             mensagem: 'Atenção: Orçamento de $categoria estourado este mês!',
             icone: Icons.error_outline_rounded,
           ),
@@ -48,7 +47,12 @@ class InsightsService {
       }
     }
 
-    if (_ritmoAltoInicioMes(previsao, referencia)) {
+    final orcamentoTotal = orcamentos.fold<double>(
+      0,
+      (total, item) => total + item.orcamento.valorLimite,
+    );
+
+    if (_ritmoAltoInicioMes(previsao, referencia, orcamentoTotal)) {
       itens.add(
         const InsightItem(
           nivel: InsightNivel.atencao,
@@ -57,11 +61,6 @@ class InsightsService {
         ),
       );
     }
-
-    final orcamentoTotal = orcamentos.fold<double>(
-      0,
-      (total, item) => total + item.orcamento.valorLimite,
-    );
 
     if (orcamentoTotal > 0 && previsao.projecaoTotal > orcamentoTotal) {
       itens.add(
@@ -105,18 +104,21 @@ class InsightsService {
     return unicos.take(limite).toList();
   }
 
-  bool _ritmoAltoInicioMes(PrevisaoFechamentoMes previsao, DateTime agora) {
-    if (previsao.gastoAtual <= 0) {
-      return false;
-    }
-    if (agora.day > 10) {
-      return false;
-    }
+  bool _ritmoAltoInicioMes(
+    PrevisaoFechamentoMes previsao,
+    DateTime agora,
+    double orcamentoTotal,
+  ) {
+    if (previsao.gastoAtual <= 0) return false;
+    if (agora.day > 10) return false;
 
-    final razao = previsao.projecaoTotal <= 0
-        ? 0
-        : previsao.projecaoTotal / previsao.gastoAtual;
-
-    return razao >= 1.7;
+    if (orcamentoTotal > 0) {
+      final gastoIdealDiario = orcamentoTotal / previsao.diasNoMes;
+      final gastoIdealAteHoje = gastoIdealDiario * previsao.diasPassados;
+      return previsao.gastoAtual > (gastoIdealAteHoje * 1.2);
+    } else {
+      final projecaoLinearBruta = previsao.mediaDiaria * previsao.diasNoMes;
+      return projecaoLinearBruta > (previsao.projecaoTotal * 1.5);
+    }
   }
 }

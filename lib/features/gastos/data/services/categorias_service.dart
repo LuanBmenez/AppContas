@@ -10,40 +10,31 @@ class CategoriasService {
 
   final FinanceRepository _repository;
 
-  Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas {
-    return _repository.categoriasPersonalizadas;
-  }
+  Stream<List<CategoriaPersonalizada>> get categoriasPersonalizadas =>
+      _repository.categoriasPersonalizadas;
 
-  Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao {
-    return _repository.regrasCategoriaImportacao;
-  }
+  Stream<List<RegraCategoriaImportacao>> get regrasCategoriaImportacao =>
+      _repository.regrasCategoriaImportacao;
 
-  Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto() {
-    return _repository.carregarPreferenciasNovoGasto();
-  }
+  Future<PreferenciasNovoGasto> carregarPreferenciasNovoGasto() =>
+      _repository.carregarPreferenciasNovoGasto();
 
-  Future<void> salvarCategoriaPersonalizada(CategoriaPersonalizada categoria) {
-    return _repository.salvarCategoriaPersonalizada(categoria);
-  }
+  Future<void> salvarCategoriaPersonalizada(CategoriaPersonalizada categoria) =>
+      _repository.salvarCategoriaPersonalizada(categoria);
 
-  Future<void> arquivarCategoriaPersonalizada(String id, bool arquivada) {
-    return _repository.arquivarCategoriaPersonalizada(id, arquivada);
-  }
+  Future<void> arquivarCategoriaPersonalizada(String id, bool arquivada) =>
+      _repository.arquivarCategoriaPersonalizada(id, arquivada);
 
   Future<void> alternarFavoritaCategoriaPersonalizada(
     String id,
     bool favorita,
-  ) {
-    return _repository.alternarFavoritaCategoriaPersonalizada(id, favorita);
-  }
+  ) => _repository.alternarFavoritaCategoriaPersonalizada(id, favorita);
 
-  Future<void> deletarCategoriaPersonalizada(String id) {
-    return _repository.deletarCategoriaPersonalizada(id);
-  }
+  Future<void> deletarCategoriaPersonalizada(String id) =>
+      _repository.deletarCategoriaPersonalizada(id);
 
-  Future<bool> categoriaPersonalizadaEmUso(String id) {
-    return _repository.categoriaPersonalizadaEmUso(id);
-  }
+  Future<bool> categoriaPersonalizadaEmUso(String id) =>
+      _repository.categoriaPersonalizadaEmUso(id);
 
   Future<void> salvarRegraCategoriaImportacao({
     required String termo,
@@ -60,10 +51,7 @@ class CategoriasService {
     required CategoriaGasto categoria,
   }) async {
     final termo = titulo.trim();
-    if (termo.isEmpty) {
-      return;
-    }
-
+    if (termo.isEmpty) return;
     await salvarRegraCategoriaImportacao(termo: termo, categoria: categoria);
   }
 
@@ -77,20 +65,12 @@ class CategoriasService {
     List<CategoriaPersonalizada> categorias,
   ) {
     final lista = categoriasAtivas(categorias);
-
     lista.sort((a, b) {
-      if (a.favorita != b.favorita) {
-        return a.favorita ? -1 : 1;
-      }
-
+      if (a.favorita != b.favorita) return a.favorita ? -1 : 1;
       final uso = b.usoCount.compareTo(a.usoCount);
-      if (uso != 0) {
-        return uso;
-      }
-
+      if (uso != 0) return uso;
       return a.nome.toLowerCase().compareTo(b.nome.toLowerCase());
     });
-
     return lista;
   }
 
@@ -101,20 +81,14 @@ class CategoriasService {
     final busca = TextNormalizer.normalizeForSearch(
       textoBusca,
     ).trim().toLowerCase();
+    final base = ordenarCategoriasAtivas(categorias);
 
-    final base = ordenarCategoriasAtivas(
-      categorias,
-    );
-
-    if (busca.isEmpty) {
-      return base;
-    }
+    if (busca.isEmpty) return base;
 
     return base.where((categoria) {
       final nome = TextNormalizer.normalizeForSearch(
         categoria.nome,
       ).trim().toLowerCase();
-
       return nome.contains(busca);
     }).toList();
   }
@@ -123,19 +97,10 @@ class CategoriasService {
     required List<CategoriaPersonalizada> categorias,
     required String? id,
   }) {
-    if (id == null || id.trim().isEmpty) {
-      return null;
-    }
+    if (id == null || id.trim().isEmpty) return null;
 
-    for (final categoria in categoriasAtivas(
-      categorias,
-    )) {
-      if (categoria.id == id) {
-        return categoria;
-      }
-    }
-
-    return null;
+    // Otimizado com firstOrNull (Dart 3)
+    return categoriasAtivas(categorias).where((c) => c.id == id).firstOrNull;
   }
 
   bool nomeCategoriaDuplicado({
@@ -146,37 +111,22 @@ class CategoriasService {
     final normalizado = TextNormalizer.normalizeForSearch(
       nome,
     ).trim().toLowerCase();
+    if (normalizado.isEmpty) return false;
 
-    if (normalizado.isEmpty) {
-      return false;
-    }
+    // Otimizado com .any()
+    final padraoDuplicado = CategoriaGasto.values.any(
+      (cat) =>
+          TextNormalizer.normalizeForSearch(cat.label).trim().toLowerCase() ==
+          normalizado,
+    );
 
-    for (final categoriaPadrao in CategoriaGasto.values) {
-      final nomePadrao = TextNormalizer.normalizeForSearch(
-        categoriaPadrao.label,
-      ).trim().toLowerCase();
+    if (padraoDuplicado) return true;
 
-      if (nomePadrao == normalizado) {
-        return true;
-      }
-    }
-
-    for (final categoria in categoriasAtivas(
-      categorias,
-    )) {
-      if (categoria.id == ignorarId) {
-        continue;
-      }
-
-      final nomeExistente = TextNormalizer.normalizeForSearch(
-        categoria.nome,
-      ).trim().toLowerCase();
-
-      if (nomeExistente == normalizado) {
-        return true;
-      }
-    }
-
-    return false;
+    return categoriasAtivas(categorias).any(
+      (cat) =>
+          cat.id != ignorarId &&
+          TextNormalizer.normalizeForSearch(cat.nome).trim().toLowerCase() ==
+              normalizado,
+    );
   }
 }

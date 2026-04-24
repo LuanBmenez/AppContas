@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
 import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
+import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
@@ -66,52 +67,34 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
     return conta.recebidaEm ?? conta.data;
   }
 
+  // --- OTIMIZAÇÃO: Lógica Funcional (Dart 3) ---
+
   double _somarGastosMes(List<Gasto> gastos) {
-    double total = 0;
-    for (final gasto in gastos) {
-      if (_estaNoMes(gasto.data)) {
-        total += gasto.valor;
-      }
-    }
-    return total;
+    return gastos
+        .where((g) => _estaNoMes(g.data))
+        .fold<double>(0.0, (soma, g) => soma + g.valor);
   }
 
   double _somarRecebidoMes(List<Conta> contas) {
-    double total = 0;
-    for (final conta in contas) {
-      if (!conta.foiPago) {
-        continue;
-      }
-
-      final dataReferencia = _dataReferenciaConta(conta);
-      if (_estaNoMes(dataReferencia)) {
-        total += conta.valor;
-      }
-    }
-    return total;
+    return contas
+        .where((c) => c.foiPago && _estaNoMes(_dataReferenciaConta(c)))
+        .fold<double>(0.0, (soma, c) => soma + c.valor);
   }
 
   double _somarValores(
     Iterable<Guardado> itens, {
     GuardadoTipoMovimentacao? somenteTipo,
   }) {
-    double total = 0;
-    for (final item in itens) {
-      if (somenteTipo != null && item.tipoMovimentacao != somenteTipo) {
-        continue;
-      }
-      total += item.valor;
-    }
-    return total;
+    return itens
+        .where((i) => somenteTipo == null || i.tipoMovimentacao == somenteTipo)
+        .fold<double>(0.0, (soma, i) => soma + i.valor);
   }
 
   double _somarLiquido(Iterable<Guardado> itens) {
-    double total = 0;
-    for (final item in itens) {
-      total += item.valorAssinado;
-    }
-    return total;
+    return itens.fold<double>(0.0, (soma, i) => soma + i.valorAssinado);
   }
+
+  // ----------------------------------------------
 
   Map<GuardadoDestino, double> _agruparPorDestino(Iterable<Guardado> itens) {
     final totais = <GuardadoDestino, double>{
@@ -130,9 +113,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
     for (final item in itens) {
       final meta = item.metaNome?.trim() ?? '';
-      if (meta.isEmpty) {
-        continue;
-      }
+      if (meta.isEmpty) continue;
       totais[meta] = (totais[meta] ?? 0) + item.valorAssinado;
     }
 
@@ -143,15 +124,12 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   }
 
   List<String> _metasExistentes(List<Guardado> guardados) {
-    final metas = <String>{};
-    for (final item in guardados) {
-      final meta = item.metaNome?.trim() ?? '';
-      if (meta.isNotEmpty) {
-        metas.add(meta);
-      }
-    }
-    final lista = metas.toList()..sort();
-    return lista;
+    return guardados
+        .map((g) => g.metaNome?.trim() ?? '')
+        .where((m) => m.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
   }
 
   String _formatarMes(DateTime data) {
@@ -166,10 +144,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
         .replaceAll('.', '')
         .replaceAll(',', '.');
 
-    if (normalizado.isEmpty) {
-      return null;
-    }
-
+    if (normalizado.isEmpty) return null;
     return double.tryParse(normalizado);
   }
 
@@ -237,22 +212,15 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
       message: 'Deseja excluir esta movimentação do guardado?',
     );
 
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     try {
       await _guardadoService.deletarGuardado(item.id);
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppFeedback.showSuccess(context, 'Movimentação excluída com sucesso.');
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (!mounted) return;
+      AppFeedback.showError(context, AppException.from(e).message);
     }
   }
 
@@ -318,9 +286,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
       ),
     );
 
-    if (onTap == null) {
-      return child;
-    }
+    if (onTap == null) return child;
 
     return InkWell(
       onTap: onTap,
@@ -375,7 +341,10 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
 
   Widget _buildMetaResumoCard(ThemeData theme, String meta, double valor) {
     final positivo = valor >= 0;
-    final color = positivo ? const Color(0xFF2563EB) : const Color(0xFFC26A00);
+    // Uso da extensão semântica global!
+    final color = positivo
+        ? const Color(0xFF2563EB)
+        : context.semanticColors.warning;
 
     return Container(
       width: double.infinity,
@@ -419,6 +388,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final semantic = context.semanticColors;
 
     return StreamBuilder<DashboardResumo>(
       stream: _db.dashboardResumo,
@@ -433,12 +403,8 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
             final guardados = guardadosSnapshot.data ?? <Guardado>[];
             final metasExistentes = _metasExistentes(guardados);
 
-            final totalRecebidoMes = _somarRecebidoMes(
-              dashboardResumo.contas,
-            );
-            final totalGastosMes = _somarGastosMes(
-              dashboardResumo.gastos,
-            );
+            final totalRecebidoMes = _somarRecebidoMes(dashboardResumo.contas);
+            final totalGastosMes = _somarGastosMes(dashboardResumo.gastos);
             final saldoMes = totalRecebidoMes - totalGastosMes;
 
             final guardadosMes =
@@ -457,12 +423,14 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
               guardadosMes,
               somenteTipo: GuardadoTipoMovimentacao.resgate,
             );
+
             final saldoLiquidoMes = _somarLiquido(guardadosMes);
             final saldoGuardadoTotal = _somarLiquido(guardados);
             final double disponivelParaGuardar = math.max(
               0,
               saldoMes - totalAportesMes,
             );
+
             final totaisPorDestino = _agruparPorDestino(guardados);
             final totaisPorMeta = _agruparPorMeta(guardados);
 
@@ -560,7 +528,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                   descricao:
                       'Saldo do mês menos os aportes já feitos neste mês.',
                   icon: Icons.savings_outlined,
-                  color: const Color(0xFF0F9D7A),
+                  color: semantic.success, // <-- Atualizado
                   onTap: () => _abrirFormularioGuardado(
                     tipoInicial: GuardadoTipoMovimentacao.aporte,
                     saldoMes: saldoMes,
@@ -586,7 +554,7 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                   descricao:
                       'Quanto voltou do guardado para uso livre neste mês.',
                   icon: Icons.arrow_upward_rounded,
-                  color: const Color(0xFFC26A00),
+                  color: semantic.warning, // <-- Atualizado
                 ),
                 const SizedBox(height: 12),
                 _buildResumoCard(
@@ -605,8 +573,9 @@ class _GuardadoScreenState extends State<GuardadoScreen> {
                   descricao: 'Aportes menos resgates no mês selecionado.',
                   icon: Icons.swap_horiz_rounded,
                   color: saldoLiquidoMes >= 0
-                      ? const Color(0xFF0F9D7A)
-                      : const Color(0xFFD64545),
+                      ? semantic
+                            .success // <-- Atualizado
+                      : semantic.error, // <-- Atualizado
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -886,13 +855,9 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
   }
 
   Future<void> _salvar() async {
-    if (salvando) {
-      return;
-    }
+    if (salvando) return;
 
-    if (formKey.currentState?.validate() != true) {
-      return;
-    }
+    if (formKey.currentState?.validate() != true) return;
 
     final valor = widget.parseValor(valorController.text.trim()) ?? 0;
     final meta = metaController.text.trim().isEmpty
@@ -913,9 +878,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
       observacao: observacao,
     );
 
-    setState(() {
-      salvando = true;
-    });
+    setState(() => salvando = true);
 
     try {
       if (widget.existente == null) {
@@ -924,9 +887,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
         await widget.guardadoService.atualizarGuardado(guardado);
       }
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       Navigator.of(context).pop();
       AppFeedback.showSuccess(
@@ -936,17 +897,11 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
             : 'Movimentação atualizada com sucesso.',
       );
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final exception = AppException.from(e);
       AppFeedback.showError(context, exception.message);
     } finally {
-      if (mounted) {
-        setState(() {
-          salvando = false;
-        });
-      }
+      if (mounted) setState(() => salvando = false);
     }
   }
 
@@ -1053,12 +1008,8 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
                   onChanged: salvando
                       ? null
                       : (value) {
-                          if (value == null) {
-                            return;
-                          }
-                          setState(() {
-                            destinoSelecionado = value;
-                          });
+                          if (value == null) return;
+                          setState(() => destinoSelecionado = value);
                         },
                 ),
                 const SizedBox(height: 12),
@@ -1107,9 +1058,7 @@ class _GuardadoFormModalState extends State<_GuardadoFormModal> {
                       : () => widget.selecionarDataMovimentacao(
                           dataAtual: dataSelecionada,
                           onSelecionada: (novaData) {
-                            setState(() {
-                              dataSelecionada = novaData;
-                            });
+                            setState(() => dataSelecionada = novaData);
                           },
                         ),
                   icon: const Icon(Icons.calendar_month_outlined),

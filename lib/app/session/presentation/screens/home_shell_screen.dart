@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
@@ -6,16 +8,12 @@ import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
 import 'package:paga_o_que_me_deve/core/services/notificacao_local_service.dart';
 import 'package:paga_o_que_me_deve/domain/repositories/finance_repository.dart';
 
-enum HomeTab { inicio, gastos, receber, guardado, perfil }
-
 class HomeShellScreen extends StatefulWidget {
   const HomeShellScreen({
-    required this.currentTab,
     required this.child,
     super.key,
   });
 
-  final HomeTab currentTab;
   final Widget child;
 
   @override
@@ -31,7 +29,9 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
     super.initState();
     _db = getIt<FinanceRepository>();
     _notificacaoLocalService = getIt<NotificacaoLocalService>();
-    _configurarLembretesInteligentes();
+
+    // Usamos unawaited para não travar a build inicial da tela
+    unawaited(_configurarLembretesInteligentes());
   }
 
   Future<void> _configurarLembretesInteligentes() async {
@@ -51,39 +51,49 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
     }
   }
 
-  String get _titulo {
-    if (widget.currentTab == HomeTab.inicio) return 'Visão Geral';
-    if (widget.currentTab == HomeTab.gastos) return 'Meus Gastos';
-    if (widget.currentTab == HomeTab.receber) return 'A Receber';
-    if (widget.currentTab == HomeTab.guardado) return 'Guardado';
-    return 'Perfil';
+  /// Descobre em que aba estamos baseado na Rota do GoRouter
+  int _obterIndiceAtual(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    if (location.startsWith(AppRoutes.inicioPath)) return 0;
+    if (location.startsWith(AppRoutes.gastosPath)) return 1;
+    if (location.startsWith(AppRoutes.receberPath)) return 2;
+    if (location.startsWith(AppRoutes.guardadoPath)) return 3;
+    if (location.startsWith(AppRoutes.perfilPath)) return 4;
+    return 0; // Fallback
   }
 
-  int get _indiceAtual => switch (widget.currentTab) {
-    HomeTab.inicio => 0,
-    HomeTab.gastos => 1,
-    HomeTab.receber => 2,
-    HomeTab.guardado => 3,
-    HomeTab.perfil => 4,
-  };
+  String _obterTitulo(int indice) {
+    return switch (indice) {
+      0 => 'Visão Geral',
+      1 => 'Meus Gastos',
+      2 => 'A Receber',
+      3 => 'Guardado',
+      4 => 'Perfil',
+      _ => 'AppContas',
+    };
+  }
 
-  Future<void> _onAdicionar(BuildContext context) async {
-    if (widget.currentTab == HomeTab.gastos) {
+  Future<void> _onAdicionar(BuildContext context, int indiceAtual) async {
+    if (indiceAtual == 1) {
+      // Aba Gastos
       context.push(AppRoutes.novoGastoPath);
-      return;
-    }
-
-    if (widget.currentTab == HomeTab.receber) {
+    } else if (indiceAtual == 2) {
+      // Aba Receber
       context.push(AppRoutes.novoRecebivelPath);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Calculamos o índice apenas uma vez por build
+    final indiceAtual = _obterIndiceAtual(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titulo),
-        actions: widget.currentTab == HomeTab.gastos
+        title: Text(_obterTitulo(indiceAtual)),
+        actions:
+            indiceAtual ==
+                1 // Mostra botões apenas na aba Gastos
             ? <Widget>[
                 IconButton(
                   tooltip: 'Orçamentos',
@@ -105,13 +115,11 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
       ),
       body: widget.child,
       floatingActionButton:
-          widget.currentTab == HomeTab.inicio ||
-              widget.currentTab == HomeTab.guardado ||
-              widget.currentTab == HomeTab.perfil
+          (indiceAtual == 0 || indiceAtual == 3 || indiceAtual == 4)
           ? null
           : FloatingActionButton(
               heroTag: 'home_shell_add_fab',
-              onPressed: () => _onAdicionar(context),
+              onPressed: () => _onAdicionar(context, indiceAtual),
               child: const Icon(Icons.add),
             ),
       bottomNavigationBar: NavigationBarTheme(
@@ -128,25 +136,15 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
           indicatorColor: Theme.of(context).colorScheme.primaryContainer,
         ),
         child: NavigationBar(
-          selectedIndex: _indiceAtual,
+          selectedIndex: indiceAtual,
           onDestinationSelected: (index) {
-            if (index == 0) {
-              context.go(AppRoutes.inicioPath);
-              return;
-            }
-            if (index == 1) {
-              context.go(AppRoutes.gastosPath);
-              return;
-            }
-            if (index == 2) {
-              context.go(AppRoutes.receberPath);
-              return;
-            }
-            if (index == 3) {
-              context.go(AppRoutes.guardadoPath);
-              return;
-            }
-            context.go(AppRoutes.perfilPath);
+            // Em vez de context.go(), você pode usar navigateTo se implementar o StatefulShellRoute,
+            // mas o context.go() funciona perfeitamente.
+            if (index == 0) context.go(AppRoutes.inicioPath);
+            if (index == 1) context.go(AppRoutes.gastosPath);
+            if (index == 2) context.go(AppRoutes.receberPath);
+            if (index == 3) context.go(AppRoutes.guardadoPath);
+            if (index == 4) context.go(AppRoutes.perfilPath);
           },
           destinations: const [
             NavigationDestination(
@@ -180,5 +178,3 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
     );
   }
 }
-
-typedef HomeScreen = HomeShellScreen;

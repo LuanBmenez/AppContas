@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:paga_o_que_me_deve/app/routes/app_routes.dart';
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 
@@ -31,22 +33,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _autenticar() async {
-    if (_entrando) {
-      return;
-    }
-
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (_entrando) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _entrando = true);
+
     try {
       final auth = FirebaseAuth.instance;
       final email = _emailController.text.trim();
       final senha = _senhaController.text;
-      final nomeBase = email.contains('@')
-          ? email.split('@').first
-          : 'Usuario';
+      final nomeBase = email.contains('@') ? email.split('@').first : 'Usuario';
 
       if (_modoCadastro) {
         await auth.createUserWithEmailAndPassword(
@@ -65,21 +61,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final uid = auth.currentUser!.uid;
       final firestore = FirebaseFirestore.instance;
-      await firestore.collection('users').doc(uid).set({
+
+      // Batch write para garantir que as duas coleções são criadas ao mesmo tempo
+      final batch = firestore.batch();
+
+      final userRef = firestore.collection('users').doc(uid);
+      batch.set(userRef, {
         'email': email,
         'nome': nomeBase,
         'workspaceId': uid,
         'atualizadoEm': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      await firestore.collection('workspaces').doc(uid).set({
+
+      final workspaceRef = firestore.collection('workspaces').doc(uid);
+      batch.set(workspaceRef, {
         'ownerUid': uid,
         'nome': 'Workspace de $email',
         'atualizadoEm': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      if (!mounted) {
-        return;
-      }
+      await batch.commit();
+
+      if (!mounted) return;
 
       AppFeedback.showSuccess(
         context,
@@ -87,15 +90,14 @@ class _LoginScreenState extends State<LoginScreen> {
             ? 'Conta criada com sucesso.'
             : 'Login realizado com sucesso.',
       );
+
+      // Força o redirecionamento imediato e seguro!
+      context.go(AppRoutes.inicioPath);
     } on FirebaseAuthException catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppFeedback.showError(context, _mensagemErroAuth(e));
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppFeedback.showError(context, 'Falha na autenticação. Tente novamente.');
     } finally {
       if (mounted) {
@@ -107,7 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String _mensagemErroAuth(FirebaseAuthException e) {
     final mensagem = (e.message ?? '').toUpperCase();
     if (mensagem.contains('CONFIGURATION_NOT_FOUND')) {
-      return 'Configuração do Firebase Auth ausente para este app Android. Atualize o google-services.json e os SHA-1/SHA-256 no Firebase.';
+      return 'Configuração do Firebase Auth ausente. Atualize o google-services.json e os SHA no Firebase.';
     }
 
     switch (e.code) {
@@ -125,10 +127,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Muitas tentativas. Tente novamente em instantes.';
       case 'operation-not-allowed':
         return 'Login por e-mail/senha não está habilitado no Firebase.';
-      case 'internal-error':
-        return 'Falha interna de configuração no Firebase Auth. Verifique Email/Senha habilitado e configuração Android (SHA-1/SHA-256).';
       default:
-        return e.message ?? 'Erro de autenticação.';
+        return 'Erro de autenticação.';
     }
   }
 
@@ -168,8 +168,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: AppSpacing.s8),
                       Text(
                         _modoCadastro
-                            ? 'Crie sua conta para salvar seus dados no Firebase.'
-                            : 'Faça login para acessar seus dados no Firebase.',
+                            ? 'Crie sua conta para salvar seus dados com segurança.'
+                            : 'Faça login para acessar seus dados financeiros.',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.s16),

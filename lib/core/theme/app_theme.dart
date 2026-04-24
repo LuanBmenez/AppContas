@@ -202,3 +202,8 @@ class AppTheme {
     );
   }
 }
+
+extension AppThemeContextExtension on BuildContext {
+  AppSemanticColors get semanticColors =>
+      Theme.of(this).extension<AppSemanticColors>()!;
+}

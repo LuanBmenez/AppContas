@@ -34,9 +34,7 @@ class NovoGastoCategoriaController {
     List<RegraCategoriaImportacao> regrasAprendidas =
         const <RegraCategoriaImportacao>[],
   }) {
-    final normalizado = TextNormalizer.normalizeForSearch(
-      titulo,
-    ).toLowerCase();
+    final normalizado = TextNormalizer.normalizeForSearch(titulo).toLowerCase();
 
     if (normalizado.isEmpty) {
       return const CategoriaSugestaoResultado(
@@ -45,61 +43,54 @@ class NovoGastoCategoriaController {
       );
     }
 
-    String? customId;
-    for (final categoria in categoriasAtivas) {
+    // 1. Tentativa: Categorias Personalizadas (Código Funcional Limpo)
+    final customMatch = categoriasAtivas.where((categoria) {
       final nome = TextNormalizer.normalizeForSearch(
         categoria.nome,
       ).toLowerCase();
-      if (nome.isNotEmpty && normalizado.contains(nome)) {
-        customId = categoria.id;
-        break;
-      }
-    }
+      return nome.isNotEmpty && normalizado.contains(nome);
+    }).firstOrNull;
 
-    if (customId != null) {
+    if (customMatch != null) {
       return CategoriaSugestaoResultado(
         categoriaPadrao: null,
-        categoriaPersonalizadaId: customId,
+        categoriaPersonalizadaId: customMatch.id,
       );
     }
 
-    final regrasOrdenadas =
-        List<RegraCategoriaImportacao>.from(regrasAprendidas)
-          ..sort((a, b) => b.termo.length.compareTo(a.termo.length));
-    for (final regra in regrasOrdenadas) {
+    // 2. Tentativa: Regras Aprendidas do Utilizador
+    final regrasOrdenadas = List<RegraCategoriaImportacao>.from(
+      regrasAprendidas,
+    )..sort((a, b) => b.termo.length.compareTo(a.termo.length));
+
+    final regraMatch = regrasOrdenadas.where((regra) {
       final termo = TextNormalizer.normalizeForSearch(
         regra.termo,
       ).toLowerCase();
-      if (termo.isNotEmpty && normalizado.contains(termo)) {
-        return CategoriaSugestaoResultado(
-          categoriaPadrao: regra.categoria,
-          categoriaPersonalizadaId: null,
-        );
-      }
+      return termo.isNotEmpty && normalizado.contains(termo);
+    }).firstOrNull;
+
+    if (regraMatch != null) {
+      return CategoriaSugestaoResultado(
+        categoriaPadrao: regraMatch.categoria,
+        categoriaPersonalizadaId: null,
+      );
     }
 
-    CategoriaGasto? sugerida;
-    for (final entry
-        in _sugestoesPadrao.entries) {
-      if (normalizado.contains(entry.key)) {
-        sugerida = entry.value;
-        break;
-      }
-    }
+    // 3. Tentativa: Dicionário Estático de Palavras-Chave
+    final padraoMatch = _sugestoesPadrao.entries
+        .where((entry) => normalizado.contains(entry.key))
+        .firstOrNull;
 
     return CategoriaSugestaoResultado(
-      categoriaPadrao: sugerida,
+      categoriaPadrao: padraoMatch?.value,
       categoriaPersonalizadaId: null,
     );
   }
 
   static List<CategoriaGasto> filtrarCategoriasPadrao(String textoBusca) {
-    final busca = TextNormalizer.normalizeForSearch(
-      textoBusca,
-    ).toLowerCase();
-    if (busca.isEmpty) {
-      return CategoriaGasto.values;
-    }
+    final busca = TextNormalizer.normalizeForSearch(textoBusca).toLowerCase();
+    if (busca.isEmpty) return CategoriaGasto.values;
 
     return CategoriaGasto.values.where((categoria) {
       final nome = TextNormalizer.normalizeForSearch(
@@ -113,18 +104,12 @@ class NovoGastoCategoriaController {
     String textoBusca,
     List<CategoriaPersonalizada> categoriasAtivas,
   ) {
-    final busca = TextNormalizer.normalizeForSearch(
-      textoBusca,
-    ).toLowerCase();
-    final base = <CategoriaPersonalizada>[
-      ...categoriasAtivas,
-    ];
+    final busca = TextNormalizer.normalizeForSearch(textoBusca).toLowerCase();
+    final base = List<CategoriaPersonalizada>.from(categoriasAtivas);
 
     if (busca.isEmpty) {
       base.sort((a, b) {
-        if (a.favorita != b.favorita) {
-          return a.favorita ? -1 : 1;
-        }
+        if (a.favorita != b.favorita) return a.favorita ? -1 : 1;
         return b.usoCount.compareTo(a.usoCount);
       });
       return base;
@@ -142,12 +127,7 @@ class NovoGastoCategoriaController {
     List<CategoriaPersonalizada> categoriasAtivas,
     String id,
   ) {
-    for (final categoria in categoriasAtivas) {
-      if (categoria.id == id) {
-        return categoria;
-      }
-    }
-    return null;
+    return categoriasAtivas.where((c) => c.id == id).firstOrNull;
   }
 
   static bool nomeCategoriaDuplicado({
@@ -158,32 +138,21 @@ class NovoGastoCategoriaController {
     final normalizado = TextNormalizer.normalizeForSearch(
       nome,
     ).trim().toLowerCase();
+    if (normalizado.isEmpty) return false;
 
-    if (normalizado.isEmpty) {
-      return false;
-    }
+    final padraoDuplicado = CategoriaGasto.values.any(
+      (item) =>
+          TextNormalizer.normalizeForSearch(item.label).toLowerCase() ==
+          normalizado,
+    );
 
-    for (final item in CategoriaGasto.values) {
-      final padrao = TextNormalizer.normalizeForSearch(
-        item.label,
-      ).toLowerCase();
-      if (padrao == normalizado) {
-        return true;
-      }
-    }
+    if (padraoDuplicado) return true;
 
-    for (final item in categoriasAtivas) {
-      if (item.id == ignorarId) {
-        continue;
-      }
-      final existente = TextNormalizer.normalizeForSearch(
-        item.nome,
-      ).toLowerCase();
-      if (existente == normalizado) {
-        return true;
-      }
-    }
-
-    return false;
+    return categoriasAtivas.any(
+      (item) =>
+          item.id != ignorarId &&
+          TextNormalizer.normalizeForSearch(item.nome).toLowerCase() ==
+              normalizado,
+    );
   }
 }

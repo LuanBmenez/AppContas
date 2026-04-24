@@ -36,34 +36,21 @@ class GastosService {
     );
   }
 
-  Future<void> adicionarGasto(Gasto gasto) {
-    return _repository.adicionarGasto(gasto);
-  }
-
-  Future<void> atualizarGasto(Gasto gasto) {
-    return _repository.atualizarGasto(gasto);
-  }
-
-  Future<void> restaurarGasto(Gasto gasto) {
-    return _repository.restaurarGasto(gasto);
-  }
-
-  Future<void> deletarGasto(String id) {
-    return _repository.deletarGasto(id);
-  }
+  Future<void> adicionarGasto(Gasto gasto) => _repository.adicionarGasto(gasto);
+  Future<void> atualizarGasto(Gasto gasto) => _repository.atualizarGasto(gasto);
+  Future<void> restaurarGasto(Gasto gasto) => _repository.restaurarGasto(gasto);
+  Future<void> deletarGasto(String id) => _repository.deletarGasto(id);
 
   Future<ResultadoImportacaoGastos> importarGastosComDeduplicacao(
     List<Gasto> gastos,
-  ) {
-    return _repository.importarGastosComDeduplicacao(gastos);
-  }
+  ) => _repository.importarGastosComDeduplicacao(gastos);
 
-  Future<int> contarDuplicadosPorHash(List<String> hashes) {
-    return _repository.contarDuplicadosPorHash(hashes);
-  }
+  Future<int> contarDuplicadosPorHash(List<String> hashes) =>
+      _repository.contarDuplicadosPorHash(hashes);
 
   Future<void> registrarUsoNovoGasto({
-    required TipoGasto tipo, CategoriaGasto? categoriaPadrao,
+    required TipoGasto tipo,
+    CategoriaGasto? categoriaPadrao,
     String? categoriaPersonalizadaId,
   }) {
     return _repository.registrarUsoNovoGasto(
@@ -75,9 +62,7 @@ class GastosService {
 
   Future<SugestaoRecorrenciaDespesa?> sugerirRecorrenciaPorTitulo(
     String titulo,
-  ) {
-    return _repository.sugerirRecorrenciaPorTitulo(titulo);
-  }
+  ) => _repository.sugerirRecorrenciaPorTitulo(titulo);
 
   Future<int> contarPossiveisDuplicadosNoMesmoDia({
     required String titulo,
@@ -87,41 +72,24 @@ class GastosService {
     final tituloNormalizado = TextNormalizer.normalizeForSearch(
       titulo,
     ).trim().toLowerCase();
+    if (tituloNormalizado.length < 3 || valor <= 0) return 0;
 
-    if (tituloNormalizado.length < 3 || valor <= 0) {
-      return 0;
-    }
-
-    final gastos = await meusGastos.first;
     final dataBase = DateTime(data.year, data.month, data.day);
+    final fimDia = dataBase.add(const Duration(days: 1));
 
-    var duplicados = 0;
+    // CORREÇÃO CRÍTICA DE PERFORMANCE: Busca APENAS os gastos de hoje no Firestore!
+    final gastosDoDia = await streamGastosPorPeriodo(
+      inicio: dataBase,
+      fimExclusivo: fimDia,
+    ).first;
 
-    for (final gasto in gastos) {
-      final dataGasto = DateTime(
-        gasto.data.year,
-        gasto.data.month,
-        gasto.data.day,
-      );
-
-      if (dataGasto != dataBase) {
-        continue;
-      }
-
-      if ((gasto.valor - valor).abs() > 0.001) {
-        continue;
-      }
-
+    return gastosDoDia.where((gasto) {
+      if ((gasto.valor - valor).abs() > 0.001) return false;
       final tituloExistente = TextNormalizer.normalizeForSearch(
         gasto.titulo,
       ).trim().toLowerCase();
-
-      if (tituloExistente == tituloNormalizado) {
-        duplicados++;
-      }
-    }
-
-    return duplicados;
+      return tituloExistente == tituloNormalizado;
+    }).length;
   }
 
   Future<int> salvarGastoComRecorrencias({
@@ -131,18 +99,15 @@ class GastosService {
   }) async {
     await adicionarGasto(gastoBase);
 
-    if (!recorrenciaAtiva || mesesFuturos <= 0) {
-      return 1;
-    }
+    if (!recorrenciaAtiva || mesesFuturos <= 0) return 1;
 
     final futuros = gerarRecorrenciasFuturas(
       base: gastoBase,
       mesesFuturos: mesesFuturos,
     );
 
-    for (final gasto in futuros) {
-      await adicionarGasto(gasto);
-    }
+    // Otimizado: Grava os meses futuros todos ao mesmo tempo!
+    await Future.wait(futuros.map(adicionarGasto));
 
     return 1 + futuros.length;
   }
@@ -167,39 +132,36 @@ class GastosService {
         ),
       );
     }
-
     return futuros;
   }
 
+  // --- OTIMIZAÇÃO: FUTURE.WAIT PARA PROCESSAMENTO PARALELO ---
+
   Future<void> deletarGastosEmLote(Iterable<Gasto> gastos) async {
-    for (final gasto in gastos) {
-      if (gasto.id.trim().isEmpty) {
-        continue;
-      }
-      await deletarGasto(gasto.id);
-    }
+    final apagarFutures = gastos
+        .where((gasto) => gasto.id.trim().isNotEmpty)
+        .map((gasto) => deletarGasto(gasto.id));
+    await Future.wait(apagarFutures);
   }
 
   Future<void> atualizarCategoriaEmLote({
     required Iterable<Gasto> gastos,
     required CategoriaGasto categoria,
   }) async {
-    for (final gasto in gastos) {
-      await atualizarGasto(
-        gasto.copyWith(
-          categoria: categoria,
-        ),
-      );
-    }
+    final updateFutures = gastos.map(
+      (gasto) => atualizarGasto(gasto.copyWith(categoria: categoria)),
+    );
+    await Future.wait(updateFutures);
   }
 
   Future<void> atualizarTipoEmLote({
     required Iterable<Gasto> gastos,
     required TipoGasto tipo,
   }) async {
-    for (final gasto in gastos) {
-      await atualizarGasto(gasto.copyWith(tipo: tipo));
-    }
+    final updateFutures = gastos.map(
+      (gasto) => atualizarGasto(gasto.copyWith(tipo: tipo)),
+    );
+    await Future.wait(updateFutures);
   }
 
   DateTime _adicionarMesesPreservandoDia(DateTime dataBase, int meses) {

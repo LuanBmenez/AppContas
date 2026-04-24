@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
 import 'package:paga_o_que_me_deve/core/theme/app_theme_preference.dart';
 
 class AppThemeController extends ChangeNotifier {
@@ -40,15 +39,23 @@ class AppThemeController extends ChangeNotifier {
         .collection('users')
         .doc(user.uid)
         .snapshots()
-        .listen((snapshot) {
-          final data =
-              snapshot.data() ?? <String, dynamic>{};
-          final preferencias =
-              (data['preferencias'] as Map?)?.cast<String, dynamic>() ??
-              <String, dynamic>{};
+        .listen(
+          (snapshot) {
+            final data = snapshot.data() ?? <String, dynamic>{};
+            final preferencias =
+                (data['preferencias'] as Map?)?.cast<String, dynamic>() ??
+                <String, dynamic>{};
 
-          _setPreference(AppThemePreference.fromValue(preferencias['tema']));
-        });
+            _setPreference(AppThemePreference.fromValue(preferencias['tema']));
+          },
+          // Tratamento de erro crucial adicionado aqui:
+          onError: (Object error) {
+            debugPrint('Falha ao sincronizar preferências de tema: $error');
+            // Em caso de erro (ex: perda de permissão), mantemos a app a funcionar
+            // no modo de sistema como fallback de segurança.
+            _setPreference(AppThemePreference.system);
+          },
+        );
   }
 
   void _setPreference(AppThemePreference preference) {

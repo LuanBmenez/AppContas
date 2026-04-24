@@ -14,12 +14,13 @@ class RegraCategoriaImportacao {
     return RegraCategoriaImportacao(
       id: id,
       termo: (map['termo'] ?? '').toString(),
-      categoria: CategoriaGasto.values.firstWhere(
-        (c) => c.name == map['categoria'],
-        orElse: () => CategoriaGasto.outros,
-      ),
+      // Otimizado com asNameMap()
+      categoria:
+          CategoriaGasto.values.asNameMap()[map['categoria']] ??
+          CategoriaGasto.outros,
     );
   }
+
   final String id;
   final String termo;
   final CategoriaGasto categoria;

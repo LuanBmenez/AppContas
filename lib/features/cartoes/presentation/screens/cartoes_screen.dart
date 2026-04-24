@@ -15,22 +15,23 @@ class CartoesScreen extends StatefulWidget {
 }
 
 class _CartoesScreenState extends State<CartoesScreen> {
-  late final FinanceRepository _db;
   late final CartoesService _cartoesService;
 
   @override
   void initState() {
     super.initState();
-    _db = getIt<FinanceRepository>();
-    _cartoesService = CartoesService(_db);
+    // Injeção simplificada
+    _cartoesService = CartoesService(getIt<FinanceRepository>());
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cartoes de Credito'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('Cartões de Crédito'),
+        // Removida a cor fixa para manter consistência com o tema global
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'cartoes_add_fab',
@@ -42,7 +43,7 @@ class _CartoesScreenState extends State<CartoesScreen> {
         stream: _cartoesService.cartoesCredito,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const ListSkeleton(withHeader: false);
           }
 
           if (snapshot.hasError) {
@@ -53,6 +54,7 @@ class _CartoesScreenState extends State<CartoesScreen> {
                 child: Text(
                   exception.message,
                   textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
                 ),
               ),
             );
@@ -60,14 +62,13 @@ class _CartoesScreenState extends State<CartoesScreen> {
 
           final cartoes = snapshot.data ?? <CartaoCredito>[];
           if (cartoes.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(AppSpacing.s24),
-                child: Text(
-                  'Nenhum cartao cadastrado ainda.\nToque em "Novo cartão" para começar.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
+            return AppEmptyStateCta(
+              icon: Icons.credit_card_off_outlined,
+              title: 'Nenhum cartão',
+              description:
+                  'Cadastre os seus cartões para organizar as faturas.',
+              buttonLabel: 'Adicionar agora',
+              onPressed: () => _abrirNovoCartaoDialog(context),
             );
           }
 
@@ -78,12 +79,29 @@ class _CartoesScreenState extends State<CartoesScreen> {
             itemBuilder: (context, index) {
               final cartao = cartoes[index];
 
-              return Card(
+              return AppSectionCard(
                 child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.credit_card)),
-                  title: Text(cartao.label),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.credit_card,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  title: Text(
+                    cartao.nome,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   subtitle: Text(
-                    'Fecha dia ${cartao.diaFechamento} • Vence dia ${cartao.diaVencimento}',
+                    'Final ${cartao.finalCartao} • Fecha dia ${cartao.diaFechamento}',
+                    style: theme.textTheme.bodySmall,
                   ),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
@@ -104,22 +122,21 @@ class _CartoesScreenState extends State<CartoesScreen> {
   ) async {
     final confirmar = await AppConfirmDialog.show(
       context,
-      title: 'Excluir cartao',
-      message: 'Deseja excluir ${cartao.label}?',
+      title: 'Excluir cartão',
+      message: 'Deseja excluir ${cartao.nome} final ${cartao.finalCartao}?',
     );
 
-    if (!confirmar || !context.mounted) {
-      return;
-    }
+    if (!confirmar || !context.mounted) return;
 
     try {
       await _cartoesService.deletarCartaoCredito(cartao.id);
-      if (!context.mounted) return;
-      AppFeedback.showSuccess(context, 'Cartão excluído com sucesso.');
+      if (context.mounted) {
+        AppFeedback.showSuccess(context, 'Cartão excluído com sucesso.');
+      }
     } catch (e) {
-      if (!context.mounted) return;
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (context.mounted) {
+        AppFeedback.showError(context, AppException.from(e).message);
+      }
     }
   }
 
@@ -137,53 +154,55 @@ class _CartoesScreenState extends State<CartoesScreen> {
           title: const Text('Novo cartão'),
           content: Form(
             key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nomeController,
-                    decoration: const InputDecoration(labelText: 'Nome'),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Informe o nome do cartao.';
-                      }
-                      return null;
-                    },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nomeController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do Cartão (Ex: Nubank)',
                   ),
-                  TextFormField(
-                    controller: finalController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Final (4 digitos)',
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Obrigatório' : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: finalController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  decoration: const InputDecoration(
+                    labelText: '4 últimos dígitos',
+                  ),
+                  validator: (v) =>
+                      (v?.length != 4) ? 'Informe 4 dígitos' : null,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: fechamentoController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Dia Fecham.',
+                        ),
+                        validator: _validarDia,
+                      ),
                     ),
-                    validator: (value) {
-                      final digits = (value ?? '').replaceAll(
-                        RegExp(r'\D'),
-                        '',
-                      );
-                      if (digits.length != 4) {
-                        return 'Informe exatamente 4 digitos.';
-                      }
-                      return null;
-                    },
-                  ),
-                  TextFormField(
-                    controller: fechamentoController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Fechamento'),
-                    validator: _validarDia,
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  TextFormField(
-                    controller: vencimentoController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Vencimento'),
-                    validator: _validarDia,
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: vencimentoController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Dia Venc.',
+                        ),
+                        validator: _validarDia,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           actions: [
@@ -204,36 +223,29 @@ class _CartoesScreenState extends State<CartoesScreen> {
       },
     );
 
-    if (salvar != true || !context.mounted) {
-      return;
-    }
+    if (salvar != true || !context.mounted) return;
 
     final novo = CartaoCredito(
       id: '',
       nome: nomeController.text.trim(),
       finalCartao: finalController.text.replaceAll(RegExp(r'\D'), ''),
-      diaFechamento: int.parse(fechamentoController.text),
-      diaVencimento: int.parse(vencimentoController.text),
+      diaFechamento: int.tryParse(fechamentoController.text) ?? 10,
+      diaVencimento: int.tryParse(vencimentoController.text) ?? 20,
     );
 
     try {
       await _cartoesService.adicionarCartaoCredito(novo);
-      if (!context.mounted) return;
-      AppFeedback.showSuccess(context, 'Cartão salvo com sucesso.');
+      if (context.mounted) AppFeedback.showSuccess(context, 'Cartão salvo.');
     } catch (e) {
-      if (!context.mounted) return;
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (context.mounted) {
+        AppFeedback.showError(context, AppException.from(e).message);
+      }
     }
   }
 
   String? _validarDia(String? value) {
     final dia = int.tryParse((value ?? '').trim());
-    if (dia == null || dia < 1 || dia > 31) {
-      return 'Dia deve ser 1..31.';
-    }
+    if (dia == null || dia < 1 || dia > 31) return '1 a 31';
     return null;
   }
 }
-
-typedef CartoesCreditoScreen = CartoesScreen;

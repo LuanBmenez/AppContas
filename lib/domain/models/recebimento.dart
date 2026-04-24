@@ -13,12 +13,10 @@ class Recebimento {
   });
 
   factory Recebimento.fromMap(Map<String, dynamic> map, String id) {
-    final dataPrevista = (map['dataPrevista'] as Timestamp).toDate();
-    final dataRecebido = map['dataRecebido'] != null
-        ? (map['dataRecebido'] as Timestamp).toDate()
-        : null;
+    // Agora o parse é totalmente seguro contra falhas e nulos!
+    final dataPrevista = _parseDate(map['dataPrevista']);
+    final dataRecebido = _parseNullableDate(map['dataRecebido']);
 
-    // Compatibilidade: calcula competencia se não existir
     final competenciaMes =
         map['competenciaMes'] as String? ??
         "${dataPrevista.year.toString().padLeft(4, '0')}-${dataPrevista.month.toString().padLeft(2, '0')}";
@@ -34,13 +32,14 @@ class Recebimento {
 
     return Recebimento(
       id: id,
-      valor: (map['valor'] as num).toDouble(),
+      valor: (map['valor'] as num?)?.toDouble() ?? 0.0,
       dataPrevista: dataPrevista,
       dataRecebido: dataRecebido,
       status: status,
       competenciaMes: competenciaMes,
     );
   }
+
   final String id;
   final double valor;
   final DateTime dataPrevista;
@@ -57,5 +56,18 @@ class Recebimento {
           : null,
       'competenciaMes': competenciaMes,
     };
+  }
+
+  static DateTime _parseDate(dynamic raw) {
+    return _parseNullableDate(raw) ?? DateTime.now();
+  }
+
+  static DateTime? _parseNullableDate(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    return null;
   }
 }

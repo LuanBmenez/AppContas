@@ -68,9 +68,7 @@ class DashboardScreenController {
   }
 
   DateTime mesReferenciaExportacao(DateTime agora) {
-    final faixa = faixaSelecionada(
-      agora,
-    );
+    final faixa = faixaSelecionada(agora);
     return DateTime(faixa.inicio.year, faixa.inicio.month);
   }
 
@@ -101,17 +99,14 @@ class DashboardScreenController {
     List<RecorrenciaAtiva> recorrencias,
     DateTime referenciaMes,
   ) {
-    double total = 0;
-
-    for (final recorrencia in recorrencias) {
+    // Refatorado com fold para não usar variáveis mutáveis externas
+    return recorrencias.fold<double>(0, (total, recorrencia) {
       final ocorrencias = contarOcorrenciasRestantesNoMes(
         recorrencia,
         referenciaMes,
       );
-      total += recorrencia.valorMedio * ocorrencias;
-    }
-
-    return total;
+      return total + (recorrencia.valorMedio * ocorrencias);
+    });
   }
 
   double calcularJaGuardadoNoMes(
@@ -119,19 +114,15 @@ class DashboardScreenController {
     DateTime referenciaMes,
   ) {
     final competencia = Guardado.competenciaFromDate(referenciaMes);
-    double total = 0;
 
-    for (final item in guardados) {
-      if (item.competencia != competencia) {
-        continue;
-      }
-      if (item.tipoMovimentacao != GuardadoTipoMovimentacao.aporte) {
-        continue;
-      }
-      total += item.valor;
-    }
-
-    return total;
+    // Refatorado com where e fold para ser idiomático em Dart
+    return guardados
+        .where(
+          (item) =>
+              item.competencia == competencia &&
+              item.tipoMovimentacao == GuardadoTipoMovimentacao.aporte,
+        )
+        .fold<double>(0, (total, item) => total + item.valor);
   }
 
   String insightPrincipal(DashboardResumoCalculado resumo) {
@@ -151,13 +142,11 @@ class DashboardScreenController {
     DashboardResumo bruto,
     DateTime agora,
   ) {
-    final faixa = faixaSelecionada(
-      agora,
-    );
+    final faixa = faixaSelecionada(agora);
 
+    // CORREÇÃO CRÍTICA DE CACHE: identityHashCode previne o bug de edição!
     final chave = [
-      bruto.gastos.length,
-      bruto.contas.length,
+      identityHashCode(bruto),
       faixa.inicio.millisecondsSinceEpoch,
       faixa.fimExclusivo.millisecondsSinceEpoch,
       periodo.name,
