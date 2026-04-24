@@ -10,17 +10,11 @@ class AppBootstrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => AppThemeController(),
-      child: const _AppWithTheme(),
+      child: Consumer<AppThemeController>(
+        builder: (context, themeController, child) {
+          return PagaOQueMeDeveApp(themeMode: themeController.themeMode);
+        },
+      ),
     );
-  }
-}
-
-class _AppWithTheme extends StatelessWidget {
-  const _AppWithTheme();
-
-  @override
-  Widget build(BuildContext context) {
-    final themeController = Provider.of<AppThemeController>(context);
-    return PagaOQueMeDeveApp(themeMode: themeController.themeMode);
   }
 }

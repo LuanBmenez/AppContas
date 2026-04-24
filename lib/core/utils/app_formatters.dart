@@ -20,8 +20,8 @@ class AppFormatters {
   ];
 
   static String moeda(double valor) {
-    final numero = valor.toStringAsFixed(2).replaceAll('.', ',');
-    return 'R\$ $numero';
+    final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: r'R$');
+    return formatter.format(valor);
   }
 
   static double parseMoedaInput(String input) {
@@ -39,7 +39,6 @@ class AppFormatters {
       final parsed = br.parse(limpo);
       return parsed.toDouble();
     } catch (_) {
-      // Fallback para entradas parcialmente normalizadas.
       final normalizado = limpo.replaceAll('.', '').replaceAll(',', '.');
       final valor = double.tryParse(normalizado);
       if (valor == null) {
@@ -49,10 +48,9 @@ class AppFormatters {
     }
   }
 
+  /// Usa o DateFormat para garantir o padrão dd/MM/yyyy facilmente
   static String dataCurta(DateTime data) {
-    final dia = data.day.toString().padLeft(2, '0');
-    final mes = data.month.toString().padLeft(2, '0');
-    return '$dia/$mes/${data.year}';
+    return DateFormat('dd/MM/yyyy').format(data);
   }
 
   static String mesAno(DateTime data) {

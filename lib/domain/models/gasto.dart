@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
 import 'package:paga_o_que_me_deve/core/utils/text_normalizer.dart';
 
 enum CategoriaGasto {
@@ -122,7 +121,6 @@ extension OrigemGastoInfo on OrigemGasto {
 }
 
 class Gasto {
-
   Gasto({
     required this.id,
     required this.titulo,
@@ -146,7 +144,6 @@ class Gasto {
 
   factory Gasto.fromMap(Map<String, dynamic> map, String id) {
     final dynamic valorRaw = map['valor'];
-    final dynamic dataRaw = map['data'];
 
     return Gasto(
       id: id,
@@ -154,11 +151,16 @@ class Gasto {
       valor: valorRaw is num
           ? valorRaw.toDouble()
           : double.tryParse(valorRaw?.toString() ?? '') ?? 0,
-      data: _parseDate(dataRaw),
-      categoria: CategoriaGasto.values.firstWhere(
-        (e) => e.name == map['categoria'],
-        orElse: () => CategoriaGasto.outros,
-      ),
+      data: _parseDate(map['data']),
+
+      // Otimização de Performance usando asNameMap() em vez de loops (firstWhere)
+      categoria:
+          CategoriaGasto.values.asNameMap()[map['categoria']] ??
+          CategoriaGasto.outros,
+      tipo: TipoGasto.values.asNameMap()[map['tipo']] ?? TipoGasto.variavel,
+      origem:
+          OrigemGasto.values.asNameMap()[map['origem']] ?? OrigemGasto.manual,
+
       categoriaPersonalizadaId: map['categoriaPersonalizadaId']?.toString(),
       categoriaPersonalizadaNome: map['categoriaPersonalizadaNome']?.toString(),
       categoriaPersonalizadaCorValue: _parseNullableInt(
@@ -166,14 +168,6 @@ class Gasto {
       ),
       categoriaPersonalizadaIconeCodePoint: _parseNullableInt(
         map['categoriaPersonalizadaIconeCodePoint'],
-      ),
-      tipo: TipoGasto.values.firstWhere(
-        (e) => e.name == map['tipo'],
-        orElse: () => TipoGasto.variavel,
-      ),
-      origem: OrigemGasto.values.firstWhere(
-        (e) => e.name == map['origem'],
-        orElse: () => OrigemGasto.manual,
       ),
       cartaoId: map['cartaoId']?.toString(),
       cartaoNome: map['cartaoNome']?.toString(),
@@ -184,6 +178,7 @@ class Gasto {
       dataLancamento: _parseNullableDate(map['dataLancamento']),
     );
   }
+
   final String id;
   final String titulo;
   final double valor;
@@ -308,46 +303,25 @@ class Gasto {
     return categoria.icon;
   }
 
+  // --- MÉTODOS UTILITÁRIOS --- //
+
   static DateTime _parseDate(dynamic raw) {
-    if (raw is Timestamp) {
-      return raw.toDate();
-    }
-
-    if (raw is DateTime) {
-      return raw;
-    }
-
-    if (raw is String) {
-      return DateTime.tryParse(raw) ?? DateTime.now();
-    }
-
-    if (raw is int) {
-      return DateTime.fromMillisecondsSinceEpoch(raw);
-    }
-
-    throw FormatException('Campo data invalido em Gasto: $raw');
+    return _parseNullableDate(raw) ?? DateTime.now();
   }
 
   static DateTime? _parseNullableDate(dynamic raw) {
-    if (raw == null) {
-      return null;
-    }
-    return _parseDate(raw);
+    if (raw == null) return null;
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    return null;
   }
 
   static int? _parseNullableInt(dynamic raw) {
-    if (raw == null) {
-      return null;
-    }
-
-    if (raw is int) {
-      return raw;
-    }
-
-    if (raw is num) {
-      return raw.toInt();
-    }
-
+    if (raw == null) return null;
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
     return int.tryParse(raw.toString());
   }
 }

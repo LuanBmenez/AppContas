@@ -686,7 +686,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const CartoesCreditoScreen(),
+                              builder: (_) => const CartoesScreen(),
                             ),
                           );
                         },
@@ -1199,7 +1199,7 @@ class _ImportacaoScreenState extends State<ImportacaoScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const CartoesCreditoScreen(),
+                    builder: (_) => const CartoesScreen(),
                   ),
                 );
               },

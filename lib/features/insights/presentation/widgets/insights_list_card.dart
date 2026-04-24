@@ -70,9 +70,12 @@ class _InsightRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final semantic = context.semanticColors; // Nossa extensão global!
+
+    // Uso direto das cores padronizadas
     final cor = switch (item.nivel) {
-      InsightNivel.alerta => theme.colorScheme.error,
-      InsightNivel.atencao => const Color(0xFFC26A00),
+      InsightNivel.alerta => semantic.error,
+      InsightNivel.atencao => semantic.warning,
       InsightNivel.info => theme.colorScheme.primary,
     };
 

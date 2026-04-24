@@ -24,8 +24,10 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
   late final OrcamentosService _orcamentosService;
   late Stream<List<OrcamentoCategoriaResumo>> _resumosOrcamentoStream;
 
-  // Estado para controlar o mês atual na tela
   DateTime _mesSelecionado = DateTime.now();
+
+  // CORREÇÃO: Variável para armazenar o estado atual e passar para o FAB
+  List<OrcamentoCategoriaResumo> _resumosAtuais = [];
 
   @override
   void initState() {
@@ -35,7 +37,6 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
     _carregarStreamDoMes();
   }
 
-  // Atualiza a Stream baseada no mês selecionado
   void _carregarStreamDoMes() {
     _resumosOrcamentoStream = _orcamentosService.calcularResumoPorCategoria(
       _mesSelecionado,
@@ -156,7 +157,7 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
     if (categoriaDuplicada) {
       AppFeedback.showError(
         screenContext,
-        'Já existe orçamento para essa categoria.',
+        'Já existe um orçamento para essa categoria.',
       );
       return;
     }
@@ -207,7 +208,6 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
     }
   }
 
-  // Widget para navegar entre os meses
   Widget _buildSeletorMes() {
     final mesFormatado = DateFormat(
       'MMMM yyyy',
@@ -225,9 +225,9 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
           ),
           Text(
             mesFormatado,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right),
@@ -244,7 +244,8 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
       appBar: AppBar(title: const Text('Orçamentos Globais')),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'orcamentos_add_fab',
-        onPressed: () => _abrirFormularioOrcamento(resumos: const []),
+        // CORREÇÃO: Usando a referência atualizada da lista para a validação funcionar
+        onPressed: () => _abrirFormularioOrcamento(resumos: _resumosAtuais),
         icon: const Icon(Icons.add),
         label: const Text('Adicionar'),
       ),
@@ -272,6 +273,9 @@ class _OrcamentosScreenState extends State<OrcamentosScreen> {
                 }
 
                 final resumos = snapshot.data ?? <OrcamentoCategoriaResumo>[];
+
+                // Mantém a lista atualizada silenciosamente para o FAB usar
+                _resumosAtuais = resumos;
 
                 if (resumos.isEmpty) {
                   return AppEmptyStateCta(

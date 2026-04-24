@@ -52,7 +52,6 @@ class AppRouter {
         name: AppRoutes.inicioName,
         builder: (context, state) {
           return const HomeShellScreen(
-            currentTab: HomeTab.inicio,
             child: DashboardScreen(),
           );
         },
@@ -69,7 +68,6 @@ class AppRouter {
               : null;
           final filtro = filtroViaQuery ?? filtroViaExtra;
           return HomeShellScreen(
-            currentTab: HomeTab.gastos,
             child: GastosScreen(
               key: ValueKey<String>(
                 filtro == null
@@ -86,7 +84,6 @@ class AppRouter {
         name: AppRoutes.receberName,
         builder: (context, state) {
           return const HomeShellScreen(
-            currentTab: HomeTab.receber,
             child: AReceberScreen(),
           );
         },
@@ -96,7 +93,6 @@ class AppRouter {
         name: AppRoutes.guardadoName,
         builder: (context, state) {
           return const HomeShellScreen(
-            currentTab: HomeTab.guardado,
             child: GuardadoScreen(),
           );
         },
@@ -106,7 +102,6 @@ class AppRouter {
         name: AppRoutes.perfilName,
         builder: (context, state) {
           return const HomeShellScreen(
-            currentTab: HomeTab.perfil,
             child: PerfilScreen(),
           );
         },

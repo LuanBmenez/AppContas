@@ -7,12 +7,14 @@ class AppException implements Exception {
   @override
   String toString() => message;
 
-  /// Construtor de Fábrica que converte um erro bruto em uma mensagem amigável
   factory AppException.from(Object? error) {
+    if (error is AppException) {
+      return error;
+    }
+
     final texto = error.toString();
     final lower = texto.toLowerCase();
 
-    // Erros de Banco de Dados / Firebase
     if (lower.contains('firestore.googleapis.com') ||
         lower.contains('permission_denied')) {
       return AppException(
@@ -20,7 +22,6 @@ class AppException implements Exception {
       );
     }
 
-    // Erros de Internet
     if (lower.contains('network_error') ||
         lower.contains('offline') ||
         lower.contains('socketexception')) {
@@ -29,12 +30,10 @@ class AppException implements Exception {
       );
     }
 
-    // Outros erros mapeados...
     if (lower.contains('user-not-found')) {
       return AppException('Usuário não encontrado no sistema.');
     }
 
-    // Fallback genérico para não mostrar rastros de código assustadores ao usuário
     return AppException(
       'Ocorreu um erro inesperado. Tente novamente mais tarde.',
     );

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class AppEmptyStateCta extends StatelessWidget {
   const AppEmptyStateCta({
-    required this.icon, required this.title, required this.description, required this.buttonLabel, required this.onPressed, super.key,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.buttonLabel,
+    required this.onPressed,
+    super.key,
   });
 
   final IconData icon;
@@ -26,7 +30,8 @@ class AppEmptyStateCta extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              // Usando a tipografia semântica do AppTheme!
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.s8),
             Text(description, textAlign: TextAlign.center),

@@ -173,9 +173,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Future<String?> _abrirDialogEditarNome({required String nomeAtual}) async {
-    final controller = TextEditingController(
-      text: nomeAtual,
-    );
+    final controller = TextEditingController(text: nomeAtual);
     final formKey = GlobalKey<FormState>();
 
     final result = await showDialog<String>(
@@ -195,18 +193,13 @@ class _PerfilScreenState extends State<PerfilScreen> {
               ),
               validator: (value) {
                 final text = (value ?? '').trim();
-
                 if (text.length < 2) {
                   return 'Informe um nome com ao menos 2 letras.';
                 }
-
                 return null;
               },
               onFieldSubmitted: (_) {
-                if (formKey.currentState?.validate() != true) {
-                  return;
-                }
-
+                if (formKey.currentState?.validate() != true) return;
                 Navigator.pop(dialogContext, controller.text.trim());
               },
             ),
@@ -218,10 +211,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
             ),
             FilledButton(
               onPressed: () {
-                if (formKey.currentState?.validate() != true) {
-                  return;
-                }
-
+                if (formKey.currentState?.validate() != true) return;
                 Navigator.pop(dialogContext, controller.text.trim());
               },
               child: const Text('Salvar'),
@@ -240,9 +230,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     required Future<void> Function() action,
     required String errorMessage,
   }) async {
-    if (_pendingActions.contains(key)) {
-      return;
-    }
+    if (_pendingActions.contains(key)) return;
 
     setState(() {
       _pendingActions.add(key);
@@ -251,10 +239,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     try {
       await action();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       AppFeedback.showError(context, errorMessage);
     } finally {
       if (mounted) {
@@ -377,8 +362,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   }
 
   Widget _buildPerfilContent(PerfilUsuario perfil) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final semantic = context.semanticColors;
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.s16),
@@ -394,7 +378,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.sync_problem_outlined, color: colorScheme.error),
+                // Utilização do sematic.error para consistência
+                Icon(Icons.sync_problem_outlined, color: semantic.error),
                 const SizedBox(width: AppSpacing.s12),
                 Expanded(
                   child: Column(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
 import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
@@ -26,6 +28,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
   Stream<List<Conta>>? _contasStream;
   final TextEditingController _buscaController = TextEditingController();
 
+  Timer? _debounce;
+
   String _termoBusca = '';
   bool _selecionandoLote = false;
   bool _processandoLote = false;
@@ -33,15 +37,6 @@ class _AReceberScreenState extends State<AReceberScreen> {
   DateTime _mesSelecionado = DateTime(
     DateTime.now().year,
     DateTime.now().month,
-  );
-
-  static const AppSemanticColors _fallbackSemanticColors = AppSemanticColors(
-    success: Color(0xFF0F9D7A),
-    successContainer: Color(0xFFE5F6F2),
-    warning: Color(0xFFC26A00),
-    warningContainer: Color(0xFFFFEED9),
-    error: Color(0xFFD64545),
-    errorContainer: Color(0xFFFDE8E8),
   );
 
   DateTime get _inicioMes =>
@@ -61,18 +56,28 @@ class _AReceberScreenState extends State<AReceberScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _buscaController.removeListener(_onBuscaAlterada);
     _buscaController.dispose();
     _listController.dispose();
     super.dispose();
   }
 
-  Stream<List<Conta>> _obterContasStream() {
-    return _contasStream ??= _recebiveisService.contasAReceber;
+  void _onBuscaAlterada() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      final novoTermo = _buscaController.text;
+      if (novoTermo == _termoBusca) return;
+
+      setState(() {
+        _termoBusca = novoTermo;
+      });
+    });
   }
 
-  AppSemanticColors _semanticColors(ThemeData theme) {
-    return theme.extension<AppSemanticColors>() ?? _fallbackSemanticColors;
+  Stream<List<Conta>> _obterContasStream() {
+    return _contasStream ??= _recebiveisService.contasAReceber;
   }
 
   DateTime _dataReferenciaConta(Conta conta) {
@@ -214,17 +219,6 @@ class _AReceberScreenState extends State<AReceberScreen> {
       if ((_listController.offset - destino).abs() > 0.5) {
         _listController.jumpTo(destino);
       }
-    });
-  }
-
-  void _onBuscaAlterada() {
-    final novoTermo = _buscaController.text;
-    if (novoTermo == _termoBusca) {
-      return;
-    }
-
-    setState(() {
-      _termoBusca = novoTermo;
     });
   }
 
@@ -489,7 +483,8 @@ class _AReceberScreenState extends State<AReceberScreen> {
     required double totalPendenteMes,
     required double progresso,
   }) {
-    final semantic = _semanticColors(theme);
+    final semantic = context.semanticColors;
+
     final base = theme.colorScheme.primaryContainer;
     final accent = theme.colorScheme.surfaceContainerHighest;
 

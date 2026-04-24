@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-
 import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 
 class AppFormSubmitBar extends StatelessWidget {
   const AppFormSubmitBar({
-    required this.onPressed, required this.label, super.key,
+    required this.onPressed,
+    required this.label,
+    super.key,
     this.isLoading = false,
     this.loadingLabel = 'Salvando...',
   });
@@ -41,11 +42,12 @@ class AppFormSubmitBar extends StatelessWidget {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                          color: Colors.white,
+                          // Garante contraste perfeito dinamicamente!
+                          color: Theme.of(context).colorScheme.onPrimary,
                           strokeWidth: 2,
                         ),
                       ),

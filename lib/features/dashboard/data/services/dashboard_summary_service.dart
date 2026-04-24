@@ -85,7 +85,9 @@ class DashboardSummaryService {
     final referencia = agora ?? DateTime.now();
     _evictExpired(referencia);
 
-    final faixaAtual = inicioOverride != null && fimExclusivoOverride != null
+    final isCustomDate = inicioOverride != null && fimExclusivoOverride != null;
+
+    final faixaAtual = isCustomDate
         ? (inicio: inicioOverride, fimExclusivo: fimExclusivoOverride)
         : _faixaAtual(periodo, referencia);
 
@@ -232,7 +234,12 @@ class DashboardSummaryService {
     final categoriasOrdenadas = totaisPorCategoria.values.toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
 
-    final comparativoLabel = _labelComparativo(faixaAnterior.inicio);
+    // Agora enviamos o contexto exato para o label!
+    final comparativoLabel = _labelComparativo(
+      periodo,
+      faixaAnterior.inicio,
+      isCustomDate,
+    );
 
     final calculado = DashboardResumoCalculado(
       totalGastosPeriodo: totalGastosPeriodo,
@@ -261,9 +268,7 @@ class DashboardSummaryService {
   }
 
   void _evictExpired(DateTime now) {
-    if (_cacheLru.isEmpty) {
-      return;
-    }
+    if (_cacheLru.isEmpty) return;
 
     final expirados = <String>[];
     _cacheLru.forEach((key, entry) {
@@ -272,6 +277,7 @@ class DashboardSummaryService {
       }
     });
 
+    // Boa prática Dart: Substitui o .forEach por um loop for-in
     expirados.forEach(_cacheLru.remove);
   }
 
@@ -344,9 +350,7 @@ class DashboardSummaryService {
     String? filtroCategoriaPersonalizadaId,
     TipoGasto? filtroTipo,
   }) {
-    if (filtroTipo != null && gasto.tipo != filtroTipo) {
-      return false;
-    }
+    if (filtroTipo != null && gasto.tipo != filtroTipo) return false;
 
     if (filtroCategoriaPersonalizadaId != null &&
         filtroCategoriaPersonalizadaId.isNotEmpty) {
@@ -361,8 +365,24 @@ class DashboardSummaryService {
     return true;
   }
 
-  String _labelComparativo(DateTime referencia) {
-    return AppFormatters.nomeMes(referencia.month);
+  // --- NOVA FUNÇÃO DE LABELS CONTEXTUAIS ---
+  String _labelComparativo(
+    DashboardPeriodoRapido periodo,
+    DateTime inicioAnterior,
+    bool hasOverride,
+  ) {
+    if (hasOverride) return 'Período anterior';
+
+    switch (periodo) {
+      case DashboardPeriodoRapido.hoje:
+        return 'Ontem';
+      case DashboardPeriodoRapido.seteDias:
+        return 'Semana passada';
+      case DashboardPeriodoRapido.mes:
+        return AppFormatters.nomeMes(inicioAnterior.month);
+      case DashboardPeriodoRapido.trimestre:
+        return 'Trimestre anterior';
+    }
   }
 }
 

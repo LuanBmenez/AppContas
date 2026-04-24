@@ -225,17 +225,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    const fallbackSemantic = AppSemanticColors(
-      success: Color(0xFF0F9D7A),
-      successContainer: Color(0xFFE5F6F2),
-      warning: Color(0xFFC26A00),
-      warningContainer: Color(0xFFFFEED9),
-      error: Color(0xFFD64545),
-      errorContainer: Color(0xFFFDE8E8),
-    );
-
-    final semantic = theme.extension<AppSemanticColors>() ?? fallbackSemantic;
+    // 1. Usar a nossa extensão global!
+    final semantic = context.semanticColors;
 
     return StreamBuilder<bool>(
       stream: _mostrarValoresDashboardStream(),
@@ -266,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: AppSpacing.s8),
                       const Text(
-                        'Verifique conexão, permissões do Firebase e tente novamente.',
+                        'Verifique a conexão, permissões e tente novamente.',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.s12),
@@ -428,7 +419,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     child: MiniSummaryCard(
                                       titulo: 'Saídas',
                                       valor: resumo.totalGastosPeriodo,
-                                      cor: semantic.error,
+                                      cor: semantic.error, // Nova Sintaxe!
                                       icone: Icons.arrow_downward_rounded,
                                       mostrarValores: mostrarValores,
                                       onTap: () {
@@ -451,7 +442,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     child: MiniSummaryCard(
                                       titulo: 'A receber',
                                       valor: resumo.totalPendente,
-                                      cor: semantic.warning,
+                                      cor: semantic.warning, // Nova Sintaxe!
                                       icone: Icons.pending_actions_rounded,
                                       mostrarValores: mostrarValores,
                                       onTap: widget.onTapReceber,

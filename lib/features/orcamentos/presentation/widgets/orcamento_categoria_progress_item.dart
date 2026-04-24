@@ -18,17 +18,17 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
   final VoidCallback? onDelete;
   final bool compacto;
 
-  Color _statusColor(ThemeData theme) {
+  // Atualizado para usar a extensão global SemanticColors de forma limpa
+  Color _statusColor(BuildContext context) {
+    final semantic = context.semanticColors;
+
     switch (resumo.status) {
       case OrcamentoCategoriaStatus.normal:
-        return theme.extension<AppSemanticColors>()?.success ??
-            const Color(0xFF0F9D7A);
+        return semantic.success;
       case OrcamentoCategoriaStatus.alerta:
-        return theme.extension<AppSemanticColors>()?.warning ??
-            const Color(0xFFC26A00);
+        return semantic.warning;
       case OrcamentoCategoriaStatus.estourado:
-        return theme.extension<AppSemanticColors>()?.error ??
-            const Color(0xFFD64545);
+        return semantic.error;
     }
   }
 
@@ -46,7 +46,9 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusColor = _statusColor(theme);
+    final statusColor = _statusColor(
+      context,
+    ); // Usando o contexto para pegar a cor correta
     final progress = resumo.percentualUtilizado.clamp(0, 1).toDouble();
 
     return Card(
@@ -107,8 +109,7 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
                           _statusLabel(),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: statusColor,
-                            fontWeight:
-                                FontWeight.w800, // Deixei um pouco mais negrito
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -128,17 +129,13 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: TweenAnimationBuilder<double>(
-                  duration: const Duration(
-                    milliseconds: 1200,
-                  ), // Duração da animação
-                  curve: Curves.easeOutCubic, // Curva suave de desaceleração
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeOutCubic,
                   tween: Tween<double>(begin: 0, end: progress),
                   builder: (context, value, _) {
                     return LinearProgressIndicator(
                       value: value,
-                      minHeight: compacto
-                          ? 6
-                          : 10, // Ligeiramente mais gordinha para dar destaque
+                      minHeight: compacto ? 6 : 10,
                       backgroundColor:
                           theme.colorScheme.surfaceContainerHighest,
                       valueColor: AlwaysStoppedAnimation<Color>(statusColor),
@@ -147,13 +144,7 @@ class OrcamentoCategoriaProgressItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.s8),
-              LinearProgressIndicator(
-                value: progress,
-                minHeight: compacto ? 6 : 8,
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-              ),
-              const SizedBox(height: AppSpacing.s8),
+              // A barra estática duplicada que estava aqui em baixo foi eliminada!
               Wrap(
                 spacing: AppSpacing.s12,
                 runSpacing: AppSpacing.s6,

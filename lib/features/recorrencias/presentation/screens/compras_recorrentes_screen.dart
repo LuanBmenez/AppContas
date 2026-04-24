@@ -228,6 +228,8 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Future<void> _abrirAcoesRecorrencia(RecorrenciaAtiva item) async {
+    final semantic = context.semanticColors; // Acesso limpo às cores
+
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -293,13 +295,11 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
                 ListTile(
                   leading: Icon(
                     Icons.delete_outline,
-                    color: Theme.of(context).colorScheme.error,
+                    color: semantic.error, // Usando semantic global
                   ),
                   title: Text(
                     'Remover recorrência',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                    style: TextStyle(color: semantic.error),
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -315,14 +315,16 @@ class _ComprasRecorrentesScreenState extends State<ComprasRecorrentesScreen> {
   }
 
   Color _statusColor(BuildContext context, RecorrenciaAtiva item) {
+    final semantic = context.semanticColors;
+
     if (item.status == RecorrenciaStatus.pausada) {
       return Theme.of(context).colorScheme.outline;
     }
     if (item.estaAtrasada) {
-      return Theme.of(context).colorScheme.error;
+      return semantic.error; // Semantic Color
     }
     if (item.venceEmBreve) {
-      return Theme.of(context).colorScheme.tertiary;
+      return semantic.warning; // Semantic Color para atenção primária
     }
     return Theme.of(context).colorScheme.primary;
   }

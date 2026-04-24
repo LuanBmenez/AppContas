@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum ContaHistoricoTipo { criada, atualizada, recebida, reaberta }
 
 class ContaHistoricoEvento {
-
   const ContaHistoricoEvento({
     required this.tipo,
     required this.descricao,
@@ -14,9 +13,10 @@ class ContaHistoricoEvento {
     return ContaHistoricoEvento(
       tipo: _parseTipo(map['tipo']),
       descricao: (map['descricao'] ?? '').toString(),
-      data: _parseDate(map['data']),
+      data: Conta.parseDate(map['data']),
     );
   }
+
   final ContaHistoricoTipo tipo;
   final String descricao;
   final DateTime data;
@@ -26,38 +26,14 @@ class ContaHistoricoEvento {
   }
 
   static ContaHistoricoTipo _parseTipo(dynamic raw) {
-    final valor = raw?.toString() ?? '';
-    for (final tipo in ContaHistoricoTipo.values) {
-      if (tipo.name == valor) {
-        return tipo;
-      }
-    }
-    return ContaHistoricoTipo.atualizada;
-  }
-
-  static DateTime _parseDate(dynamic raw) {
-    if (raw is Timestamp) {
-      return raw.toDate();
-    }
-
-    if (raw is DateTime) {
-      return raw;
-    }
-
-    if (raw is String) {
-      return DateTime.tryParse(raw) ?? DateTime.now();
-    }
-
-    if (raw is int) {
-      return DateTime.fromMillisecondsSinceEpoch(raw);
-    }
-
-    return DateTime.now();
+    if (raw == null) return ContaHistoricoTipo.atualizada;
+    // Otimização de performance com asNameMap()
+    return ContaHistoricoTipo.values.asNameMap()[raw.toString()] ??
+        ContaHistoricoTipo.atualizada;
   }
 }
 
 class Conta {
-
   Conta({
     required this.id,
     required this.nome,
@@ -73,17 +49,14 @@ class Conta {
 
   factory Conta.fromMap(Map<String, dynamic> map, String id) {
     final dynamic valorRaw = map['valor'];
-    final dynamic dataRaw = map['data'];
-    final dynamic vencimentoRaw = map['vencimento'];
-    final dynamic recebidaEmRaw = map['recebidaEm'];
-    final dynamic atualizadaEmRaw = map['atualizadaEm'];
-    final historicoRaw =
-        map['historico'] as List<dynamic>? ?? <dynamic>[];
+    final historicoRaw = map['historico'] as List<dynamic>? ?? <dynamic>[];
+
     final historico = historicoRaw
         .whereType<Map<String, dynamic>>()
         .map(ContaHistoricoEvento.fromMap)
         .toList();
-    final criadaEm = _parseDate(dataRaw);
+
+    final criadaEm = parseDate(map['data']);
 
     return Conta(
       id: id,
@@ -93,9 +66,9 @@ class Conta {
           ? valorRaw.toDouble()
           : double.tryParse(valorRaw?.toString() ?? '') ?? 0,
       data: criadaEm,
-      vencimento: _parseNullableDate(vencimentoRaw),
-      recebidaEm: _parseNullableDate(recebidaEmRaw),
-      atualizadaEm: _parseNullableDate(atualizadaEmRaw),
+      vencimento: parseNullableDate(map['vencimento']),
+      recebidaEm: parseNullableDate(map['recebidaEm']),
+      atualizadaEm: parseNullableDate(map['atualizadaEm']),
       foiPago: map['foiPago'] == true,
       historico: historico.isEmpty
           ? <ContaHistoricoEvento>[
@@ -108,6 +81,7 @@ class Conta {
           : historico,
     );
   }
+
   final String id;
   final String nome;
   final String descricao;
@@ -160,47 +134,16 @@ class Conta {
     );
   }
 
-  static DateTime _parseDate(dynamic raw) {
-    if (raw is Timestamp) {
-      return raw.toDate();
-    }
-
-    if (raw is DateTime) {
-      return raw;
-    }
-
-    if (raw is String) {
-      return DateTime.tryParse(raw) ?? DateTime.now();
-    }
-
-    if (raw is int) {
-      return DateTime.fromMillisecondsSinceEpoch(raw);
-    }
-
-    throw FormatException('Campo data invalido em Conta: $raw');
+  static DateTime parseDate(dynamic raw) {
+    return parseNullableDate(raw) ?? DateTime.now();
   }
 
-  static DateTime? _parseNullableDate(dynamic raw) {
-    if (raw == null) {
-      return null;
-    }
-
-    if (raw is Timestamp) {
-      return raw.toDate();
-    }
-
-    if (raw is DateTime) {
-      return raw;
-    }
-
-    if (raw is String) {
-      return DateTime.tryParse(raw);
-    }
-
-    if (raw is int) {
-      return DateTime.fromMillisecondsSinceEpoch(raw);
-    }
-
+  static DateTime? parseNullableDate(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
     return null;
   }
 }

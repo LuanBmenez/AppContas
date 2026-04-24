@@ -114,51 +114,32 @@ class Guardado {
   });
 
   factory Guardado.fromMap(Map<String, dynamic> map, String id) {
-    final dynamic rawData = map['data'];
-    DateTime data;
+    final data = _parseDate(map['data']);
 
-    if (rawData is Timestamp) {
-      data = rawData.toDate();
-    } else if (rawData is DateTime) {
-      data = rawData;
-    } else if (rawData is String) {
-      data = DateTime.tryParse(rawData) ?? DateTime.now();
-    } else {
-      data = DateTime.now();
-    }
+    // Otimização de Performance usando asNameMap()
+    final destino =
+        GuardadoDestino.values.asNameMap()[map['destino']] ??
+        GuardadoDestino.semDestino;
 
-    final destinoRaw =
-        (map['destino'] as String?) ?? GuardadoDestino.semDestino.name;
-    final destino = GuardadoDestino.values.firstWhere(
-      (item) => item.name == destinoRaw,
-      orElse: () => GuardadoDestino.semDestino,
-    );
-
-    final tipoRaw =
-        (map['tipoMovimentacao'] as String?) ??
-        GuardadoTipoMovimentacao.aporte.name;
     final tipoMovimentacao =
-        GuardadoTipoMovimentacao.values.firstWhere(
-          (item) => item.name == tipoRaw,
-          orElse: () => GuardadoTipoMovimentacao.aporte,
-        );
+        GuardadoTipoMovimentacao.values.asNameMap()[map['tipoMovimentacao']] ??
+        GuardadoTipoMovimentacao.aporte;
 
     final observacao = (map['observacao'] as String?)?.trim();
     final metaNome = (map['metaNome'] as String?)?.trim();
+    final compRaw = (map['competencia'] as String?)?.trim() ?? '';
 
     return Guardado(
       id: id,
       valor: (map['valor'] as num?)?.toDouble() ?? 0,
       data: data,
-      competencia:
-          (map['competencia'] as String?)?.trim().isNotEmpty == true
-              ? (map['competencia'] as String).trim()
-              : competenciaFromDate(data),
+      competencia: compRaw.isNotEmpty ? compRaw : competenciaFromDate(data),
       destino: destino,
       tipoMovimentacao: tipoMovimentacao,
       metaNome: (metaNome == null || metaNome.isEmpty) ? null : metaNome,
-      observacao:
-          (observacao == null || observacao.isEmpty) ? null : observacao,
+      observacao: (observacao == null || observacao.isEmpty)
+          ? null
+          : observacao,
     );
   }
 
@@ -212,5 +193,13 @@ class Guardado {
       'metaNome': (meta == null || meta.isEmpty) ? null : meta,
       'observacao': (obs == null || obs.isEmpty) ? null : obs,
     };
+  }
+
+  static DateTime _parseDate(dynamic raw) {
+    if (raw == null) return DateTime.now();
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw) ?? DateTime.now();
+    return DateTime.now();
   }
 }

@@ -18,7 +18,7 @@ class DatabaseService implements FinanceRepository {
   buscarResumoParaNotificacao(DateTime data) async {
     final inicioDia = DateTime(data.year, data.month, data.day);
     final fimDia = inicioDia.add(const Duration(days: 1));
-
+    // Busca os gastos do dia
     final gastosSnap = await _gastosCollection
         .where('data', isGreaterThanOrEqualTo: inicioDia)
         .where('data', isLessThan: fimDia)
@@ -37,10 +37,12 @@ class DatabaseService implements FinanceRepository {
 
     double totalReceber = 0;
     final nomes = <String>[];
+
     for (final doc in receberSnap.docs) {
-      final valor = (doc.data()['valor'] as num).toDouble();
+      final dataDoc = doc.data();
+      final valor = (dataDoc['valor'] as num).toDouble();
       totalReceber += valor;
-      nomes.add("${doc.data()['nome']} (R\$ ${valor.toStringAsFixed(2)})");
+      nomes.add("${dataDoc['nome']} (R\$ ${valor.toStringAsFixed(2)})");
     }
 
     return (gastos: totalGastos, receber: totalReceber, nomesReceber: nomes);
@@ -807,29 +809,13 @@ class DatabaseService implements FinanceRepository {
       TextNormalizer.normalizeForSearch(texto);
 
   CategoriaGasto? _parseCategoria(dynamic raw) {
-    if (raw == null) {
-      return null;
-    }
-    final valor = raw.toString();
-    for (final item in CategoriaGasto.values) {
-      if (item.name == valor) {
-        return item;
-      }
-    }
-    return null;
+    if (raw == null) return null;
+    return CategoriaGasto.values.asNameMap()[raw.toString()];
   }
 
   TipoGasto? _parseTipo(dynamic raw) {
-    if (raw == null) {
-      return null;
-    }
-    final valor = raw.toString();
-    for (final item in TipoGasto.values) {
-      if (item.name == valor) {
-        return item;
-      }
-    }
-    return null;
+    if (raw == null) return null;
+    return TipoGasto.values.asNameMap()[raw.toString()];
   }
 
   Future<int> _gravarGastosSemHash(List<Gasto> gastos) async {

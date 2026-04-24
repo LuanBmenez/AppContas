@@ -25,15 +25,6 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
 
   DateTime _dataSelecionada = DateTime.now();
 
-  static const AppSemanticColors _fallbackSemanticColors = AppSemanticColors(
-    success: Color(0xFF0F9D7A),
-    successContainer: Color(0xFFE5F6F2),
-    warning: Color(0xFFC26A00),
-    warningContainer: Color(0xFFFFEED9),
-    error: Color(0xFFD64545),
-    errorContainer: Color(0xFFFDE8E8),
-  );
-
   @override
   void initState() {
     super.initState();
@@ -96,10 +87,6 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
     return AppSectionCard(child: child);
   }
 
-  AppSemanticColors _semanticColors(ThemeData theme) {
-    return theme.extension<AppSemanticColors>() ?? _fallbackSemanticColors;
-  }
-
   Widget _buildSectionTitle({required String title, required IconData icon}) {
     final theme = Theme.of(context);
     return Row(
@@ -150,7 +137,9 @@ class _NovoRecebivelScreenState extends State<NovoRecebivelScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final semantic = _semanticColors(theme);
+    // Usando a extensão global que criámos!
+    final semantic = context.semanticColors;
+
     final nomePreview = _nomeController.text.trim().isEmpty
         ? 'Sem nome'
         : _nomeController.text.trim();

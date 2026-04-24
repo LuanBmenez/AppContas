@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:paga_o_que_me_deve/core/di/service_locator.dart';
 import 'package:paga_o_que_me_deve/core/errors/app_exceptions.dart';
-import 'package:paga_o_que_me_deve/core/theme/app_tokens.dart';
+import 'package:paga_o_que_me_deve/core/theme/theme.dart';
 import 'package:paga_o_que_me_deve/core/utils/utils.dart';
 import 'package:paga_o_que_me_deve/core/widgets/widgets.dart';
 import 'package:paga_o_que_me_deve/domain/models/models.dart';
@@ -104,9 +104,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     final preferencias = await _categoriasService
         .carregarPreferenciasNovoGasto();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       _tipoSelecionado = preferencias.ultimoTipo ?? _tipoSelecionado;
@@ -120,9 +118,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     _categoriasSub = _categoriasService.categoriasPersonalizadas.listen((
       categorias,
     ) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       final categoriasAtivas = _categoriasService.categoriasAtivas(categorias);
 
@@ -171,9 +167,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     });
 
     _regrasSub = _categoriasService.regrasCategoriaImportacao.listen((regras) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       final sugestao = NovoGastoCategoriaController.sugerirPorTitulo(
         titulo: _tituloController?.text ?? '',
@@ -241,17 +235,13 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   void _sincronizarSugestaoPorTitulo({required bool aplicarAutomaticamente}) {
     final sugestao = _calcularSugestaoPorTitulo();
 
-    if (!mounted || _isDisposed) {
-      return;
-    }
+    if (!mounted || _isDisposed) return;
 
     setState(() {
       _categoriaSugerida = sugestao.categoriaPadrao;
       _categoriaPersonalizadaSugeridaId = sugestao.categoriaPersonalizadaId;
 
-      if (!aplicarAutomaticamente) {
-        return;
-      }
+      if (!aplicarAutomaticamente) return;
 
       if (sugestao.categoriaPersonalizadaId != null) {
         _categoriaPersonalizadaSelecionadaId =
@@ -268,9 +258,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     final valor = _valorAtualOuNull();
 
     if (titulo.length < 3 || valor == null || valor <= 0) {
-      if (!mounted || _isDisposed) {
-        return;
-      }
+      if (!mounted || _isDisposed) return;
       setState(() {
         _possiveisDuplicados = 0;
         _carregandoDuplicados = false;
@@ -278,9 +266,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       return;
     }
 
-    if (!mounted || _isDisposed) {
-      return;
-    }
+    if (!mounted || _isDisposed) return;
     setState(() => _carregandoDuplicados = true);
 
     try {
@@ -291,18 +277,14 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
             data: _dataSelecionada,
           );
 
-      if (!mounted || _isDisposed) {
-        return;
-      }
+      if (!mounted || _isDisposed) return;
 
       setState(() {
         _carregandoDuplicados = false;
         _possiveisDuplicados = duplicados;
       });
     } catch (_) {
-      if (!mounted || _isDisposed) {
-        return;
-      }
+      if (!mounted || _isDisposed) return;
 
       setState(() {
         _carregandoDuplicados = false;
@@ -315,9 +297,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
     final titulo = _tituloController?.text.trim() ?? '';
 
     if (titulo.length < 3) {
-      if (!mounted || _isDisposed) {
-        return;
-      }
+      if (!mounted || _isDisposed) return;
 
       setState(() {
         _carregandoSugestaoRecorrencia = false;
@@ -326,16 +306,12 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       return;
     }
 
-    if (!mounted || _isDisposed) {
-      return;
-    }
+    if (!mounted || _isDisposed) return;
     setState(() => _carregandoSugestaoRecorrencia = true);
 
     final sugestao = await _gastosService.sugerirRecorrenciaPorTitulo(titulo);
 
-    if (!mounted || _isDisposed) {
-      return;
-    }
+    if (!mounted || _isDisposed) return;
 
     setState(() {
       _carregandoSugestaoRecorrencia = false;
@@ -425,9 +401,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       helpText: 'Escolha a data do gasto',
     );
 
-    if (novaData == null) {
-      return;
-    }
+    if (novaData == null) return;
 
     setState(() => _dataSelecionada = novaData);
     _agendarVerificacaoDuplicados();
@@ -458,9 +432,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
   }
 
   Future<void> _salvarGasto() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _salvando = true);
 
@@ -497,19 +469,16 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
         tipo: _tipoSelecionado,
       );
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       Navigator.pop(context);
       AppFeedback.showSuccess(context, 'Gasto salvo com sucesso.');
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       final exception = AppException.from(e);
       AppFeedback.showError(context, exception.message);
+    } finally {
+      if (mounted) setState(() => _salvando = false);
     }
   }
 
@@ -521,9 +490,7 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       builder: (dialogContext) => const _NovaCategoriaDialog(),
     );
 
-    if (!mounted || result == null) {
-      return;
-    }
+    if (!mounted || result == null) return;
 
     final nome = result.nome.trim();
 
@@ -571,6 +538,8 @@ class _NovoGastoScreenState extends State<NovoGastoScreen> {
       if (!mounted) return;
       final exception = AppException.from(e);
       AppFeedback.showError(context, exception.message);
+    } finally {
+      if (mounted) setState(() => _salvandoCategoria = false);
     }
   }
 
@@ -1150,9 +1119,9 @@ class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
             const SizedBox(height: AppSpacing.s12),
             Text(
               'Cor',
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: AppSpacing.s8),
             Wrap(
@@ -1176,7 +1145,9 @@ class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
                       color: cor,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: selecionada ? Colors.black : Colors.transparent,
+                        color: selecionada
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Colors.transparent,
                         width: 2,
                       ),
                     ),
@@ -1187,9 +1158,9 @@ class _NovaCategoriaDialogState extends State<_NovaCategoriaDialog> {
             const SizedBox(height: AppSpacing.s12),
             Text(
               'Ícone',
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: AppSpacing.s8),
             Wrap(

@@ -39,15 +39,6 @@ class _GastosScreenState extends State<GastosScreen> {
   bool _processandoLote = false;
   final Set<String> _idsSelecionados = <String>{};
 
-  static const AppSemanticColors _fallbackSemanticColors = AppSemanticColors(
-    success: Color(0xFF0F9D7A),
-    successContainer: Color(0xFFE5F6F2),
-    warning: Color(0xFFC26A00),
-    warningContainer: Color(0xFFFFEED9),
-    error: Color(0xFFD64545),
-    errorContainer: Color(0xFFFDE8E8),
-  );
-
   DateTime get _inicioMes =>
       DateTime(_mesSelecionado.year, _mesSelecionado.month);
 
@@ -106,10 +97,6 @@ class _GastosScreenState extends State<GastosScreen> {
   String _formatarMes(DateTime date) => AppFormatters.mesAno(date);
 
   String _formatarValor(double valor) => AppFormatters.moeda(valor);
-
-  AppSemanticColors _semanticColors(ThemeData theme) {
-    return theme.extension<AppSemanticColors>() ?? _fallbackSemanticColors;
-  }
 
   void _setStatePreservandoScroll(VoidCallback fn) {
     final tinhaClientes = _listController.hasClients;
@@ -416,15 +403,11 @@ class _GastosScreenState extends State<GastosScreen> {
       },
     );
 
-    if (confirmar != true) {
-      return;
-    }
+    if (confirmar != true) return;
 
     try {
       await _gastosService.atualizarGasto(
-        gasto.copyWith(
-          categoria: categoriaSelecionada,
-        ),
+        gasto.copyWith(categoria: categoriaSelecionada),
       );
 
       if (aprenderRegra) {
@@ -434,18 +417,11 @@ class _GastosScreenState extends State<GastosScreen> {
         );
       }
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       AppFeedback.showSuccess(context, 'Categoria atualizada com sucesso.');
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (!mounted) return;
+      AppFeedback.showError(context, AppException.from(e).message);
     }
   }
 
@@ -478,9 +454,7 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   void _marcarTodos(List<Gasto> gastos) {
-    if (gastos.isEmpty) {
-      return;
-    }
+    if (gastos.isEmpty) return;
 
     _setStatePreservandoScroll(() {
       _selecionandoLote = true;
@@ -495,9 +469,7 @@ class _GastosScreenState extends State<GastosScreen> {
   }
 
   Future<void> _excluirSelecionados(List<Gasto> selecionados) async {
-    if (selecionados.isEmpty || _processandoLote) {
-      return;
-    }
+    if (selecionados.isEmpty || _processandoLote) return;
 
     final confirmar = await AppConfirmDialog.show(
       context,
@@ -505,42 +477,29 @@ class _GastosScreenState extends State<GastosScreen> {
       message: 'Deseja excluir ${selecionados.length} gastos selecionados?',
     );
 
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     setState(() => _processandoLote = true);
 
     try {
       await _gastosService.deletarGastosEmLote(selecionados);
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       AppFeedback.showSuccess(
         context,
         '${selecionados.length} gastos excluídos.',
       );
       _encerrarSelecaoLote();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (!mounted) return;
+      AppFeedback.showError(context, AppException.from(e).message);
     } finally {
-      if (mounted) {
-        setState(() => _processandoLote = false);
-      }
+      if (mounted) setState(() => _processandoLote = false);
     }
   }
 
   Future<void> _alterarCategoriaSelecionados(List<Gasto> selecionados) async {
-    if (selecionados.isEmpty || _processandoLote) {
-      return;
-    }
+    if (selecionados.isEmpty || _processandoLote) return;
 
     var categoriaSelecionada = CategoriaGasto.outros;
 
@@ -587,9 +546,7 @@ class _GastosScreenState extends State<GastosScreen> {
       },
     );
 
-    if (confirmar != true) {
-      return;
-    }
+    if (confirmar != true) return;
 
     setState(() => _processandoLote = true);
 
@@ -599,33 +556,22 @@ class _GastosScreenState extends State<GastosScreen> {
         categoria: categoriaSelecionada,
       );
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       AppFeedback.showSuccess(
         context,
         'Categoria atualizada em ${selecionados.length} gastos.',
       );
       _encerrarSelecaoLote();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (!mounted) return;
+      AppFeedback.showError(context, AppException.from(e).message);
     } finally {
-      if (mounted) {
-        setState(() => _processandoLote = false);
-      }
+      if (mounted) setState(() => _processandoLote = false);
     }
   }
 
   Future<void> _alterarTipoSelecionados(List<Gasto> selecionados) async {
-    if (selecionados.isEmpty || _processandoLote) {
-      return;
-    }
+    if (selecionados.isEmpty || _processandoLote) return;
 
     var tipoSelecionado = TipoGasto.variavel;
 
@@ -672,9 +618,7 @@ class _GastosScreenState extends State<GastosScreen> {
       },
     );
 
-    if (confirmar != true) {
-      return;
-    }
+    if (confirmar != true) return;
 
     setState(() => _processandoLote = true);
 
@@ -684,54 +628,39 @@ class _GastosScreenState extends State<GastosScreen> {
         tipo: tipoSelecionado,
       );
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       AppFeedback.showSuccess(
         context,
         'Tipo atualizado em ${selecionados.length} gastos.',
       );
       _encerrarSelecaoLote();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (!mounted) return;
+      AppFeedback.showError(context, AppException.from(e).message);
     } finally {
-      if (mounted) {
-        setState(() => _processandoLote = false);
-      }
+      if (mounted) setState(() => _processandoLote = false);
     }
   }
 
   Future<void> _excluirItem(Gasto gasto) async {
     final confirmar = await _confirmarExclusao(gasto);
-    if (!confirmar) {
-      return;
-    }
+    if (!confirmar) return;
 
     try {
       await _gastosService.deletarGasto(gasto.id);
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppFeedback.showSuccess(context, 'Gasto excluído com sucesso.');
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      final exception = AppException.from(e);
-      AppFeedback.showError(context, exception.message);
+      if (!mounted) return;
+      AppFeedback.showError(context, AppException.from(e).message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final semantic = _semanticColors(theme);
+    // 1. Uso limpo das Semantic Colors Globais
+    final semantic = context.semanticColors;
 
     return StreamBuilder<List<Gasto>>(
       stream: _obterGastosStream(),
@@ -759,10 +688,11 @@ class _GastosScreenState extends State<GastosScreen> {
             .toList();
         final selecionados = _selecionadosDe(gastosFiltrados);
 
-        double totalGasto = 0;
-        for (final gasto in gastosFiltrados) {
-          totalGasto += gasto.valor;
-        }
+        // 2. Otimização idiomática em Dart usando fold
+        final totalGasto = gastosFiltrados.fold<double>(
+          0.0,
+          (soma, gasto) => soma + gasto.valor,
+        );
 
         if (gastosFiltrados.isEmpty) {
           return LayoutBuilder(
